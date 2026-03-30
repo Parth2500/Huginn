@@ -1,0 +1,5 @@
+<span style="display: flex;" [ngClass]="{ownContainer: message.user?.Id === user.Id}">
+  <p [ngClass]="{ownMessage: message.user?.Id === user.Id}">
+    <em>{{message.user?.username}}</em> <br /> {{message.text}}
+  </p>
+</span>

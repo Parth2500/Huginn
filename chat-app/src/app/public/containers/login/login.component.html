@@ -1,0 +1,45 @@
+<div class="container">
+  <mat-card>
+    <mat-card-header>
+      <mat-card-title>Login</mat-card-title>
+    </mat-card-header>
+    <mat-card-content>
+      <form [formGroup]="loginForm" (ngSubmit)="login()">
+        <mat-form-field>
+          <mat-label>Email</mat-label>
+          <input
+            type="email"
+            matInput
+            placeholder="john.doe@mail.com"
+            formControlName="email"
+          />
+          <mat-error>
+            <p *ngIf="email.hasError('required')">Email is required field.</p>
+          </mat-error>
+        </mat-form-field>
+        <mat-form-field>
+          <mat-label>Password</mat-label>
+          <input type="password" matInput formControlName="password" />
+          <mat-error>
+            <p *ngIf="password.hasError('required')">
+              Password is required field.
+            </p>
+          </mat-error>
+        </mat-form-field>
+        <button
+          mat-flat-button
+          color="primary"
+          type="submit"
+          [disabled]="!loginForm.valid"
+        >
+          Login
+        </button>
+      </form>
+    </mat-card-content>
+    <mat-card-footer>
+      <p>
+        Don't have an account? <a [routerLink]="['/public/register']">Sign Up</a>
+      </p>
+    </mat-card-footer>
+  </mat-card>
+</div>

@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  chat-api:
+    build:
+      dockerfile: Dockerfile
+      context: ./chat-api
+      target: development
+    command: npm run start:debug
+    volumes:
+      - ./chat-api:/chat-demo/api/src/app
+    depends_on:
+      - postgres
+    environment:
+      DATABASE_URL: postgres://user:password@postgres:5432/db
+      NODE_ENV: development
+      JWT_SECRET: 1vYD^T2we%aVKc3t!8T5
+      PORT: 3000
+    ports:
+      - 3000:3000
+      - 9229:9229
+  
+  chat-app:
+    build:
+      dockerfile: Dockerfile
+      context: ./chat-app
+      target: development
+    command: npm run start
+    volumes:
+      - ./chat-app:/chat-demo/app/src/app
+    ports:
+      - 4200:4200
+    links:
+      - chat-api
+
+  postgres:
+    image: postgres:15.2
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+    ports:
+      - 35000:5432
+
+  postgres_admin:
+    image: dpage/pgadmin4:7.1
+    depends_on:
+      - postgres
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - 5050:80

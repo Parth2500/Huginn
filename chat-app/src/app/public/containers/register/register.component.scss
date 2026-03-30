@@ -1,0 +1,30 @@
+.container {
+  display: flex;
+  justify-content: center;
+  margin: 64px;
+  min-width: 350px;
+
+  mat-card {
+    mat-card-header {
+      margin: 16px;
+      display: flex;
+      justify-content: center;
+    }
+    mat-card-content {
+      form {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        mat-form-field {
+          width: 100%;
+          min-width: 480px;
+        }
+      }
+    }
+    mat-card-footer {
+      display: flex;
+      justify-content: center;
+      margin-top: 16px;
+    }
+  }
+}
