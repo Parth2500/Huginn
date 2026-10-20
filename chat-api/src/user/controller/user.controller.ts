@@ -8,9 +8,11 @@ import {
   Delete,
   Inject,
   Query,
+  Req,
 } from '@nestjs/common';
 import { Pagination } from 'nestjs-typeorm-paginate';
-import { map, Observable, switchMap } from 'rxjs';
+import { map, Observable, of, switchMap } from 'rxjs';
+import { RequestModel } from 'src/middleware/auth.middleware';
 import { CreateUserDto } from '../dto/create-user.dto';
 import { LoginUserDto } from '../dto/login-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
@@ -54,6 +56,16 @@ export class UserController {
     });
   }
 
+  // Declared before ':id' so "search" is not read as an id.
+  @Get('search')
+  search(@Query('q') q = '', @Req() req: RequestModel): Observable<IUser[]> {
+    const query = q.trim();
+    if (!query) {
+      return of([]);
+    }
+    return this.userService.searchByUsername(query.slice(0, 50), req.user?.Id);
+  }
+
   @Get(':id')
   findById(@Param('id') id: string) {
     return this.userService.findById(+id);
@@ -88,7 +100,7 @@ export class UserController {
             const response: LoginResponse = {
               access_token: jwt,
               type: 'JWT',
-              expires_in: 36000,
+              expires_in: 3600, // matches signOptions.expiresIn ('1h')
             };
             return response;
           }),

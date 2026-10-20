@@ -1,7 +1,7 @@
 import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
-import { Repository, UpdateResult } from 'typeorm';
+import { ILike, Not, Repository, UpdateResult } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { IUser } from '../entities/user.interface';
 import { IUserService } from './iservices/user.service.interface';
@@ -31,7 +31,18 @@ export class UserService implements IUserService {
 
   //#region create
   create(createUser: IUser): Observable<IUser> {
-    return this.isMailExists(createUser.email).pipe(
+    createUser.email = createUser.email.trim().toLowerCase();
+    createUser.username = createUser.username.trim();
+    return this.isUsernameTaken(createUser.username).pipe(
+      switchMap((taken: boolean) => {
+        if (taken) {
+          throw new HttpException(
+            'That username is taken. Try another one.',
+            HttpStatus.CONFLICT,
+          );
+        }
+        return this.isMailExists(createUser.email);
+      }),
       switchMap((exists: boolean) => {
         if (!exists) {
           return this.passwordService.hashPassword(createUser.password).pipe(
@@ -127,6 +138,20 @@ export class UserService implements IUserService {
       }),
     );
   }
+  /** Case-insensitive prefix match on username, excluding the searcher. */
+  searchByUsername(query: string, excludeId?: number): Observable<IUser[]> {
+    const escaped = query.replace(/[\\%_]/g, (c) => `\\${c}`);
+    return from(
+      this.userRepository.find({
+        where: {
+          username: ILike(`${escaped}%`),
+          ...(excludeId ? { Id: Not(excludeId) } : {}),
+        },
+        order: { username: 'ASC' },
+        take: 8,
+      }),
+    );
+  }
   //#endregion
 
   //#region update
@@ -162,6 +187,14 @@ export class UserService implements IUserService {
   //#endregion
 
   //#region utility
+  /** Usernames are unique regardless of case, so "maya" and "Maya" can't both exist. */
+  private isUsernameTaken(username: string): Observable<boolean> {
+    const escaped = username.replace(/[\\%_]/g, (c) => `\\${c}`);
+    return from(
+      this.userRepository.count({ where: { username: ILike(escaped) } }),
+    ).pipe(map((count: number) => count > 0));
+  }
+
   private isMailExists(email: string): Observable<boolean> {
     return from(
       this.userRepository.findOne({
@@ -176,7 +209,7 @@ export class UserService implements IUserService {
 
   //#region  login
   login(loginUser: IUser): Observable<string> {
-    return this.findByEmailForLogin(loginUser.email).pipe(
+    return this.findByEmailForLogin(loginUser.email.trim().toLowerCase()).pipe(
       switchMap((foundUser: IUser) => {
         if (foundUser) {
           return this.passwordService

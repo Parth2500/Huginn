@@ -10,6 +10,7 @@ export interface IUserService {
   findByEmail(email: string): Observable<IUser>;
   findByEmailForLogin(email: string): Observable<IUser>;
   findByUserName(username: string): Observable<IUser>;
+  searchByUsername(query: string, excludeId?: number): Observable<IUser[]>;
   update(id: number, updateUser: IUser): Observable<IUser>;
   removeById(id: number): Observable<IUser>;
   login(loginUser: IUser): Observable<string>;
