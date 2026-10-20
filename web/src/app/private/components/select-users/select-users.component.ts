@@ -7,7 +7,7 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
     selector: 'app-select-users',
     templateUrl: './select-users.component.html',
     styleUrls: ['./select-users.component.scss'],

@@ -1,48 +1,62 @@
-import { formatDate, NgClass, SlicePipe } from '@angular/common';
-import { AfterViewInit, Component, ElementRef, LOCALE_ID, OnChanges, OnDestroy, OnInit, SimpleChanges, inject, input, output, viewChild, ChangeDetectionStrategy } from '@angular/core';
-import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { Subscription } from 'rxjs';
-import { IMessage } from 'src/app/models/message.interface';
-import { IRoom } from 'src/app/models/room.interface';
-import { IUser } from 'src/app/models/user.interface';
+import { NgClass, SlicePipe, formatDate } from '@angular/common';
 import {
-  ChatToken,
-  ConnectionState,
-  IChatService,
-} from '../../services/iservices/chat.service.interface';
-import { personName, roomPartner, roomTitle } from '../../helpers/room-display';
-import { IconComponent } from '../../../shared/icon/icon.component';
+  AfterViewInit,
+  ChangeDetectionStrategy,
+  Component,
+  DestroyRef,
+  ElementRef,
+  LOCALE_ID,
+  computed,
+  effect,
+  inject,
+  input,
+  output,
+  signal,
+  untracked,
+  viewChild,
+} from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { ChatMessage, OpenChat } from 'src/app/models/chat.interface';
+import { IUser } from 'src/app/models/user.interface';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
-import { ChatMessageComponent } from '../chat-message/chat-message.component';
-import { TonePipe, InitialsPipe } from '../../../shared/pipes/avatar.pipes';
+import { IconComponent } from '../../../shared/icon/icon.component';
+import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
+import { chatPartner, chatTitle, personName } from '../../helpers/chat-display';
+import { ChatService, ConnectionState } from '../../services/chat.service';
+import { MessagesStore } from '../../state/messages.store';
+import { OutboxStore } from '../../state/outbox.store';
+import { ChatMessageComponent } from '../chat-message/chat-message.component';
 
 /** Consecutive messages from one person within this window share a bubble group. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
-/** A send with no server echo after this long is flagged as not confirmed. */
-const STALL_MS = 10 * 1000;
 /** Within this distance of the bottom, the stream follows new content. */
 const PIN_THRESHOLD_PX = 160;
 /** How long a "typing" ping keeps someone listed as typing. */
 const TYPING_TTL_MS = 3500;
 /** Minimum gap between our own typing pings. */
 const TYPING_THROTTLE_MS = 2000;
-
-interface PendingMessage {
-  tempId: number;
-  text: string;
-  created_at: Date;
-  stalled: boolean;
-}
+/** How long a message that just arrived keeps its highlight. */
+const FRESH_MS = 1000;
 
 export type MessageStatus = 'pending' | 'stalled' | 'sent' | null;
+
+/** What a bubble shows: a stored message, or one still in the outbox. */
+export interface ShownMessage {
+  id?: number;
+  text: string | null;
+  sender: IUser | null;
+  createdAt: string;
+  deleted: boolean;
+}
 
 export type StreamRow =
   | { kind: 'day'; key: string; label: string }
   | {
       kind: 'message';
       key: string;
-      message: IMessage;
+      message: ShownMessage;
       own: boolean;
       first: boolean;
       last: boolean;
@@ -51,11 +65,11 @@ export type StreamRow =
     };
 
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
-    selector: 'app-chat-room',
-    templateUrl: './chat-room.component.html',
-    styleUrls: ['./chat-room.component.scss'],
-    imports: [
+  selector: 'app-chat-room',
+  templateUrl: './chat-room.component.html',
+  styleUrls: ['./chat-room.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  imports: [
     IconComponent,
     AvatarComponent,
     NgClass,
@@ -65,17 +79,19 @@ export type StreamRow =
     SlicePipe,
     TonePipe,
     InitialsPipe,
-    DisplayNamePipe
-],
+    DisplayNamePipe,
+  ],
 })
-export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDestroy {
-  private chatService = inject<IChatService>(ChatToken);
+export class ChatRoomComponent implements AfterViewInit {
+  private chatService = inject(ChatService);
+  private messagesStore = inject(MessagesStore);
+  private outbox = inject(OutboxStore);
   private locale = inject(LOCALE_ID);
 
-  readonly chatRoom = input.required<IRoom>();
+  readonly chat = input.required<OpenChat>();
   readonly me = input<IUser>({});
   readonly connection = input<ConnectionState>('connecting');
-  readonly onlineIds = input<Set<number> | null>(null);
+  readonly onlineIds = input<Set<number>>(new Set());
   readonly back = output<void>();
   /** A name or photo was clicked: show that person's profile. */
   readonly openProfile = output<IUser>();
@@ -84,123 +100,144 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
 
   chatMessage: FormControl<string | null> = new FormControl('');
 
-  loaded = false;
-  total = 0;
-  rows: StreamRow[] = [];
-  /** Messages from others that arrived while the reader was scrolled up. */
-  unseen = 0;
-  loadingOlder = false;
-  /** Who is typing right now, by user id. */
-  typing = new Map<number, { username: string; timer: ReturnType<typeof setTimeout> }>();
+  readonly chatId = computed(() => this.chat().id);
+  /** Not saved yet: the chat is created when the first message is sent. */
+  readonly isDraft = computed(() => this.chatId() === undefined);
+  /** In a direct chat the other person stands in for the chat's avatar and name. */
+  readonly partner = computed(() => chatPartner(this.chat(), this.me()));
+  readonly title = computed(() => chatTitle(this.chat(), this.me()));
+  readonly otherMembers = computed(() => this.chat().members.filter((u) => u.Id !== this.me().Id));
+  readonly onlineOthers = computed(() =>
+    this.otherMembers().filter((u) => this.onlineIds().has(u.Id!)),
+  );
 
-  private history: IMessage[] = [];
-  private pending: PendingMessage[] = [];
-  private freshIds = new Set<number>();
-  private nextTempId = -1;
-  private subscription = new Subscription();
+  /** Which conversation is open; changes only when the chat or the draft's person does. */
+  private readonly conversation = computed(
+    () => ({
+      id: this.chatId(),
+      partnerId: this.chat().kind === 'direct' ? this.partner()?.Id : undefined,
+    }),
+    { equal: (a, b) => a.id === b.id && a.partnerId === b.partnerId },
+  );
+
+  private readonly history = computed(() => this.messagesStore.history(this.chatId()));
+  readonly loaded = computed(() => this.isDraft() || !!this.history()?.loaded);
+  /** Older messages exist on the server: offer to load them. */
+  readonly truncated = computed(() => this.loaded() && !!this.history()?.hasMore);
+
+  /** This chat's sends still in the outbox, including a draft's first message. */
+  private readonly pending = computed(() => {
+    const id = this.chatId();
+    const partnerId = this.chat().kind === 'direct' ? this.partner()?.Id : undefined;
+    return this.outbox
+      .entries()
+      .filter(
+        (e) =>
+          (id !== undefined && e.chatId === id) ||
+          (partnerId !== undefined && e.toUserId === partnerId),
+      );
+  });
+
+  readonly rows = computed(() => this.buildRows());
+
+  /** Messages from others that arrived while the reader was scrolled up. */
+  readonly unseen = signal(0);
+  readonly loadingOlder = signal(false);
+  /** Who is typing right now, by user id. */
+  private readonly typing = signal(new Map<number, string>());
+  private readonly freshIds = signal(new Set<number>());
+
+  readonly membersLabel = computed(() => {
+    const others = this.otherMembers().map((u) => personName(u));
+    return others.length ? `Members: you, ${others.join(', ')}` : 'Members: only you';
+  });
+
+  /** "maya is typing…", "maya and sam are typing…", or "3 people are typing…". */
+  readonly typingLabel = computed(() => {
+    const names = [...this.typing().values()];
+    if (names.length === 0) {
+      return null;
+    }
+    if (names.length === 1) {
+      return `${names[0]} is typing…`;
+    }
+    if (names.length === 2) {
+      return `${names[0]} and ${names[1]} are typing…`;
+    }
+    return `${names.length} people are typing…`;
+  });
+
+  readonly statusLine = computed(() => {
+    const partner = this.partner();
+    if (partner) {
+      const online = this.onlineIds().has(partner.Id!) || partner.online;
+      return `@${partner.username} · ${online ? 'online' : 'offline'}`;
+    }
+    const others = this.otherMembers().length;
+    const online = this.onlineOthers().length;
+    const presence = online > 0 ? `${online} of ${others} others online` : `${others + 1} members`;
+    const description = this.chat().description;
+    return description ? `${description} · ${presence}` : presence;
+  });
+
   private pinned = true;
   private resizeObserver?: ResizeObserver;
-  private pagesLoaded = 1;
-  /** Set the moment the server creates the chat for our first message to a draft. */
-  private createdRoomId: number | undefined;
   private lastTypingSent = 0;
+  private typingTimers = new Map<number, ReturnType<typeof setTimeout>>();
+  /** Newest message id already on screen, to tell live arrivals from history. */
+  private newestShown = 0;
 
-  ngOnInit() {
-    this.subscription.add(
-      this.chatService.getMessages().subscribe((page) => {
-        if (page.roomId !== undefined && page.roomId !== this.roomId) {
-          return;
-        }
-        this.history = [...page.items].sort(byCreatedAt);
-        this.reconcilePending();
-        this.total = page.meta.totalItems;
-        this.loaded = true;
-        this.rebuild();
-        this.scrollToBottom(true);
-      })
-    );
-    this.subscription.add(
-      this.chatService.getAddedMessage().subscribe((message) => this.onAdded(message))
-    );
-    this.subscription.add(
-      this.chatService.getOlderMessages().subscribe((page) => {
-        if (page.roomId !== this.roomId) {
-          return;
-        }
-        this.prependOlder(page.items);
-      })
-    );
-    this.subscription.add(
-      this.chatService.getTyping().subscribe(({ roomId, user }) => {
-        if (roomId !== this.roomId || user.Id === this.me().Id) {
-          return;
-        }
-        clearTimeout(this.typing.get(user.Id)?.timer);
-        const timer = setTimeout(() => this.typing.delete(user.Id), TYPING_TTL_MS);
-        this.typing.set(user.Id, { username: personName(user), timer });
-      })
-    );
-    this.subscription.add(
-      this.chatService.getUserUpdated().subscribe((updated) => {
-        // Names and photos on messages already on screen follow profile changes.
-        this.history = this.history.map((m) =>
-          m.user?.Id === updated.Id ? { ...m, user: { ...m.user, ...updated } } : m
-        );
-        // Our own profile arrives through the `me` input, which the dashboard keeps current.
-        this.rebuild();
-      })
-    );
-    this.subscription.add(
-      this.chatService.getDirectRoomCreated().subscribe(({ room, partnerId }) => {
-        // Our first message turned this draft into a real chat; the server already opened it for us.
-        if (this.isDraft && this.partner?.Id === partnerId) {
-          this.createdRoomId = room.id;
-        }
-      })
-    );
-  }
+  constructor() {
+    const destroyRef = inject(DestroyRef);
 
-  ngOnChanges(changes: SimpleChanges) {
-    const change = changes['chatRoom'];
-    if (!change) {
-      return;
-    }
-    const previous: IRoom | undefined = change.previousValue;
-    const next: IRoom | undefined = this.chatRoom();
-    if (previous?.id !== undefined && previous.id === next?.id) {
-      return;
-    }
-    // A draft that just became a real chat keeps its messages; the server joined us already.
-    if (previous && previous.id === undefined && next?.id !== undefined && next.id === this.createdRoomId) {
-      return;
-    }
-    const me = this.me();
-    if (previous?.id === undefined && next?.id === undefined &&
-        roomPartner(previous, me)?.Id === roomPartner(next, me)?.Id) {
-      return;
-    }
-    if (previous?.id !== undefined) {
-      this.chatService.leaveRoom(previous);
-    }
-    this.createdRoomId = undefined;
-    this.history = [];
-    this.pending = [];
-    this.freshIds.clear();
-    this.loaded = false;
-    this.total = 0;
-    this.rows = [];
-    this.unseen = 0;
-    this.pinned = true;
-    this.pagesLoaded = 1;
-    this.loadingOlder = false;
-    this.clearTyping();
-    this.chatMessage.reset('');
-    if (next?.id !== undefined) {
-      this.chatService.joinRoom(next);
-    } else {
-      // A draft: nothing to load until the first message is sent.
-      this.loaded = true;
-    }
+    // Opening a chat (and switching between chats) resets the view and asks for the latest page.
+    // A draft becoming its real chat is the same conversation: the composer keeps its text.
+    let previousPartner: number | undefined;
+    effect((onCleanup) => {
+      const { id, partnerId } = this.conversation();
+      const sameConversation = partnerId !== undefined && partnerId === previousPartner;
+      previousPartner = partnerId;
+      if (!sameConversation) {
+        untracked(() => this.resetView());
+      }
+      if (id === undefined) {
+        return;
+      }
+      void this.chatService.openChat(id);
+      onCleanup(() => this.chatService.closeChat(id));
+    });
+
+    // New messages: follow them when at the bottom, otherwise count them; mark them read.
+    effect(() => {
+      const messages = this.history()?.messages ?? [];
+      const pendingCount = this.pending().length;
+      untracked(() => this.onStreamChanged(messages, pendingCount));
+    });
+
+    this.chatService.typing.pipe(takeUntilDestroyed()).subscribe(({ chatId, user }) => {
+      if (chatId !== this.chatId() || user.Id === this.me().Id) {
+        return;
+      }
+      clearTimeout(this.typingTimers.get(user.Id));
+      this.typingTimers.set(
+        user.Id,
+        setTimeout(() => this.stopTyping(user.Id), TYPING_TTL_MS),
+      );
+      this.typing.update((map) => new Map(map).set(user.Id, personName(user)));
+    });
+
+    const onVisible = () => {
+      const id = this.chatId();
+      if (document.visibilityState === 'visible' && id !== undefined) {
+        this.chatService.markRead(id);
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    destroyRef.onDestroy(() => {
+      document.removeEventListener('visibilitychange', onVisible);
+      this.clearTyping();
+      this.resizeObserver?.disconnect();
+    });
   }
 
   ngAfterViewInit() {
@@ -218,18 +255,9 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     if (el.firstElementChild) {
       this.resizeObserver.observe(el.firstElementChild);
     }
-    // On wide screens the composer is ready for typing as soon as a room opens.
+    // On wide screens the composer is ready for typing as soon as a chat opens.
     if (window.matchMedia('(min-width: 768px)').matches) {
       setTimeout(() => this.composer()?.nativeElement.focus());
-    }
-  }
-
-  ngOnDestroy() {
-    this.clearTyping();
-    this.resizeObserver?.disconnect();
-    this.subscription.unsubscribe();
-    if (this.roomId !== undefined) {
-      this.chatService.leaveRoom({ id: this.roomId });
     }
   }
 
@@ -237,116 +265,49 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     return !!this.chatMessage.value?.trim();
   }
 
-  get truncated(): boolean {
-    return this.loaded && this.total > this.history.length;
-  }
-
-  get shownCount(): number {
-    return this.history.length;
-  }
-
-  get membersLabel(): string {
-    const others = this.otherMembers.map((u) => personName(u));
-    return others.length ? `Members: you, ${others.join(', ')}` : 'Members: only you';
-  }
-
-  get onlineOthers(): IUser[] {
-    return this.otherMembers.filter((u) => this.onlineIds()?.has(u.Id!));
-  }
-
-  /** "maya is typing…", "maya and sam are typing…", or "3 people are typing…". */
-  get typingLabel(): string | null {
-    const names = [...this.typing.values()].map((t) => t.username);
-    if (names.length === 0) {
-      return null;
-    }
-    if (names.length === 1) {
-      return `${names[0]} is typing…`;
-    }
-    if (names.length === 2) {
-      return `${names[0]} and ${names[1]} are typing…`;
-    }
-    return `${names.length} people are typing…`;
-  }
-
-  get statusLine(): string {
-    const partner = this.partner;
-    if (partner) {
-      const online = this.onlineIds()?.has(partner.Id!) || partner.online;
-      return `@${partner.username} · ${online ? 'online' : 'offline'}`;
-    }
-    const others = this.otherMembers.length;
-    const online = this.onlineOthers.length;
-    const presence = online > 0 ? `${online} of ${others} others online` : `${others + 1} members`;
-    const chatRoom = this.chatRoom();
-    return chatRoom?.description ? `${chatRoom.description} · ${presence}` : presence;
-  }
-
-  /** In a direct chat the other person stands in for the room's avatar and name. */
-  get partner(): IUser | undefined {
-    return roomPartner(this.chatRoom(), this.me());
-  }
-
-  get title(): string {
-    return roomTitle(this.chatRoom(), this.me());
-  }
-
-  /** Not saved yet: the chat is created when the first message is sent. */
-  get isDraft(): boolean {
-    return this.chatRoom()?.id === undefined && this.createdRoomId === undefined;
-  }
-
-  /** The saved chat's id, including one just created from this draft. */
-  get roomId(): number | undefined {
-    return this.chatRoom()?.id ?? this.createdRoomId;
-  }
-
-  get otherMembers(): IUser[] {
-    return (this.chatRoom()?.users ?? []).filter((u) => u.Id !== this.me().Id);
-  }
-
   sendMessage() {
     const text = this.chatMessage.value?.trim();
     if (!text) {
       return;
     }
-    const pending: PendingMessage = { tempId: this.nextTempId--, text, created_at: new Date(), stalled: false };
-    this.pending.push(pending);
-    const directTo = this.isDraft ? this.partner?.Id : undefined;
-    setTimeout(() => {
-      if (this.pending.includes(pending)) {
-        pending.stalled = true;
-        this.rebuild();
-      }
-    }, STALL_MS);
-    if (directTo !== undefined) {
-      this.chatService.sendDirectMessage(directTo, text);
-    } else {
-      this.chatService.sendMessage({ text, room: { id: this.roomId } });
+    const id = this.chatId();
+    const partnerId = this.partner()?.Id;
+    if (id !== undefined) {
+      this.chatService.send({ chatId: id }, text);
+    } else if (partnerId !== undefined) {
+      this.chatService.send({ toUserId: partnerId }, text);
     }
     this.chatMessage.reset('');
     this.resizeComposer();
-    this.rebuild();
     this.scrollToBottom(true);
   }
 
   onComposerInput() {
     this.resizeComposer();
     const now = Date.now();
-    const roomId = this.roomId;
-    if (roomId !== undefined && this.chatMessage.value?.trim() && now - this.lastTypingSent > TYPING_THROTTLE_MS) {
+    const id = this.chatId();
+    if (id !== undefined && this.chatMessage.value?.trim() && now - this.lastTypingSent > TYPING_THROTTLE_MS) {
       this.lastTypingSent = now;
-      this.chatService.sendTyping(roomId);
+      this.chatService.sendTyping(id);
     }
   }
 
-  loadOlder() {
-    const roomId = this.roomId;
-    if (this.loadingOlder || roomId === undefined) {
+  async loadOlder() {
+    const id = this.chatId();
+    if (this.loadingOlder() || id === undefined) {
       return;
     }
-    this.loadingOlder = true;
-    this.chatService.loadOlderMessages(roomId, this.pagesLoaded);
+    this.loadingOlder.set(true);
+    const el = this.messagesScroller()?.nativeElement;
+    const fromBottom = el ? el.scrollHeight - el.scrollTop : 0;
+    await this.chatService.loadOlder(id);
+    this.loadingOlder.set(false);
+    // Keep the reader's place on screen as older messages appear above.
+    setTimeout(() => {
+      if (el) {
+        el.scrollTop = el.scrollHeight - fromBottom;
+      }
+    });
   }
 
   onComposerKeydown(event: KeyboardEvent) {
@@ -372,108 +333,79 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     }
     this.pinned = el.scrollHeight - el.scrollTop - el.clientHeight < PIN_THRESHOLD_PX;
     if (this.pinned) {
-      this.unseen = 0;
+      this.unseen.set(0);
     }
   }
 
   jumpToLatest() {
-    this.unseen = 0;
+    this.unseen.set(0);
     this.scrollToBottom(true);
   }
 
-  trackRow(_: number, row: StreamRow) {
-    return row.key;
+  private resetView() {
+    this.unseen.set(0);
+    this.pinned = true;
+    this.newestShown = 0;
+    this.loadingOlder.set(false);
+    this.freshIds.set(new Set());
+    this.clearTyping();
+    this.chatMessage.reset('');
   }
 
-  private onAdded(message: IMessage) {
-    if (this.roomId === undefined || message.room?.id !== this.roomId) {
+  private onStreamChanged(messages: ChatMessage[], pendingCount: number) {
+    const newest = messages.at(-1);
+    const id = this.chatId();
+    if (!newest || newest.id <= this.newestShown) {
+      if (pendingCount > 0) {
+        this.scrollToBottom(true);
+      }
       return;
     }
-    if (this.history.some((m) => m.id === message.id)) {
-      return;
+    const firstLoad = this.newestShown === 0;
+    const arrived = messages.filter((m) => m.id > this.newestShown);
+    this.newestShown = newest.id;
+    if (firstLoad) {
+      this.scrollToBottom(true);
+    } else {
+      const fromOthers = arrived.filter((m) => m.sender?.Id !== this.me().Id);
+      fromOthers.forEach((m) => {
+        if (m.sender?.Id !== undefined) {
+          this.stopTyping(m.sender.Id);
+        }
+      });
+      this.markFresh(fromOthers.map((m) => m.id));
+      const own = arrived.length > fromOthers.length;
+      if (!this.pinned && !own) {
+        this.unseen.update((n) => n + fromOthers.length);
+      }
+      this.scrollToBottom(own);
     }
-    const own = message.user?.Id === this.me().Id;
-    if (message.user?.Id !== undefined) {
-      clearTimeout(this.typing.get(message.user.Id)?.timer);
-      this.typing.delete(message.user.Id);
-    }
-    if (own) {
-      const index = this.pending.findIndex((p) => p.text === message.text);
-      if (index > -1) {
-        this.pending.splice(index, 1);
-      }
-    } else if (message.id !== undefined) {
-      const id = message.id;
-      this.freshIds.add(id);
-      setTimeout(() => this.freshIds.delete(id), 1000);
-      if (!this.pinned) {
-        this.unseen++;
-      }
-    }
-    this.history = [...this.history, message].sort(byCreatedAt);
-    this.total++;
-    this.rebuild();
-    this.scrollToBottom(own);
-  }
-
-  /** Adds a page of older history above, keeping the reader's place on screen. */
-  private prependOlder(items: IMessage[]) {
-    const el = this.messagesScroller()?.nativeElement;
-    const fromBottom = el ? el.scrollHeight - el.scrollTop : 0;
-    const known = new Set(this.history.map((m) => m.id));
-    this.history = [...items.filter((m) => !known.has(m.id)), ...this.history].sort(byCreatedAt);
-    this.pagesLoaded++;
-    this.loadingOlder = false;
-    this.rebuild();
-    setTimeout(() => {
-      if (el) {
-        el.scrollTop = el.scrollHeight - fromBottom;
-      }
-    });
-  }
-
-  /** Drops pending sends that a freshly loaded history already contains. */
-  private reconcilePending() {
-    for (const message of this.history) {
-      if (message.user?.Id !== this.me().Id) {
-        continue;
-      }
-      // Only a message saved around when we sent it can be the server's copy of a pending one.
-      const savedAt = new Date(message.created_at ?? 0).getTime();
-      const index = this.pending.findIndex(
-        (p) => p.text === message.text && savedAt >= p.created_at.getTime() - 5000
-      );
-      if (index > -1) {
-        this.pending.splice(index, 1);
-      }
+    if (id !== undefined && document.visibilityState === 'visible') {
+      this.chatService.markRead(id);
     }
   }
 
-  private clearTyping() {
-    for (const entry of this.typing.values()) {
-      clearTimeout(entry.timer);
-    }
-    this.typing.clear();
-  }
-
-  private rebuild() {
-    const entries: { message: IMessage; status: MessageStatus; key: string }[] = [
-      ...this.history.map((message) => ({
-        message,
-        status: (message.user?.Id === this.me().Id ? 'sent' : null) as MessageStatus,
-        key: `m${message.id}`,
+  private buildRows(): StreamRow[] {
+    const meId = this.me().Id;
+    const stalled = this.outbox.stalled();
+    const fresh = this.freshIds();
+    const entries: { message: ShownMessage; status: MessageStatus; key: string }[] = [
+      ...(this.history()?.messages ?? []).map((m) => ({
+        message: m as ShownMessage,
+        status: (m.sender?.Id === meId ? 'sent' : null) as MessageStatus,
+        key: `m${m.id}`,
       })),
-      ...this.pending.map((p) => ({
-        message: { text: p.text, room: this.chatRoom(), user: this.me(), created_at: p.created_at },
-        status: (p.stalled ? 'stalled' : 'pending') as MessageStatus,
-        key: `p${p.tempId}`,
+      ...this.pending().map((p) => ({
+        message: { text: p.text, sender: this.me(), createdAt: p.createdAt, deleted: false },
+        status: (stalled.has(p.clientMessageId) ? 'stalled' : 'pending') as MessageStatus,
+        key: `p${p.clientMessageId}`,
       })),
     ];
 
     const rows: StreamRow[] = [];
     let lastDay = '';
     entries.forEach((entry, i) => {
-      const date = new Date(entry.message.created_at ?? Date.now());
+      const date = new Date(entry.message.createdAt);
       const day = date.toDateString();
       if (day !== lastDay) {
         rows.push({ kind: 'day', key: `d${day}`, label: this.dayLabel(date) });
@@ -485,14 +417,48 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
         kind: 'message',
         key: entry.key,
         message: entry.message,
-        own: entry.message.user?.Id === this.me().Id,
+        own: entry.message.sender?.Id === meId,
         first: !prev || !sameGroup(prev, entry.message),
         last: !next || !sameGroup(entry.message, next),
         status: entry.status,
-        fresh: entry.message.id !== undefined && this.freshIds.has(entry.message.id),
+        fresh: entry.message.id !== undefined && fresh.has(entry.message.id),
       });
     });
-    this.rows = rows;
+    return rows;
+  }
+
+  private markFresh(ids: number[]) {
+    if (ids.length === 0) {
+      return;
+    }
+    this.freshIds.update((set) => new Set([...set, ...ids]));
+    setTimeout(
+      () =>
+        this.freshIds.update((set) => {
+          const copy = new Set(set);
+          ids.forEach((id) => copy.delete(id));
+          return copy;
+        }),
+      FRESH_MS,
+    );
+  }
+
+  private stopTyping(userId: number) {
+    clearTimeout(this.typingTimers.get(userId));
+    this.typingTimers.delete(userId);
+    if (this.typing().has(userId)) {
+      this.typing.update((map) => {
+        const copy = new Map(map);
+        copy.delete(userId);
+        return copy;
+      });
+    }
+  }
+
+  private clearTyping() {
+    this.typingTimers.forEach((timer) => clearTimeout(timer));
+    this.typingTimers.clear();
+    this.typing.set(new Map());
   }
 
   private dayLabel(date: Date): string {
@@ -515,6 +481,7 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
       return;
     }
     this.pinned = true;
+    this.unseen.set(0);
     setTimeout(() => {
       const target = this.messagesScroller()?.nativeElement;
       if (target) {
@@ -524,19 +491,11 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   }
 }
 
-/** Server ids are insertion order; timestamps can tie when messages arrive in a burst. */
-function byCreatedAt(a: IMessage, b: IMessage): number {
-  if (a.id !== undefined && b.id !== undefined) {
-    return a.id - b.id;
-  }
-  return new Date(a.created_at ?? 0).getTime() - new Date(b.created_at ?? 0).getTime();
-}
-
-function sameGroup(a: IMessage, b: IMessage): boolean {
-  const gap = new Date(b.created_at ?? 0).getTime() - new Date(a.created_at ?? 0).getTime();
+function sameGroup(a: ShownMessage, b: ShownMessage): boolean {
+  const gap = Date.parse(b.createdAt) - Date.parse(a.createdAt);
   return (
-    a.user?.Id === b.user?.Id &&
+    a.sender?.Id === b.sender?.Id &&
     gap < GROUP_WINDOW_MS &&
-    new Date(a.created_at ?? 0).toDateString() === new Date(b.created_at ?? 0).toDateString()
+    new Date(a.createdAt).toDateString() === new Date(b.createdAt).toDateString()
   );
 }

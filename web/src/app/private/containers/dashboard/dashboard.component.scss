@@ -138,14 +138,17 @@
   .title { color: var(--side-text); font-weight: 600; font-size: 15px; margin-bottom: 4px; }
 }
 
-.pager {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 4px 8px;
-  border-top: 1px solid var(--side-line);
+.more-chats {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 4px 8px 8px;
+  padding: 8px;
+  border-radius: 8px;
   font-size: 13px;
   color: var(--side-text-2);
+
+  &:hover:not(:disabled) { background: var(--side-bg-2); color: var(--side-text); }
+  &:disabled { opacity: 0.6; }
 }
 
 .me {
@@ -219,7 +222,7 @@
     app-chat-search { order: 2; background: var(--side-bg); padding-bottom: 8px; }
     .detail { display: flex; order: 3; flex: 1; min-height: 0; }
     .me { order: 4; color: var(--side-text); }
-    .side-title, .room-list, .pager { display: none; }
+    .side-title, .room-list { display: none; }
     &.searching .detail { display: none; }
   }
 }

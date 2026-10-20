@@ -1,4 +1,4 @@
-import { AfterViewInit, Component, ElementRef, HostListener, OnChanges, inject, input, output, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, HostListener, OnChanges, inject, input, output, viewChild, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { IUser } from 'src/app/models/user.interface';
 import { ProfileService } from '../../services/profile.service';
 import { IconComponent } from '../../../shared/icon/icon.component';
@@ -9,7 +9,7 @@ import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 
 /** Another person's profile: photo, names, bio, presence and when they joined. */
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
     selector: 'app-profile-panel',
     templateUrl: './profile-panel.component.html',
     styleUrls: ['./profile-panel.component.scss'],
@@ -21,6 +21,8 @@ import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 })
 export class ProfilePanelComponent implements OnChanges, AfterViewInit {
   private profiles = inject(ProfileService);
+  /** Async results (searches, uploads) arrive outside an input change or event. */
+  private cdr = inject(ChangeDetectorRef);
 
   /** What we already know (from the chat); refreshed from the server on open. */
   readonly person = input.required<IUser>();
@@ -55,9 +57,13 @@ export class ProfilePanelComponent implements OnChanges, AfterViewInit {
       next: (profile) => {
         if (this.person()?.Id === id) {
           this.profile = profile;
+          this.cdr.markForCheck();
         }
       },
-      error: () => (this.failed = true),
+      error: () => {
+        this.failed = true;
+        this.cdr.markForCheck();
+      },
     });
   }
 

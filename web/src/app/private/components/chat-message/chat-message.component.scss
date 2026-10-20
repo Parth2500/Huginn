@@ -110,3 +110,8 @@
   .msg { padding-right: 8%; }
   .msg.own { padding-left: 8%; }
 }
+
+.deleted {
+  color: var(--text-2);
+  font-style: italic;
+}

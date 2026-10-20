@@ -1,13 +1,19 @@
 import { AfterViewInit, Component, ElementRef, input, output, viewChild, ChangeDetectionStrategy } from '@angular/core';
 import { FormArray, FormControl, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { IRoom } from 'src/app/models/room.interface';
 import { IUser } from 'src/app/models/user.interface';
 import { IconComponent } from '../../../shared/icon/icon.component';
 
 import { SelectUsersComponent } from '../select-users/select-users.component';
 
+/** What the form produces; the dashboard sends it as `group.create`. */
+export interface NewGroup {
+  title: string;
+  description?: string;
+  memberIds: number[];
+}
+
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
     selector: 'app-create-room',
     templateUrl: './create-room.component.html',
     styleUrls: ['./create-room.component.scss'],
@@ -22,7 +28,7 @@ export class CreateRoomComponent implements AfterViewInit {
   readonly me = input<IUser>({});
   readonly onlineIds = input<Set<number> | null>(null);
   private readonly nameInput = viewChild<ElementRef<HTMLInputElement>>('nameInput');
-  readonly created = output<IRoom>();
+  readonly created = output<NewGroup>();
   readonly cancel = output<void>();
 
   form: FormGroup = new FormGroup({
@@ -47,9 +53,9 @@ export class CreateRoomComponent implements AfterViewInit {
       return;
     }
     this.created.emit({
-      name: this.name.value.trim(),
+      title: this.name.value.trim(),
       description: this.description.value?.trim() || undefined,
-      users: this.users.value,
+      memberIds: this.users.value.map((u: IUser) => u.Id!),
     });
   }
 

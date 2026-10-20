@@ -3,25 +3,25 @@
   @if (!own() && showSender()) {
     <button type="button" class="sender-avatar" [class.placeholder]="!last()"
       [tabindex]="last() ? 0 : -1" (click)="emitSender()"
-      [attr.aria-label]="'View profile of ' + (message().user | displayName)">
+      [attr.aria-label]="'View profile of ' + (message().sender | displayName)">
       @if (last()) {
-        <app-avatar [user]="message().user" size="sm" />
+        <app-avatar [user]="message().sender" size="sm" />
       }
     </button>
   }
   <div class="bubble">
     @if (!own() && first() && showSender()) {
-      <button type="button" class="sender" [ngClass]="message().user?.Id | tone"
-      (click)="emitSender()">{{ message().user | displayName }}</button>
+      <button type="button" class="sender" [ngClass]="message().sender?.Id | tone"
+      (click)="emitSender()">{{ message().sender | displayName }}</button>
     }
-    <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().user | displayName) }}: </span>@for (part of message().text | linkify; track part) {
+    <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().sender | displayName) }}: </span>@if (message().deleted) {<em class="deleted">This message was deleted</em>} @else {@for (part of message().text | linkify; track $index) {
     @if (part.href) {
       <a [href]="part.href" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>
     } @else {
       {{ part.text }}
     }
-    }<span class="meta">
-    <time [attr.datetime]="message().created_at" [title]="message().created_at | date: 'EEEE d MMMM y, HH:mm'">{{ message().created_at | date: 'HH:mm' }}</time>
+    }}<span class="meta">
+    <time [attr.datetime]="message().createdAt" [title]="message().createdAt | date: 'EEEE d MMMM y, HH:mm'">{{ message().createdAt | date: 'HH:mm' }}</time>
     @switch (status()) {
       @case ('pending') {
         <span class="state" title="Sending">

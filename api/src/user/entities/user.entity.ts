@@ -1,17 +1,15 @@
-import { ConnectedUser } from 'src/chat/entities/connected-user/connected-user.entity';
-import { JoinedRoom } from 'src/chat/entities/joined-room/joined-room.entity';
-import { Message } from 'src/chat/entities/message/message.entity';
-import { Room } from 'src/chat/entities/room/room.entity';
 import {
   Column,
   CreateDateColumn,
   Entity,
-  ManyToMany,
-  OneToMany,
+  Index,
   PrimaryGeneratedColumn,
 } from 'typeorm';
 import { IUser } from './user.interface';
 
+// Trigram search indexes live in a migration; TypeORM can't express gin_trgm_ops, so it must not touch them.
+@Index('user_username_key_trgm', { synchronize: false })
+@Index('user_display_name_trgm', { synchronize: false })
 @Entity()
 export class User implements IUser {
   @PrimaryGeneratedColumn()
@@ -41,22 +39,18 @@ export class User implements IUser {
   @CreateDateColumn()
   created_at: Date;
 
+  /** Written once when the last connection closes (after a grace period); never broadcast. */
+  @Column({ type: 'timestamptz', nullable: true })
+  lastSeenAt: Date | null;
+
+  /** Highest sequence number in this person's update log (see UserUpdate). */
+  @Column({ type: 'int', default: 0, select: false })
+  updateSeq: number;
+
   // Private: only ever returned to its owner (login token payload is built without it).
   @Column({ unique: true, select: false })
   email: string;
 
   @Column({ select: false })
   password: string;
-
-  @ManyToMany(() => Room, (room) => room.users)
-  rooms: Room[];
-
-  @OneToMany(() => ConnectedUser, (connection) => connection.user)
-  connections: ConnectedUser[];
-
-  @OneToMany(() => JoinedRoom, (joinedRoom) => joinedRoom.room)
-  joinedRooms: JoinedRoom[];
-
-  @OneToMany(() => Message, (message) => message.user)
-  messages: Message[];
 }

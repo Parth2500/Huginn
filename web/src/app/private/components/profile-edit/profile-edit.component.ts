@@ -1,5 +1,5 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, input, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, OnInit, inject, input, output, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { FormControl, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { IUser } from 'src/app/models/user.interface';
@@ -19,7 +19,7 @@ const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 
 /** The signed-in user's own profile: photo, display name, username and bio. */
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
     selector: 'app-profile-edit',
     templateUrl: './profile-edit.component.html',
     styleUrls: ['./profile-edit.component.scss'],
@@ -34,6 +34,8 @@ const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 })
 export class ProfileEditComponent implements OnInit {
   private profiles = inject(ProfileService);
+  /** Async results (searches, uploads) arrive outside an input change or event. */
+  private cdr = inject(ChangeDetectorRef);
   private http = inject(HttpClient);
   private toast = inject(ToastService);
 
@@ -59,8 +61,14 @@ export class ProfileEditComponent implements OnInit {
 
   ngOnInit(): void {
     this.profiles.loadMe().subscribe({
-      next: (profile) => this.reset(profile),
-      error: () => (this.serverError = "Couldn't load your profile. Check your connection and try again."),
+      next: (profile) => {
+        this.reset(profile);
+        this.cdr.markForCheck();
+      },
+      error: () => {
+        this.serverError = "Couldn't load your profile. Check your connection and try again.";
+        this.cdr.markForCheck();
+      },
     });
   }
 
@@ -122,7 +130,7 @@ export class ProfileEditComponent implements OnInit {
       const image = await squareAvatar(file);
       this.profiles
         .uploadAvatar(image)
-        .pipe(finalize(() => (this.uploading = false)))
+        .pipe(finalize(() => this.done(() => (this.uploading = false))))
         .subscribe({
           next: (profile) => {
             this.profile = profile;
@@ -133,7 +141,7 @@ export class ProfileEditComponent implements OnInit {
             this.toast.error(error.error?.message ?? "Couldn't upload that photo. Try another one."),
         });
     } catch {
-      this.uploading = false;
+      this.done(() => (this.uploading = false));
       this.toast.error("That image couldn't be read. Try a JPEG, PNG or WebP file.");
     }
   }
@@ -142,7 +150,7 @@ export class ProfileEditComponent implements OnInit {
     this.uploading = true;
     this.profiles
       .removeAvatar()
-      .pipe(finalize(() => (this.uploading = false)))
+      .pipe(finalize(() => this.done(() => (this.uploading = false))))
       .subscribe({
         next: (profile) => {
           this.profile = profile;
@@ -178,7 +186,7 @@ export class ProfileEditComponent implements OnInit {
     this.saving = true;
     this.profiles
       .updateMe(changes)
-      .pipe(finalize(() => (this.saving = false)))
+      .pipe(finalize(() => this.done(() => (this.saving = false))))
       .subscribe({
         next: (profile) => {
           this.reset(profile);
@@ -204,5 +212,11 @@ export class ProfileEditComponent implements OnInit {
       bio: profile.bio ?? '',
     });
     this.submitted = false;
+  }
+
+  /** Ends a request: clears its busy flag and repaints (results arrive outside any event). */
+  private done(clear: () => void) {
+    clear();
+    this.cdr.markForCheck();
   }
 }

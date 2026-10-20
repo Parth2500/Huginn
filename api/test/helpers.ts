@@ -76,7 +76,7 @@ export function api(
   });
 }
 
-/** A connected socket that records every event it receives. */
+/** A connected socket that records every event it receives, ready once the server says hello. */
 export async function connect(base: string, account: Account) {
   const socket: Socket = io(base, {
     extraHeaders: { Authorization: account.token },
@@ -84,8 +84,19 @@ export async function connect(base: string, account: Account) {
   });
   const events: { name: string; data: any }[] = [];
   socket.onAny((name, data) => events.push({ name, data }));
-  await once(socket, 'rooms');
-  return { socket, events };
+  const hello = await once<{ protocol: number; seq: number }>(socket, 'hello');
+  const updates = () =>
+    events.filter((e) => e.name === 'update').map((e) => e.data);
+  return { socket, events, hello, updates };
+}
+
+/** A protocol v1 request: emits and waits for the acknowledgement. */
+export function ask<T = any>(
+  socket: Socket,
+  event: string,
+  data: object = {},
+): Promise<T> {
+  return socket.timeout(5000).emitWithAck(event, data);
 }
 
 export function once<T = any>(

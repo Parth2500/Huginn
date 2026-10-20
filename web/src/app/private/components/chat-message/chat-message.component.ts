@@ -1,7 +1,6 @@
 import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
 import { IUser } from 'src/app/models/user.interface';
-import { IMessage } from 'src/app/models/message.interface';
-import { MessageStatus } from '../chat-room/chat-room.component';
+import { MessageStatus, ShownMessage } from '../chat-room/chat-room.component';
 import { NgClass, DatePipe } from '@angular/common';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
@@ -25,7 +24,7 @@ import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 ],
 })
 export class ChatMessageComponent {
-  readonly message = input.required<IMessage>();
+  readonly message = input.required<ShownMessage>();
   readonly own = input(false);
   /** First message of a run from the same person: shows their name. */
   readonly first = input(true);
@@ -38,7 +37,7 @@ export class ChatMessageComponent {
   readonly openSender = output<IUser>();
 
   emitSender() {
-    const sender = this.message().user;
+    const sender = this.message().sender;
     if (sender) {
       this.openSender.emit(sender);
     }

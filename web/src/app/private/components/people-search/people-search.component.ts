@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnDestroy, OnInit, inject, input, output, viewChild, ChangeDetectionStrategy } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, inject, input, output, viewChild, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import {
   catchError,
@@ -26,7 +26,7 @@ let nextId = 0;
 
 /** Username search combobox: type, arrow through matches, Enter or click to pick. */
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
     selector: 'app-people-search',
     templateUrl: './people-search.component.html',
     styleUrls: ['./people-search.component.scss'],
@@ -40,6 +40,8 @@ let nextId = 0;
 })
 export class PeopleSearchComponent implements OnInit, OnDestroy {
   private signOnService = inject<ISignOnService>(SignOnToken);
+  /** Async results (searches, uploads) arrive outside an input change or event. */
+  private cdr = inject(ChangeDetectorRef);
 
   readonly excludeIds = input<(number | undefined)[]>([]);
   readonly onlineIds = input<Set<number> | null>(null);
@@ -108,6 +110,7 @@ export class PeopleSearchComponent implements OnInit, OnDestroy {
         this.results = users;
         this.active = 0;
         this.state = !term ? 'idle' : failed ? 'error' : this.visible.length ? 'results' : 'empty';
+        this.cdr.markForCheck();
       });
   }
 

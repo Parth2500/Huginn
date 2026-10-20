@@ -5,7 +5,7 @@ import { PeopleSearchComponent } from '../people-search/people-search.component'
 
 /** The empty detail pane: find a person and start a room with them, plus how the demo works. */
 @Component({
-  changeDetection: ChangeDetectionStrategy.Eager,
+  changeDetection: ChangeDetectionStrategy.OnPush,
     selector: 'app-start-chat',
     templateUrl: './start-chat.component.html',
     styleUrls: ['./start-chat.component.scss'],

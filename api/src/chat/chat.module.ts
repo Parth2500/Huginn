@@ -1,36 +1,33 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthenticationModule } from 'src/authentication/authentication.module';
+import { User } from 'src/user/entities/user.entity';
 import { UserModule } from 'src/user/user.module';
-import { ConnectedUser } from './entities/connected-user/connected-user.entity';
-import { JoinedRoom } from './entities/joined-room/joined-room.entity';
-import { Message } from './entities/message/message.entity';
-import { Room } from './entities/room/room.entity';
-import { ChatGateway } from './gateway/chat/chat.gateway';
-import { ConnectedUserToken } from './services/iservices/connected-user.service.interface';
-import { ConnectedUserService } from './services/connected-user/connected-user.service';
-import { JoinedRoomToken } from './services/iservices/joined-room.service.interface';
-import { JoinedRoomService } from './services/joined-room/joined-room.service';
-import { MessageToken } from './services/iservices/message.service.interface';
-import { MessageService } from './services/message/message.service';
-import { RoomToken } from './services/iservices/room.service.interface';
-import { RoomService } from './services/room/room.service';
-
-const modules = [AuthenticationModule, UserModule];
-
-const providers = [
-  ChatGateway,
-  { provide: ConnectedUserToken, useClass: ConnectedUserService },
-  { provide: JoinedRoomToken, useClass: JoinedRoomService },
-  { provide: MessageToken, useClass: MessageService },
-  { provide: RoomToken, useClass: RoomService },
-];
+import { ChatGateway } from './chat.gateway';
+import { ChatsService } from './chats.service';
+import { Block } from './entities/block.entity';
+import { ChatMember } from './entities/chat-member.entity';
+import { Chat } from './entities/chat.entity';
+import { MessageHidden } from './entities/message-hidden.entity';
+import { Message } from './entities/message.entity';
+import { UserUpdate } from './entities/user-update.entity';
+import { MessagesService } from './messages.service';
+import { UpdatesService } from './updates.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Room, ConnectedUser, Message, JoinedRoom]),
-    ...modules,
+    TypeOrmModule.forFeature([
+      Chat,
+      ChatMember,
+      Message,
+      MessageHidden,
+      Block,
+      UserUpdate,
+      User,
+    ]),
+    AuthenticationModule,
+    UserModule,
   ],
-  providers: [...providers],
+  providers: [ChatGateway, ChatsService, MessagesService, UpdatesService],
 })
 export class ChatModule {}

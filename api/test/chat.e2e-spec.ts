@@ -1,5 +1,7 @@
+import { randomUUID } from 'crypto';
 import {
   Account,
+  ask,
   connect,
   once,
   pause,
@@ -8,11 +10,13 @@ import {
   TestApp,
 } from './helpers';
 
+/** Realtime protocol v1 (docs/huginn/architecture.md §4–5). */
 describe('chats over Socket.IO', () => {
   let t: TestApp;
   let maya: Account;
   let sam: Account;
   let tess: Account;
+  let rui: Account;
   const sockets: { socket: { disconnect(): void } }[] = [];
 
   beforeAll(async () => {
@@ -20,6 +24,7 @@ describe('chats over Socket.IO', () => {
     maya = await register(t.base, 'maya.chat');
     sam = await register(t.base, 'sam.chat');
     tess = await register(t.base, 'tess.chat');
+    rui = await register(t.base, 'rui.chat');
   });
   afterAll(async () => {
     sockets.forEach((s) => s.socket.disconnect());
@@ -31,123 +36,192 @@ describe('chats over Socket.IO', () => {
     sockets.push(client);
     return client;
   };
+  const send = (
+    socket: Parameters<typeof ask>[0],
+    target: { chatId: number } | { toUserId: number },
+    text: string,
+    clientMessageId = randomUUID(),
+  ) => ask(socket, 'message.send', { ...target, text, clientMessageId });
+
+  let directId: number;
 
   it('opens a draft, and the other person sees nothing until the first message', async () => {
     const m = await open(maya);
     const s = await open(sam);
+    expect(m.hello.protocol).toBe(1);
 
-    m.socket.emit('openDirect', { userId: sam.id });
-    const opened = await once(m.socket, 'directOpened');
-    expect(opened.room).toBeNull();
+    const opened = await ask(m.socket, 'direct.open', { userId: sam.id });
+    expect(opened.ok).toBe(true);
+    expect(opened.chat).toBeNull();
     expect(opened.partner.username).toBe('sam.chat');
     expect(opened.partner.email).toBeUndefined();
 
     await pause(300);
-    expect(
-      s.events
-        .filter((e) => e.name !== 'onlineUsers' && e.name !== 'rooms')
-        .map((e) => e.name),
-    ).toEqual([]);
+    expect(s.updates()).toEqual([]);
 
-    const activity = once(s.socket, 'roomActivity');
-    m.socket.emit('sendDirectMessage', {
-      userId: sam.id,
-      text: '  hello sam  ',
-    });
-    const created = await once(m.socket, 'directRoomCreated');
-    expect(created.room.type).toBe('direct');
-    expect(created.room.directKey).toBeUndefined();
+    const sent = await send(m.socket, { toUserId: sam.id }, '  hello sam  ');
+    expect(sent.ok).toBe(true);
+    expect(sent.message.text).toBe('hello sam');
+    directId = sent.chatId;
 
-    const ping = await activity;
-    expect(ping.message.text).toBe('hello sam');
-    expect(ping.message.user.email).toBeUndefined();
+    await pause(300);
+    const types = s.updates().map((u) => `${u.seq}:${u.type}`);
+    expect(types).toEqual(['1:chat.new', '2:message.new']);
+    const chat = s.updates()[0].data.chat;
+    expect(chat.kind).toBe('direct');
+    expect(chat.directKey).toBeUndefined();
+    expect(chat.members.map((u: any) => u.username).sort()).toEqual([
+      'maya.chat',
+      'sam.chat',
+    ]);
+    expect(chat.members.every((u: any) => u.email === undefined)).toBe(true);
+  });
 
-    s.socket.emit('paginateRooms', { limit: 10, page: 0 });
-    const rooms = await once(s.socket, 'rooms');
-    expect(rooms.items.map((r: any) => r.lastMessage?.text)).toContain(
-      'hello sam',
-    );
-
-    // Opening the same person again finds the chat instead of a new draft.
-    m.socket.emit('openDirect', { userId: sam.id });
-    expect((await once(m.socket, 'directOpened')).room.id).toBe(
-      created.room.id,
-    );
+  it('stores a retried send once', async () => {
+    const m = await open(maya);
+    const s = await open(sam);
+    const id = randomUUID();
+    const first = await send(m.socket, { chatId: directId }, 'only once', id);
+    const again = await send(m.socket, { chatId: directId }, 'only once', id);
+    expect(again.message.id).toBe(first.message.id);
+    await pause(300);
+    expect(s.updates().filter((u) => u.type === 'message.new')).toHaveLength(1);
   });
 
   it('keeps one sender’s burst of messages in the order they were sent', async () => {
     const m = await open(maya);
-    m.socket.emit('openDirect', { userId: tess.id });
-    await once(m.socket, 'directOpened');
-    m.socket.emit('sendDirectMessage', { userId: tess.id, text: 'first' });
-    const { room } = await once(m.socket, 'directRoomCreated');
-
-    const received: string[] = [];
-    m.socket.on('messageAdded', (msg: { text: string }) =>
-      received.push(msg.text),
+    const texts = Array.from({ length: 10 }, (_, i) => `burst ${i}`);
+    const acks = await Promise.all(
+      texts.map((text) => send(m.socket, { chatId: directId }, text)),
     );
-    for (let i = 0; i < 12; i++) {
-      m.socket.emit('addMessage', { text: `n${i}`, room: { id: room.id } });
-    }
-    await pause(2000);
-    expect(received.filter((x) => x.startsWith('n'))).toEqual(
-      Array.from({ length: 12 }, (_, i) => `n${i}`),
+    const ids = acks.map((a) => a.message.id);
+    expect([...ids].sort((a, b) => a - b)).toEqual(ids);
+  });
+
+  it('replays missed updates with sync, in order', async () => {
+    const away = await open(sam);
+    const since = away.hello.seq;
+    away.socket.disconnect();
+
+    const m = await open(maya);
+    await send(m.socket, { chatId: directId }, 'while you were away 1');
+    await send(m.socket, { chatId: directId }, 'while you were away 2');
+
+    const back = await open(sam);
+    expect(back.hello.seq).toBe(since + 2);
+    const sync = await ask(back.socket, 'sync', { sinceSeq: since });
+    expect(sync.ok).toBe(true);
+    expect(sync.reset).toBe(false);
+    expect(sync.updates.map((u: any) => [u.seq, u.data.message.text])).toEqual([
+      [since + 1, 'while you were away 1'],
+      [since + 2, 'while you were away 2'],
+    ]);
+    const upToDate = await ask(back.socket, 'sync', { sinceSeq: sync.seq });
+    expect(upToDate.updates).toEqual([]);
+  });
+
+  it('counts unread on the server and clears it on read, for every device', async () => {
+    const phone = await open(sam);
+    const laptop = await open(sam);
+    const listed = await ask(laptop.socket, 'chats.list');
+    const chat = listed.chats.find((c: any) => c.id === directId);
+    expect(chat.unreadCount).toBeGreaterThan(0);
+    expect(chat.lastMessage.text).toBe('while you were away 2');
+
+    const read = await ask(laptop.socket, 'chat.read', {
+      chatId: directId,
+      upTo: chat.lastMessage.id,
+    });
+    expect(read.ok).toBe(true);
+    await pause(300);
+    const state = phone.updates().find((u) => u.type === 'chat.state');
+    expect(state).toBeDefined();
+    expect(state.data.unreadCount).toBe(0);
+    expect(state.data.me.lastReadMessageId).toBe(chat.lastMessage.id);
+  });
+
+  it('pages history newest first, before a message id', async () => {
+    const m = await open(maya);
+    const latest = await ask(m.socket, 'chat.open', { chatId: directId });
+    expect(latest.ok).toBe(true);
+    const ids = latest.messages.map((x: any) => x.id);
+    expect([...ids].sort((a, b) => b - a)).toEqual(ids);
+    const older = await ask(m.socket, 'messages.page', {
+      chatId: directId,
+      before: ids[ids.length - 1],
+    });
+    expect(older.messages.every((x: any) => x.id < ids[ids.length - 1])).toBe(
+      true,
     );
   });
 
   it('requires a name and at least two other people for a group', async () => {
     const m = await open(maya);
-    m.socket.emit('createRoom', { name: 'Pair', users: [{ Id: sam.id }] });
-    expect((await once(m.socket, 'chatError')).message).toContain(
-      'at least two other people',
-    );
-
-    m.socket.emit('createRoom', {
-      name: 'Trio',
-      users: [{ Id: sam.id }, { Id: tess.id }],
+    const tooSmall = await ask(m.socket, 'group.create', {
+      title: 'Pair',
+      memberIds: [sam.id],
     });
-    const group = await once(m.socket, 'roomCreated');
-    expect(group.type).toBe('group');
-    expect(group.users.map((u: any) => u.username).sort()).toEqual([
-      'maya.chat',
-      'sam.chat',
-      'tess.chat',
-    ]);
+    expect(tooSmall.ok).toBe(false);
+    expect(tooSmall.error).toContain('at least two other people');
+
+    const t1 = await open(tess);
+    const created = await ask(m.socket, 'group.create', {
+      title: '  Launch crew ',
+      memberIds: [sam.id, tess.id, tess.id],
+    });
+    expect(created.ok).toBe(true);
+    expect(created.chat.title).toBe('Launch crew');
+    expect(created.chat.me.role).toBe('owner');
+    expect(created.chat.members).toHaveLength(3);
+    const update = await once(t1.socket, 'update');
+    expect(update.type).toBe('chat.new');
+    expect(update.data.chat.me.role).toBe('member');
   });
 
   it('refuses to open or write to a chat you are not in', async () => {
-    const outsider = await register(t.base, 'outsider.chat');
-    const o = await open(outsider);
-    const m = await open(maya);
-    m.socket.emit('createRoom', {
-      name: 'Private',
-      users: [{ Id: sam.id }, { Id: tess.id }],
+    const r = await open(rui);
+    const opened = await ask(r.socket, 'chat.open', { chatId: directId });
+    expect(opened).toEqual({
+      ok: false,
+      error: "You're not a member of that chat.",
     });
-    const group = await once(m.socket, 'roomCreated');
-
-    o.socket.emit('joinRoom', { id: group.id });
-    expect((await once(o.socket, 'chatError')).message).toBe(
-      "You're not a member of that chat.",
-    );
-    o.socket.emit('addMessage', { text: 'let me in', room: { id: group.id } });
-    expect((await once(o.socket, 'chatError')).message).toBe(
-      "You're not a member of that chat.",
-    );
+    const page = await ask(r.socket, 'messages.page', { chatId: directId });
+    expect(page.ok).toBe(false);
+    const sent = await send(r.socket, { chatId: directId }, 'let me in');
+    expect(sent.ok).toBe(false);
+    const got = await ask(r.socket, 'chat.get', { chatId: directId });
+    expect(got.ok).toBe(false);
   });
 
-  it('rejects empty and over-long messages', async () => {
+  it('sends typing only to people who have the chat open', async () => {
     const m = await open(maya);
-    m.socket.emit('sendDirectMessage', { userId: sam.id, text: '   ' });
-    expect((await once(m.socket, 'chatError')).message).toContain(
-      'between 1 and 2000',
-    );
-    m.socket.emit('sendDirectMessage', {
-      userId: sam.id,
-      text: 'x'.repeat(2001),
+    const s = await open(sam);
+    const r = await open(rui);
+    m.socket.emit('typing', { chatId: directId }); // not opened yet: ignored
+    await ask(m.socket, 'chat.open', { chatId: directId });
+    await ask(s.socket, 'chat.open', { chatId: directId });
+    m.socket.emit('typing', { chatId: directId });
+    const typing = await once(s.socket, 'typing');
+    expect(typing).toMatchObject({
+      chatId: directId,
+      user: { username: 'maya.chat' },
     });
-    expect((await once(m.socket, 'chatError')).message).toContain(
-      'between 1 and 2000',
-    );
+    await pause(200);
+    expect(s.events.filter((e) => e.name === 'typing')).toHaveLength(1);
+    expect(r.events.filter((e) => e.name === 'typing')).toHaveLength(0);
+  });
+
+  it('rejects empty, over-long and unidentified messages', async () => {
+    const m = await open(maya);
+    const empty = await send(m.socket, { chatId: directId }, '   ');
+    expect(empty.ok).toBe(false);
+    const long = await send(m.socket, { chatId: directId }, 'x'.repeat(2001));
+    expect(long.error).toContain('2000');
+    const noId = await ask(m.socket, 'message.send', {
+      chatId: directId,
+      text: 'hi',
+    });
+    expect(noId.error).toContain('clientMessageId');
   });
 
   it('turns away a socket without a valid session', async () => {

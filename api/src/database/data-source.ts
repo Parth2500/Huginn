@@ -1,12 +1,16 @@
 import 'reflect-metadata';
 import { DataSource, DataSourceOptions } from 'typeorm';
-import { ConnectedUser } from '../chat/entities/connected-user/connected-user.entity';
-import { JoinedRoom } from '../chat/entities/joined-room/joined-room.entity';
-import { Message } from '../chat/entities/message/message.entity';
-import { Room } from '../chat/entities/room/room.entity';
+import { Block } from '../chat/entities/block.entity';
+import { ChatMember } from '../chat/entities/chat-member.entity';
+import { Chat } from '../chat/entities/chat.entity';
+import { MessageHidden } from '../chat/entities/message-hidden.entity';
+import { Message } from '../chat/entities/message.entity';
+import { UserUpdate } from '../chat/entities/user-update.entity';
+import { UserSettings } from '../user/entities/user-settings.entity';
 import { User } from '../user/entities/user.entity';
 import { InitialSchema1792524417068 } from './migrations/1792524417068-InitialSchema';
 import { SearchAndHistoryIndexes1792524417069 } from './migrations/1792524417069-SearchAndHistoryIndexes';
+import { ChatsAndMembers1792524417070 } from './migrations/1792524417070-ChatsAndMembers';
 
 /**
  * One database configuration for the app and the TypeORM CLI. Schema changes go through
@@ -17,10 +21,20 @@ import { SearchAndHistoryIndexes1792524417069 } from './migrations/1792524417069
 export const dataSourceOptions: DataSourceOptions = {
   type: 'postgres',
   url: process.env.DATABASE_URL,
-  entities: [User, Room, Message, JoinedRoom, ConnectedUser],
+  entities: [
+    User,
+    UserSettings,
+    Chat,
+    ChatMember,
+    Message,
+    MessageHidden,
+    Block,
+    UserUpdate,
+  ],
   migrations: [
     InitialSchema1792524417068,
     SearchAndHistoryIndexes1792524417069,
+    ChatsAndMembers1792524417070,
   ],
   migrationsRun: true,
   synchronize: false,
