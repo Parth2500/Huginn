@@ -52,7 +52,8 @@ Its value is that the whole thing actually works: a real backend, real auth, per
 - Undecided: product name (the page title "ChatApp" is a scaffold default), and whether the author wants any personal attribution or links to the portfolio inside the app.
 
 ## Brand Commitments
-- No name, logo or voice to preserve yet.
+- Name: **Huginn** (chosen 2026-10-20), after Odin's messenger raven. Its sign-in comes from the separate OIDC provider **Heimdall**. The UI still says "ChatApp" until the rename in Phase 0 of `docs/huginn/roadmap.md`.
+- Goal (chosen 2026-10-20): a feature-complete showpiece first, then hardened into a real product. Priorities: end-to-end encryption first, then media; reactions are nice to have; audio-only calls in the far future (no video).
 - Standing preference (chosen 2026-10-20): the app follows the category-standard messenger layout, not a themed world. Its quality bar is Telegram / WhatsApp Web and Discord. It must still not read as a Slack or Discord clone, a stock template, or something too plain.
 
 ## Evidence on Hand
