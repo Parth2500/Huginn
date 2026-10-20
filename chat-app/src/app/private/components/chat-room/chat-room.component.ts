@@ -24,6 +24,7 @@ import {
   ConnectionState,
   IChatService,
 } from '../../services/iservices/chat.service.interface';
+import { personName, roomPartner, roomTitle } from '../../helpers/room-display';
 
 /** Consecutive messages from one person within this window share a bubble group. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -69,6 +70,8 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   @Input() connection: ConnectionState = 'connecting';
   @Input() onlineIds: Set<number> | null = null;
   @Output() back = new EventEmitter<void>();
+  /** A name or photo was clicked: show that person's profile. */
+  @Output() openProfile = new EventEmitter<IUser>();
   @ViewChild('messages') private messagesScroller: ElementRef<HTMLElement>;
   @ViewChild('composer') private composer: ElementRef<HTMLTextAreaElement>;
 
@@ -91,6 +94,8 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   private pinned = true;
   private resizeObserver?: ResizeObserver;
   private pagesLoaded = 1;
+  /** Set the moment the server creates the chat for our first message to a draft. */
+  private createdRoomId: number | undefined;
   private lastTypingSent = 0;
 
   constructor(
@@ -101,10 +106,11 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   ngOnInit() {
     this.subscription.add(
       this.chatService.getMessages().subscribe((page) => {
-        if (page.roomId !== undefined && page.roomId !== this.chatRoom?.id) {
+        if (page.roomId !== undefined && page.roomId !== this.roomId) {
           return;
         }
         this.history = [...page.items].sort(byCreatedAt);
+        this.reconcilePending();
         this.total = page.meta.totalItems;
         this.loaded = true;
         this.rebuild();
@@ -116,7 +122,7 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     );
     this.subscription.add(
       this.chatService.getOlderMessages().subscribe((page) => {
-        if (page.roomId !== this.chatRoom?.id) {
+        if (page.roomId !== this.roomId) {
           return;
         }
         this.prependOlder(page.items);
@@ -124,12 +130,32 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     );
     this.subscription.add(
       this.chatService.getTyping().subscribe(({ roomId, user }) => {
-        if (roomId !== this.chatRoom?.id || user.Id === this.me.Id) {
+        if (roomId !== this.roomId || user.Id === this.me.Id) {
           return;
         }
         clearTimeout(this.typing.get(user.Id)?.timer);
         const timer = setTimeout(() => this.typing.delete(user.Id), TYPING_TTL_MS);
-        this.typing.set(user.Id, { username: user.username, timer });
+        this.typing.set(user.Id, { username: personName(user), timer });
+      })
+    );
+    this.subscription.add(
+      this.chatService.getUserUpdated().subscribe((updated) => {
+        // Names and photos on messages already on screen follow profile changes.
+        this.history = this.history.map((m) =>
+          m.user?.Id === updated.Id ? { ...m, user: { ...m.user, ...updated } } : m
+        );
+        if (updated.Id === this.me.Id) {
+          this.me = { ...this.me, ...updated };
+        }
+        this.rebuild();
+      })
+    );
+    this.subscription.add(
+      this.chatService.getDirectRoomCreated().subscribe(({ room, partnerId }) => {
+        // Our first message turned this draft into a real chat; the server already opened it for us.
+        if (this.isDraft && this.partner?.Id === partnerId) {
+          this.createdRoomId = room.id;
+        }
       })
     );
   }
@@ -140,12 +166,22 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
       return;
     }
     const previous: IRoom | undefined = change.previousValue;
-    if (previous?.id === this.chatRoom?.id) {
+    const next: IRoom | undefined = this.chatRoom;
+    if (previous?.id !== undefined && previous.id === next?.id) {
       return;
     }
-    if (previous) {
+    // A draft that just became a real chat keeps its messages; the server joined us already.
+    if (previous && previous.id === undefined && next?.id !== undefined && next.id === this.createdRoomId) {
+      return;
+    }
+    if (previous?.id === undefined && next?.id === undefined &&
+        roomPartner(previous, this.me)?.Id === roomPartner(next, this.me)?.Id) {
+      return;
+    }
+    if (previous?.id !== undefined) {
       this.chatService.leaveRoom(previous);
     }
+    this.createdRoomId = undefined;
     this.history = [];
     this.pending = [];
     this.freshIds.clear();
@@ -158,8 +194,11 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     this.loadingOlder = false;
     this.clearTyping();
     this.chatMessage.reset('');
-    if (this.chatRoom) {
-      this.chatService.joinRoom(this.chatRoom);
+    if (next?.id !== undefined) {
+      this.chatService.joinRoom(next);
+    } else {
+      // A draft: nothing to load until the first message is sent.
+      this.loaded = true;
     }
   }
 
@@ -188,8 +227,8 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     this.clearTyping();
     this.resizeObserver?.disconnect();
     this.subscription.unsubscribe();
-    if (this.chatRoom) {
-      this.chatService.leaveRoom(this.chatRoom);
+    if (this.roomId !== undefined) {
+      this.chatService.leaveRoom({ id: this.roomId });
     }
   }
 
@@ -206,7 +245,7 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   }
 
   get membersLabel(): string {
-    const others = this.otherMembers.map((u) => u.username);
+    const others = this.otherMembers.map((u) => personName(u));
     return others.length ? `Members: you, ${others.join(', ')}` : 'Members: only you';
   }
 
@@ -230,19 +269,34 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   }
 
   get statusLine(): string {
+    const partner = this.partner;
+    if (partner) {
+      const online = this.onlineIds?.has(partner.Id!) || partner.online;
+      return `@${partner.username} · ${online ? 'online' : 'offline'}`;
+    }
     const others = this.otherMembers.length;
     const online = this.onlineOthers.length;
-    const presence =
-      others === 1
-        ? online ? `${this.otherMembers[0].username} is online` : `${this.otherMembers[0].username} is offline`
-        : online > 0 ? `${online} of ${others} others online` : `${others + 1} members`;
+    const presence = online > 0 ? `${online} of ${others} others online` : `${others + 1} members`;
     return this.chatRoom?.description ? `${this.chatRoom.description} · ${presence}` : presence;
   }
 
-  /** In a two-person room the other person stands in for the room's avatar. */
+  /** In a direct chat the other person stands in for the room's avatar and name. */
   get partner(): IUser | undefined {
-    const others = this.otherMembers;
-    return others.length === 1 ? others[0] : undefined;
+    return roomPartner(this.chatRoom, this.me);
+  }
+
+  get title(): string {
+    return roomTitle(this.chatRoom, this.me);
+  }
+
+  /** Not saved yet: the chat is created when the first message is sent. */
+  get isDraft(): boolean {
+    return this.chatRoom?.id === undefined && this.createdRoomId === undefined;
+  }
+
+  /** The saved chat's id, including one just created from this draft. */
+  get roomId(): number | undefined {
+    return this.chatRoom?.id ?? this.createdRoomId;
   }
 
   get otherMembers(): IUser[] {
@@ -256,13 +310,18 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
     }
     const pending: PendingMessage = { tempId: this.nextTempId--, text, created_at: new Date(), stalled: false };
     this.pending.push(pending);
+    const directTo = this.isDraft ? this.partner?.Id : undefined;
     setTimeout(() => {
       if (this.pending.includes(pending)) {
         pending.stalled = true;
         this.rebuild();
       }
     }, STALL_MS);
-    this.chatService.sendMessage({ text, room: this.chatRoom });
+    if (directTo !== undefined) {
+      this.chatService.sendDirectMessage(directTo, text);
+    } else {
+      this.chatService.sendMessage({ text, room: { id: this.roomId } });
+    }
     this.chatMessage.reset('');
     this.resizeComposer();
     this.rebuild();
@@ -272,18 +331,20 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   onComposerInput() {
     this.resizeComposer();
     const now = Date.now();
-    if (this.chatRoom?.id !== undefined && this.chatMessage.value?.trim() && now - this.lastTypingSent > TYPING_THROTTLE_MS) {
+    const roomId = this.roomId;
+    if (roomId !== undefined && this.chatMessage.value?.trim() && now - this.lastTypingSent > TYPING_THROTTLE_MS) {
       this.lastTypingSent = now;
-      this.chatService.sendTyping(this.chatRoom.id);
+      this.chatService.sendTyping(roomId);
     }
   }
 
   loadOlder() {
-    if (this.loadingOlder || !this.chatRoom?.id) {
+    const roomId = this.roomId;
+    if (this.loadingOlder || roomId === undefined) {
       return;
     }
     this.loadingOlder = true;
-    this.chatService.loadOlderMessages(this.chatRoom.id, this.pagesLoaded);
+    this.chatService.loadOlderMessages(roomId, this.pagesLoaded);
   }
 
   onComposerKeydown(event: KeyboardEvent) {
@@ -320,7 +381,7 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
   }
 
   private onAdded(message: IMessage) {
-    if (!this.chatRoom || message.room?.id !== this.chatRoom.id) {
+    if (this.roomId === undefined || message.room?.id !== this.roomId) {
       return;
     }
     if (this.history.some((m) => m.id === message.id)) {
@@ -364,6 +425,23 @@ export class ChatRoomComponent implements OnInit, OnChanges, AfterViewInit, OnDe
         el.scrollTop = el.scrollHeight - fromBottom;
       }
     });
+  }
+
+  /** Drops pending sends that a freshly loaded history already contains. */
+  private reconcilePending() {
+    for (const message of this.history) {
+      if (message.user?.Id !== this.me.Id) {
+        continue;
+      }
+      // Only a message saved around when we sent it can be the server's copy of a pending one.
+      const savedAt = new Date(message.created_at ?? 0).getTime();
+      const index = this.pending.findIndex(
+        (p) => p.text === message.text && savedAt >= p.created_at.getTime() - 5000
+      );
+      if (index > -1) {
+        this.pending.splice(index, 1);
+      }
+    }
   }
 
   private clearTyping() {

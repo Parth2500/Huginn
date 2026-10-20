@@ -6,7 +6,13 @@ import {
   IRoomActivity,
   ITyping,
 } from 'src/app/models/message.interface';
-import { IRoom, IRoomPaginate } from 'src/app/models/room.interface';
+import {
+  IDirectOpened,
+  IDirectRoomCreated,
+  IRoom,
+  IRoomPaginate,
+} from 'src/app/models/room.interface';
+import { IUser } from 'src/app/models/user.interface';
 
 export type ConnectionState = 'connecting' | 'online' | 'offline';
 
@@ -20,8 +26,14 @@ export interface IChatService {
   getAddedMessage(): Observable<IMessage>;
   getRoomActivity(): Observable<IRoomActivity>;
   getRoomCreated(): Observable<IRoom>;
+  /** Someone you share a chat with (or you) changed their name, photo or bio. */
+  getUserUpdated(): Observable<IUser>;
   getTyping(): Observable<ITyping>;
   sendMessage(message: IMessage): void;
+  openDirect(userId: number): void;
+  getDirectOpened(): Observable<IDirectOpened>;
+  sendDirectMessage(userId: number, text: string): void;
+  getDirectRoomCreated(): Observable<IDirectRoomCreated>;
   sendTyping(roomId: number): void;
   joinRoom(room: IRoom): void;
   leaveRoom(room: IRoom): void;

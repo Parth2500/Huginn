@@ -16,6 +16,8 @@ import {
   ConnectionState,
   IChatService,
 } from '../../services/iservices/chat.service.interface';
+import { personName, roomPartner, roomTitle, withUpdatedUser } from '../../helpers/room-display';
+import { ProfileService } from '../../services/profile.service';
 
 const PAGE_SIZE = 10;
 const APP_TITLE = 'ChatApp';
@@ -30,8 +32,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   meta: Meta | null = null;
   selectedRoom: IRoom | undefined;
   creating = false;
-  /** People picked from "Start a chat", handed to the new room form. */
-  startWith: IUser[] = [];
+  /** The sidebar search has a query, so it replaces the chat list. */
+  searching = false;
+  /** Editing your own profile in the main pane. */
+  editingProfile = false;
+  /** Someone's profile panel, open over the chat. */
+  profileUser: IUser | null = null;
   freshRoomIds = new Set<number>();
   /** Messages received this session in rooms that weren't open. */
   unread = new Map<number, number>();
@@ -50,9 +56,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
     private toast: ToastService,
     private router: Router,
     private title: Title,
+    private profiles: ProfileService,
     route: ActivatedRoute
   ) {
     this.creating = !!route.snapshot.data['create'];
+    this.editingProfile = !!route.snapshot.data['profile'];
   }
 
   ngOnInit() {
@@ -63,11 +71,37 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.chatService.getRoomActivity().subscribe((activity) => this.onActivity(activity))
     );
     this.subscription.add(
+      this.chatService.getDirectOpened().subscribe(({ partner, room }) => {
+        // An existing chat opens as usual; otherwise a draft that becomes real on the first message.
+        this.selectRoom(room ?? { type: 'direct', users: [this.user, partner] });
+      })
+    );
+    this.subscription.add(
+      this.chatService.getDirectRoomCreated().subscribe(({ room, partnerId }) => {
+        if (room.id === undefined) {
+          return;
+        }
+        this.knownRoomIds.add(room.id);
+        this.unread.delete(room.id);
+        this.updateTitle();
+        if (this.rooms && !this.rooms.some((r) => r.id === room.id)) {
+          this.rooms = [room, ...this.rooms];
+          if (this.meta) {
+            this.meta = { ...this.meta, totalItems: this.meta.totalItems + 1 };
+          }
+        }
+        const draft = this.selectedRoom;
+        if (draft && draft.id === undefined && roomPartner(draft, this.user)?.Id === partnerId) {
+          this.selectedRoom = room;
+        }
+      })
+    );
+    this.subscription.add(
       this.chatService.getRoomCreated().subscribe((room) => {
         if (room.id !== undefined) {
           this.knownRoomIds.add(room.id);
         }
-        this.toast.success(`Room “${room.name}” created.`);
+        this.toast.success(`Group “${room.name}” created.`);
         this.selectRoom(room);
       })
     );
@@ -80,6 +114,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.logout();
       })
     );
+    this.subscription.add(
+      this.chatService.getUserUpdated().subscribe((updated) => this.onUserUpdated(updated))
+    );
+    // The token carries a snapshot from sign-in; the profile (photo, display name) is fetched fresh.
+    this.profiles.loadMe().subscribe({ next: (me) => (this.user = { ...this.user, ...me }) });
     this.chatService.connect();
     this.chatService.emitPaginateRooms(PAGE_SIZE, 0);
   }
@@ -91,27 +130,76 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   selectRoom(room: IRoom) {
     this.creating = false;
+    this.editingProfile = false;
+    this.profileUser = null;
     if (room.id !== undefined) {
       this.unread.delete(room.id);
       this.updateTitle();
     }
-    if (this.selectedRoom?.id !== room.id) {
+    if (!this.isSameChat(this.selectedRoom, room)) {
       this.selectedRoom = room;
     }
+  }
+
+  /** Same saved chat, or the same not-yet-sent draft with the same person. */
+  private isSameChat(a: IRoom | undefined, b: IRoom): boolean {
+    if (!a) {
+      return false;
+    }
+    if (a.id !== undefined || b.id !== undefined) {
+      return a.id === b.id;
+    }
+    return roomPartner(a, this.user)?.Id === roomPartner(b, this.user)?.Id;
   }
 
   closeRoom() {
     this.selectedRoom = undefined;
   }
 
-  openCreate(people: IUser[] = []) {
-    this.startWith = people;
+  openCreate() {
     this.creating = true;
+    this.editingProfile = false;
+    this.profileUser = null;
+  }
+
+  openProfileEditor() {
+    this.editingProfile = true;
+    this.creating = false;
+    this.profileUser = null;
+  }
+
+  closeProfileEditor() {
+    this.editingProfile = false;
+    if (this.router.url.includes('profile')) {
+      this.router.navigate(['/private/dashboard']);
+    }
+  }
+
+  openProfile(person: IUser) {
+    if (person.Id === this.user.Id) {
+      this.openProfileEditor();
+      return;
+    }
+    this.profileUser = person;
+  }
+
+  /** "Message" from someone's profile panel. */
+  messageFromProfile(person: IUser) {
+    this.profileUser = null;
+    this.openPerson(person);
+  }
+
+  /** Whether the open chat is the direct chat with this person. */
+  isChatWith(person: IUser | null): boolean {
+    return !!person && roomPartner(this.selectedRoom, this.user)?.Id === person.Id;
+  }
+
+  onProfileSaved(me: IUser) {
+    this.user = { ...this.user, ...me };
   }
 
   closeCreate() {
     this.creating = false;
-    this.startWith = [];
     if (this.router.url.includes('create-room')) {
       this.router.navigate(['/private/dashboard']);
     }
@@ -122,17 +210,17 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.closeCreate();
   }
 
-  startChatWith(person: IUser) {
-    // Reuse an existing two-person room with them rather than making a duplicate.
+  /** Open a chat with a person: their existing direct chat, or a draft until the first message. */
+  openPerson(person: IUser) {
     const existing = (this.rooms ?? []).find(
-      (room) =>
-        room.users?.length === 2 && room.users.some((u) => u.Id === person.Id)
+      (room) => room.type === 'direct' && roomPartner(room, this.user)?.Id === person.Id
     );
     if (existing) {
       this.selectRoom(existing);
-      return;
+    } else if (person.Id !== undefined) {
+      // The chat may exist on another page of the list; the server knows.
+      this.chatService.openDirect(person.Id);
     }
-    this.openCreate([person]);
   }
 
   goToPage(page: number) {
@@ -154,7 +242,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (others.length === 0) {
       return 'Only you';
     }
-    return others.map((u) => u.username).join(', ');
+    return others.map((u) => personName(u)).join(', ');
   }
 
   preview(room: IRoom): string {
@@ -162,8 +250,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!message) {
       return `No messages yet · ${this.members(room)}`;
     }
-    const who = message.user?.Id === this.user.Id ? 'You' : message.user?.username;
-    return `${who}: ${message.text}`;
+    if (message.user?.Id === this.user.Id) {
+      return `You: ${message.text}`;
+    }
+    // In a direct chat the sender is obvious; in a group, name them.
+    return room.type === 'direct' ? message.text : `${personName(message.user)}: ${message.text}`;
+  }
+
+  chatTitle(room: IRoom): string {
+    return roomTitle(room, this.user);
   }
 
   /** Last activity: a time today, "Yesterday", or a short date. */
@@ -190,10 +285,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return (room.users ?? []).filter((u) => u.Id !== this.user.Id);
   }
 
-  /** A two-person room shows the other person's presence on its avatar. */
+  /** A direct chat shows the other person, with their presence, as its avatar. */
   directPartner(room: IRoom): IUser | undefined {
-    const others = this.othersIn(room);
-    return others.length === 1 ? others[0] : undefined;
+    return roomPartner(room, this.user);
   }
 
   trackRoom(_: number, room: IRoom) {
@@ -227,9 +321,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
     if (!this.rooms) {
       return;
     }
+    const fromMe = message.user?.Id === this.user.Id;
     const index = this.rooms.findIndex((room) => room.id === roomId);
+    const draft = this.selectedRoom;
+    if (index === -1 && draft && draft.id === undefined && !fromMe &&
+        roomPartner(draft, this.user)?.Id === message.user?.Id) {
+      // They wrote first while we had a draft open with them: swap the draft for the real chat.
+      this.chatService.openDirect(message.user!.Id!);
+      this.chatService.emitPaginateRooms(PAGE_SIZE, 0);
+      return;
+    }
     if (index === -1) {
-      // Not on this page: a fresh first page brings it to the top.
+      // A chat we don't have yet (someone's first message to us) or one on another page:
+      // count it, and a fresh first page brings it to the top.
+      if (!fromMe && this.selectedRoom?.id !== roomId) {
+        this.unread.set(roomId, (this.unread.get(roomId) ?? 0) + 1);
+        this.updateTitle();
+      }
       if (this.meta?.currentPage === 0) {
         this.chatService.emitPaginateRooms(PAGE_SIZE, 0);
       }
@@ -239,10 +347,23 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const rest = this.rooms.filter((_, i) => i !== index);
     this.rooms = this.meta?.currentPage === 0 ? [room, ...rest] : this.rooms.map((r, i) => (i === index ? room : r));
 
-    const fromMe = message.user?.Id === this.user.Id;
     if (!fromMe && this.selectedRoom?.id !== roomId) {
       this.unread.set(roomId, (this.unread.get(roomId) ?? 0) + 1);
       this.updateTitle();
+    }
+  }
+
+  /** A name, photo or bio changed: update every copy we hold. */
+  private onUserUpdated(updated: IUser) {
+    if (updated.Id === this.user.Id) {
+      this.user = { ...this.user, ...updated };
+    }
+    this.rooms = this.rooms?.map((room) => withUpdatedUser(room, updated)) ?? null;
+    if (this.selectedRoom) {
+      this.selectedRoom = withUpdatedUser(this.selectedRoom, updated);
+    }
+    if (this.profileUser?.Id === updated.Id) {
+      this.profileUser = { ...this.profileUser, ...updated };
     }
   }
 
@@ -250,7 +371,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const id = room.id as number;
     this.freshRoomIds.add(id);
     setTimeout(() => this.freshRoomIds.delete(id), 2400);
-    this.toast.show(`You were added to “${room.name}”.`);
+    // A new direct chat announces itself with its unread badge; groups say who added you.
+    if (room.type !== 'direct') {
+      this.toast.show(`You were added to the group “${room.name}”.`);
+    }
   }
 
   private updateTitle() {

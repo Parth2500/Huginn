@@ -1,18 +1,18 @@
 <section class="start" aria-labelledby="start-title">
   <div class="start-inner">
     <span class="empty-icon"><app-icon name="message"></app-icon></span>
-    <h1 id="start-title">{{ hasRooms ? 'Pick a room, or start a new chat' : 'Start your first chat' }}</h1>
-    <p class="lede">Search for someone by username. Picking them opens a new room with them in it, ready to name and send.</p>
+    <h1 id="start-title">{{ hasRooms ? 'Pick a chat, or start a new one' : 'Start your first chat' }}</h1>
+    <p class="lede">Search for someone by username and send them a message. The chat appears on their side when your first message arrives.</p>
 
-    <app-people-search class="start-search" placeholder="Search people, e.g. ma" actionLabel="Message"
+    <app-people-search class="start-search" placeholder="Search people by username" actionLabel="Message"
       [excludeIds]="[me.Id]" [onlineIds]="onlineIds" (pick)="pick.emit($event)">
-      Type the first letters of a username to see matches.
+      Type any part of a username to see matches.
     </app-people-search>
 
     <ol class="steps">
-      <li><span class="step-n">1</span><span><b>Find people</b> by username, or use <b>New room</b> to add several at once.</span></li>
-      <li><span class="step-n">2</span><span><b>Name the room</b>. Everyone you add sees it in their list straight away.</span></li>
-      <li><span class="step-n">3</span><span><b>Chat live</b>. Messages, typing and who's online update without refreshing.</span></li>
+      <li><span class="step-n">1</span><span><b>Find someone</b> here or in the sidebar search. Only usernames are shown, never emails.</span></li>
+      <li><span class="step-n">2</span><span><b>Send a message</b>. That starts the chat, and it shows up in their list.</span></li>
+      <li><span class="step-n">3</span><span><b>Need more people?</b> Use <b>New group</b> for three or more.</span></li>
     </ol>
 
     <p class="tip"><app-icon name="users"></app-icon>Demoing on your own? Sign in as a second user in a private window to watch messages arrive live.</p>

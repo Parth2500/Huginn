@@ -1,0 +1,41 @@
+<div class="scrim" (click)="close.emit()" aria-hidden="true"></div>
+<aside class="panel" role="dialog" aria-modal="false" aria-labelledby="profile-name">
+  <header class="panel-head">
+    <h2>Profile</h2>
+    <button #closeButton type="button" class="icon-btn" (click)="close.emit()" aria-label="Close profile">
+      <app-icon name="x"></app-icon>
+    </button>
+  </header>
+
+  <div class="body">
+    <app-avatar [user]="shown" size="xl" [online]="online"></app-avatar>
+    <h3 id="profile-name">{{ shown | displayName }}</h3>
+    <p class="handle">@{{ shown.username }}</p>
+    <p class="presence" [class.on]="online">{{ online ? 'Online' : 'Offline' }}</p>
+
+    <div class="actions" *ngIf="!isMe && !inChatWith">
+      <button type="button" class="btn btn-primary" (click)="message.emit(shown)">
+        <app-icon name="message"></app-icon> Message
+      </button>
+    </div>
+
+    <dl class="facts">
+      <div *ngIf="shown.bio">
+        <dt>Bio</dt>
+        <dd class="bio">{{ shown.bio }}</dd>
+      </div>
+      <div>
+        <dt>Username</dt>
+        <dd>@{{ shown.username }}</dd>
+      </div>
+      <div *ngIf="joined() as when">
+        <dt>Joined</dt>
+        <dd>{{ when }}</dd>
+      </div>
+    </dl>
+
+    <p class="loading" *ngIf="!profile && !failed" role="status"><span class="spinner" aria-hidden="true"></span> Loading profile…</p>
+    <p class="loading" *ngIf="failed" role="status">Couldn't load the full profile right now.</p>
+    <p class="private" *ngIf="profile">Emails are never shown to other people.</p>
+  </div>
+</aside>

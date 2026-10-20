@@ -19,6 +19,11 @@ const routes: Routes = [
     data: { create: true },
   },
   {
+    path: 'profile',
+    component: DashboardComponent,
+    data: { profile: true },
+  },
+  {
     path: '**',
     redirectTo: 'dashboard',
     pathMatch: 'full',

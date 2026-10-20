@@ -1,0 +1,88 @@
+:host {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.scrim {
+  position: absolute;
+  inset: 0;
+  background: var(--scrim);
+  pointer-events: auto;
+  animation: fade 200ms ease;
+}
+
+.panel {
+  position: relative;
+  width: min(360px, 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+  animation: slide 280ms var(--ease-out);
+}
+
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 12px 0 20px;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  color: var(--text-2);
+  h2 { font-size: 16px; font-weight: 700; color: var(--text); }
+}
+
+.body {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 32px 24px;
+  text-align: center;
+
+  app-avatar { --ring: var(--surface); margin-bottom: 16px; }
+  h3 { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; line-height: 1.25; overflow-wrap: anywhere; }
+}
+
+.handle { margin-top: 2px; color: var(--text-2); }
+.presence { margin-top: 6px; font-size: 13px; color: var(--text-2); }
+
+.actions { margin-top: 20px; .btn { min-width: 160px; } }
+
+.facts {
+  width: 100%;
+  margin: 28px 0 0;
+  padding: 0;
+  text-align: left;
+  border-top: 1px solid var(--line);
+
+  div { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  dt { font-size: 12px; font-weight: 600; color: var(--text-2); margin-bottom: 2px; }
+  dd { margin: 0; overflow-wrap: anywhere; }
+  .bio { white-space: pre-wrap; }
+}
+
+.loading, .private {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 16px;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+@media (max-width: 767px) {
+  .panel { width: 100%; border-left: 0; }
+}

@@ -11,15 +11,6 @@ import { IUser } from 'src/app/models/user.interface';
 export class CreateRoomComponent implements AfterViewInit {
   @Input() me: IUser = {};
   @Input() onlineIds: Set<number> | null = null;
-  /** People chosen before the form opened, e.g. from "Start a chat". */
-  @Input() set initialUsers(users: IUser[] | null) {
-    for (const user of users ?? []) {
-      this.addUser(user);
-    }
-    if (users?.length && !this.name.value) {
-      this.name.setValue([this.me.username, ...users.map((u) => u.username)].join(', '));
-    }
-  }
   @ViewChild('nameInput') private nameInput: ElementRef<HTMLInputElement>;
   @Output() created = new EventEmitter<IRoom>();
   @Output() cancel = new EventEmitter<void>();
@@ -27,7 +18,8 @@ export class CreateRoomComponent implements AfterViewInit {
   form: FormGroup = new FormGroup({
     name: new FormControl<string | null>(null, [Validators.required, Validators.maxLength(60)]),
     description: new FormControl<string | null>(null, [Validators.maxLength(140)]),
-    users: new FormArray<FormControl<IUser>>([], [Validators.required]),
+    // Groups are for three or more; one other person is a direct chat.
+    users: new FormArray<FormControl<IUser>>([], [Validators.required, Validators.minLength(2)]),
   });
 
   submitted = false;
@@ -56,7 +48,7 @@ export class CreateRoomComponent implements AfterViewInit {
       return;
     }
     this.users.push(
-      new FormControl<IUser>({ Id: user.Id, username: user.username, email: user.email }, { nonNullable: true })
+      new FormControl<IUser>({ Id: user.Id, username: user.username }, { nonNullable: true })
     );
   }
 

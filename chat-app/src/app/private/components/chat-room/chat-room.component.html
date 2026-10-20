@@ -1,30 +1,44 @@
-<section class="room" [attr.aria-label]="chatRoom.name">
+<section class="room" [attr.aria-label]="title">
   <header class="room-head">
-    <button type="button" class="icon-btn back" (click)="back.emit()" aria-label="Back to rooms">
+    <button type="button" class="icon-btn back" (click)="back.emit()" aria-label="Back to chats">
       <app-icon name="arrow-left"></app-icon>
     </button>
-    <span class="avatar" *ngIf="partner as person; else roomAvatar" [ngClass]="person.Id | tone"
-      [class.online]="onlineIds?.has(person.Id!)">{{ person.username | initials }}</span>
-    <ng-template #roomAvatar><span class="avatar" [ngClass]="chatRoom.id | tone">{{ chatRoom.name | initials }}</span></ng-template>
-    <div class="titles">
-      <h1>{{ chatRoom.name }}</h1>
-      <p *ngIf="typingLabel; else status" class="typing" aria-live="polite">
-        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typingLabel }}
-      </p>
-      <ng-template #status><p>{{ statusLine }}</p></ng-template>
-    </div>
+    <!-- In a direct chat the header is the way into the other person's profile. -->
+    <button type="button" class="identity" *ngIf="partner as person; else groupIdentity" (click)="openProfile.emit(person)"
+      [attr.aria-label]="'View profile of ' + title">
+      <app-avatar [user]="person" [online]="!!onlineIds?.has(person.Id!)"></app-avatar>
+      <span class="titles">
+        <span class="title-text" role="heading" aria-level="1">{{ title }}</span>
+        <span *ngIf="typingLabel; else statusInline" class="sub typing" aria-live="polite">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typingLabel }}
+        </span>
+        <ng-template #statusInline><span class="sub">{{ statusLine }}</span></ng-template>
+      </span>
+    </button>
+    <ng-template #groupIdentity>
+      <span class="avatar" [ngClass]="chatRoom.id | tone">{{ chatRoom.name | initials }}</span>
+      <div class="titles">
+        <h1>{{ title }}</h1>
+        <p *ngIf="typingLabel; else status" class="typing" aria-live="polite">
+          <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typingLabel }}
+        </p>
+      </div>
+    </ng-template>
+    <ng-template #status><p>{{ statusLine }}</p></ng-template>
     <div class="people" role="group" [attr.aria-label]="membersLabel" *ngIf="!partner">
-      <span class="stack" aria-hidden="true">
-        <span *ngFor="let member of otherMembers | slice: 0 : 3" class="avatar sm" [ngClass]="member.Id | tone"
-          [class.online]="onlineIds?.has(member.Id!)"
-          [title]="member.username + (onlineIds?.has(member.Id!) ? ' · online' : '')">{{ member.username | initials }}</span>
-        <span class="avatar sm more" *ngIf="otherMembers.length > 3">+{{ otherMembers.length - 3 }}</span>
+      <span class="stack">
+        <button type="button" *ngFor="let member of otherMembers | slice: 0 : 3" class="member"
+          (click)="openProfile.emit(member)" [attr.aria-label]="'View profile of ' + (member | displayName)"
+          [title]="(member | displayName) + (onlineIds?.has(member.Id!) ? ' · online' : '')">
+          <app-avatar [user]="member" size="sm" [online]="!!onlineIds?.has(member.Id!)"></app-avatar>
+        </button>
+        <span class="avatar sm more" *ngIf="otherMembers.length > 3" aria-hidden="true">+{{ otherMembers.length - 3 }}</span>
       </span>
     </div>
   </header>
 
   <div class="stream" #messages role="log" aria-live="polite" [attr.aria-busy]="!loaded"
-    [attr.aria-label]="'Messages in ' + chatRoom.name" (scroll)="onStreamScroll()">
+    [attr.aria-label]="'Messages with ' + title" (scroll)="onStreamScroll()">
     <div class="stream-inner">
       <!-- Loading -->
       <div class="loading" *ngIf="!loaded" aria-label="Loading messages">
@@ -36,9 +50,19 @@
 
       <!-- Empty -->
       <div class="empty" *ngIf="loaded && rows.length === 0">
-        <span class="empty-icon"><app-icon name="message"></app-icon></span>
-        <p class="title">No messages yet</p>
-        <p>Say hello. Everyone in the room sees it the moment you send it.</p>
+        <ng-container *ngIf="partner as person; else groupEmpty">
+          <button type="button" class="empty-person" (click)="openProfile.emit(person)" [attr.aria-label]="'View profile of ' + title">
+            <app-avatar [user]="person" size="lg" [online]="!!onlineIds?.has(person.Id!)"></app-avatar>
+          </button>
+          <p class="title">{{ isDraft ? 'Say hi to ' + title : 'No messages yet' }}</p>
+          <p *ngIf="isDraft">This chat starts when you send your first message. {{ title }} won't see it until then.</p>
+          <p *ngIf="!isDraft">Messages you send appear for {{ title }} straight away.</p>
+        </ng-container>
+        <ng-template #groupEmpty>
+          <span class="empty-icon"><app-icon name="users"></app-icon></span>
+          <p class="title">No messages yet</p>
+          <p>Say hello. Everyone in {{ title }} sees it the moment you send it.</p>
+        </ng-template>
       </div>
 
       <div class="history-note" *ngIf="truncated">
@@ -48,12 +72,15 @@
         </button>
         <span>{{ shownCount }} of {{ total }} shown</span>
       </div>
-      <p class="history-note" *ngIf="loaded && !truncated && rows.length > 0">This is the start of {{ chatRoom.name }}.</p>
+      <p class="history-note" *ngIf="loaded && !truncated && rows.length > 0">
+        {{ partner ? 'This is the start of your chat with ' + title + '.' : 'This is the start of ' + title + '.' }}
+      </p>
 
       <ng-container *ngFor="let row of rows; trackBy: trackRow">
         <div class="day" *ngIf="row.kind === 'day'"><span>{{ row.label }}</span></div>
         <app-chat-message *ngIf="row.kind === 'message'" [message]="row.message" [own]="row.own"
-          [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh">
+          [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh" [showSender]="!partner"
+          (openSender)="openProfile.emit($event)">
         </app-chat-message>
       </ng-container>
     </div>
@@ -72,9 +99,9 @@
       {{ connection === 'connecting' ? 'Connecting to the chat server…' : "You're offline. Messages you send will go out when the connection is back." }}
     </p>
     <div class="composer-row">
-      <label class="visually-hidden" for="composer-input">Message {{ chatRoom.name }}</label>
+      <label class="visually-hidden" for="composer-input">Message {{ title }}</label>
       <textarea id="composer-input" #composer rows="1" [formControl]="chatMessage"
-        [placeholder]="'Message ' + chatRoom.name" (keydown)="onComposerKeydown($event)"
+        [placeholder]="'Message ' + title" (keydown)="onComposerKeydown($event)"
         (input)="onComposerInput()" enterkeyhint="send" aria-describedby="composer-hint" maxlength="2000"></textarea>
       <button type="submit" class="send" [disabled]="!canSend" aria-label="Send message">
         <app-icon name="send"></app-icon>

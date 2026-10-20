@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, EventEmitter, Input, Output } from '@angular/core';
+import { IUser } from 'src/app/models/user.interface';
 import { IMessage } from 'src/app/models/message.interface';
 import { MessageStatus } from '../chat-room/chat-room.component';
 
@@ -17,4 +18,7 @@ export class ChatMessageComponent {
   @Input() last = true;
   @Input() status: MessageStatus = null;
   @Input() fresh = false;
+  /** Groups name and picture each sender; a direct chat has only one other person. */
+  @Input() showSender = true;
+  @Output() openSender = new EventEmitter<IUser>();
 }

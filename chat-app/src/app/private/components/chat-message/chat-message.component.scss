@@ -15,7 +15,17 @@
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
 }
 
-.avatar.placeholder { visibility: hidden; }
+.sender-avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  &.placeholder { visibility: hidden; pointer-events: none; }
+}
 
 .bubble {
   position: relative;
@@ -42,6 +52,14 @@
 }
 
 .sender {
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  &:hover { text-decoration: underline; text-underline-offset: 2px; }
   margin-bottom: 1px;
   font-size: 13px;
   font-weight: 700;

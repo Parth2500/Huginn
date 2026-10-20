@@ -15,11 +15,51 @@
   .back { display: none; margin-left: -8px; color: var(--text-2); }
 }
 
+.identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+  margin: -6px -8px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: var(--radius-m);
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  app-avatar { --ring: var(--surface); }
+  &:hover { background: var(--surface-2); app-avatar { --ring: var(--surface-2); } }
+}
+
+.member {
+  display: inline-grid;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  app-avatar { --ring: var(--surface); }
+  &:hover app-avatar { transform: translateY(-1px); }
+}
+
+.empty-person {
+  padding: 0;
+  margin-bottom: 6px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  app-avatar { --ring: var(--bg); }
+}
+
 .titles {
+  display: grid;
   min-width: 0;
   flex: 1;
-  h1 { font-size: 16px; font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  p { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .title-text, h1 { font-size: 16px; font-weight: 700; line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  p, .sub { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 }
 
 .people { display: flex; align-items: center; gap: 10px; flex: none; }

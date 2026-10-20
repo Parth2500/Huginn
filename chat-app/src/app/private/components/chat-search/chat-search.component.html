@@ -1,0 +1,48 @@
+<div class="field" role="search">
+  <app-icon name="search"></app-icon>
+  <input #input type="search" [formControl]="query" placeholder="Search people and chats" aria-label="Search people and chats"
+    role="combobox" aria-autocomplete="list" aria-controls="chat-search-results" [attr.aria-expanded]="!!term"
+    [attr.aria-activedescendant]="term && results.length ? 'chat-search-' + active : null"
+    autocomplete="off" autocapitalize="off" spellcheck="false" (keydown)="onKeydown($event)" />
+  <span class="spinner" *ngIf="searching" aria-hidden="true"></span>
+  <button type="button" class="clear" *ngIf="term && !searching" (click)="clear(); focus()" aria-label="Clear search">
+    <app-icon name="x"></app-icon>
+  </button>
+</div>
+
+<div class="results" id="chat-search-results" role="listbox" aria-label="Search results" *ngIf="term">
+  <ng-container *ngIf="chats.length">
+    <p class="group-label" role="presentation">Chats</p>
+    <div *ngFor="let room of chats; let i = index" class="result" role="option" [id]="'chat-search-' + i"
+      [class.active]="active === i" [attr.aria-selected]="active === i" (mouseenter)="active = i"
+      (mousedown)="$event.preventDefault()" (click)="pickChat(room)">
+      <app-avatar *ngIf="partner(room) as person; else groupAvatar" [user]="person"
+        [online]="!!onlineIds?.has(person.Id!)"></app-avatar>
+      <ng-template #groupAvatar><span class="avatar" [ngClass]="room.id | tone">{{ room.name | initials }}</span></ng-template>
+      <span class="lines">
+        <span class="name">{{ title(room) }}</span>
+        <span class="sub">{{ partner(room) ? '@' + partner(room)!.username : (room.users?.length ?? 0) + ' members' }}</span>
+      </span>
+    </div>
+  </ng-container>
+
+  <ng-container *ngIf="newPeople.length">
+    <p class="group-label" role="presentation">People</p>
+    <div *ngFor="let user of newPeople; let j = index" class="result" role="option" [id]="'chat-search-' + (chats.length + j)"
+      [class.active]="active === chats.length + j" [attr.aria-selected]="active === chats.length + j"
+      (mouseenter)="active = chats.length + j" (mousedown)="$event.preventDefault()" (click)="pickPerson(user)">
+      <app-avatar [user]="user" [online]="!!onlineIds?.has(user.Id!)"></app-avatar>
+      <span class="lines">
+        <span class="name">{{ user | displayName }}</span>
+        <span class="sub">@{{ user.username }}{{ onlineIds?.has(user.Id!) ? ' · online' : '' }}</span>
+      </span>
+      <app-icon class="go" name="message"></app-icon>
+    </div>
+  </ng-container>
+
+  <p class="none" *ngIf="!searching && !failed && results.length === 0" role="status">
+    No chats or people match “{{ term }}”.
+  </p>
+  <p class="none" *ngIf="failed" role="status">Couldn't search people right now. Check your connection.</p>
+  <p class="none" *ngIf="searching && results.length === 0" role="status">Searching…</p>
+</div>

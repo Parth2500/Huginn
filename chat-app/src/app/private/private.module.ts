@@ -13,6 +13,9 @@ import { CreateRoomComponent } from './components/create-room/create-room.compon
 import { SelectUsersComponent } from './components/select-users/select-users.component';
 import { PeopleSearchComponent } from './components/people-search/people-search.component';
 import { StartChatComponent } from './components/start-chat/start-chat.component';
+import { ChatSearchComponent } from './components/chat-search/chat-search.component';
+import { ProfilePanelComponent } from './components/profile-panel/profile-panel.component';
+import { ProfileEditComponent } from './components/profile-edit/profile-edit.component';
 import { PublicModule } from '../public/public.module';
 import { SharedModule } from '../shared/shared.module';
 
@@ -25,6 +28,9 @@ import { SharedModule } from '../shared/shared.module';
     SelectUsersComponent,
     PeopleSearchComponent,
     StartChatComponent,
+    ChatSearchComponent,
+    ProfilePanelComponent,
+    ProfileEditComponent,
   ],
   imports: [
     PrivateRoutingModule,

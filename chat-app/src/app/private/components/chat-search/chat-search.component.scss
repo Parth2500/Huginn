@@ -1,0 +1,79 @@
+:host { display: block; }
+
+.field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  margin: 12px 12px 4px;
+  padding: 0 8px 0 12px;
+  border: 1px solid var(--side-line);
+  border-radius: var(--radius-m);
+  background: var(--side-bg-2);
+  color: var(--side-text-2);
+  transition: border-color 120ms ease;
+
+  > app-icon { width: 17px; height: 17px; flex: none; }
+  input {
+    flex: 1;
+    min-width: 0;
+    height: 100%;
+    border: 0;
+    background: transparent;
+    color: var(--side-text);
+    font-size: 14px;
+    outline: none;
+    caret-color: var(--side-text);
+    &::placeholder { color: var(--side-text-2); opacity: 1; }
+    &::-webkit-search-cancel-button { display: none; }
+  }
+  .spinner { width: 14px; height: 14px; flex: none; }
+  &:focus-within { border-color: var(--accent); outline: 2px solid var(--accent); outline-offset: 0; }
+}
+
+.clear {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--side-text-2);
+  cursor: pointer;
+  app-icon { width: 15px; height: 15px; }
+  &:hover { background: var(--side-line); color: var(--side-text); }
+}
+
+.results { padding: 4px 8px 8px; }
+
+.group-label {
+  padding: 12px 8px 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--side-text-2);
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border-radius: var(--radius-m);
+  color: var(--side-text);
+  cursor: pointer;
+
+  .avatar { --ring: var(--side-bg); }
+  &.active { background: var(--side-bg-2); .avatar { --ring: var(--side-bg-2); } }
+}
+
+.lines { display: grid; min-width: 0; flex: 1; line-height: 1.35; }
+.name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sub { font-size: 13px; color: var(--side-text-2); }
+.go { width: 18px; height: 18px; color: var(--side-text-2); visibility: hidden; }
+.result.active .go { visibility: visible; }
+
+.none { padding: 16px 8px; font-size: 14px; color: var(--side-text-2); }
