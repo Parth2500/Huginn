@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   IPaginationOptions,
@@ -12,11 +12,26 @@ import { Repository } from 'typeorm';
 import { IMessageService } from '../iservices/message.service.interface';
 
 @Injectable()
-export class MessageService implements IMessageService {
+export class MessageService implements IMessageService, OnModuleInit {
+  private readonly logger = new Logger(MessageService.name);
+
   constructor(
     @InjectRepository(Message)
     private readonly messageRepository: Repository<Message>,
   ) {}
+
+  /** History is read newest-first per chat; this index keeps that a short index range scan. */
+  async onModuleInit() {
+    try {
+      await this.messageRepository.query(
+        'CREATE INDEX IF NOT EXISTS message_room_id_desc ON message ("roomId", id DESC)',
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Message index setup skipped: ${error?.message ?? error}`,
+      );
+    }
+  }
 
   async create(message: IMessage): Promise<IMessage> {
     return this.messageRepository.save(this.messageRepository.create(message));

@@ -18,8 +18,17 @@ export class Room implements IRoom {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column()
+  /** 'direct' for a one-to-one chat, 'group' for a named room. */
+  @Column({ default: 'group' })
+  type: 'direct' | 'group';
+
+  /** Groups have a name; direct chats are named after the other person on each side. */
+  @Column({ nullable: true })
   name: string;
+
+  /** "<lower user id>:<higher user id>" for direct chats, so each pair has at most one. */
+  @Column({ nullable: true, unique: true })
+  directKey: string;
 
   @Column({ nullable: true })
   description: string;

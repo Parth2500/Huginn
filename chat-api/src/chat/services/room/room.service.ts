@@ -15,8 +15,42 @@ export class RoomService implements IRoomService {
   ) {}
 
   async createRoom(room: IRoom, creator: IUser): Promise<IRoom> {
-    const newRoom = await this.addCreatorToRoom(room, creator);
+    const newRoom = await this.addCreatorToRoom(
+      { ...room, type: 'group' },
+      creator,
+    );
     return this.roomRepository.save(newRoom);
+  }
+
+  async findDirect(userId: number, otherId: number): Promise<IRoom | null> {
+    return this.roomRepository.findOne({
+      where: { directKey: directKey(userId, otherId) },
+      relations: { users: true },
+    });
+  }
+
+  /** Finds or creates the one direct chat between two users. Safe when both start it at once. */
+  async findOrCreateDirect(userId: number, otherId: number): Promise<IRoom> {
+    const existing = await this.findDirect(userId, otherId);
+    if (existing) {
+      return existing;
+    }
+    try {
+      const created = await this.roomRepository.save({
+        type: 'direct',
+        name: null,
+        directKey: directKey(userId, otherId),
+        users: [{ Id: userId }, { Id: otherId }],
+      } as Room);
+      return this.getRoom(created.id);
+    } catch (error) {
+      // Unique directKey: the other person created it a moment ago.
+      const raced = await this.findDirect(userId, otherId);
+      if (raced) {
+        return raced;
+      }
+      throw error;
+    }
   }
 
   async getRoom(roomId: number): Promise<IRoom> {
@@ -55,9 +89,14 @@ export class RoomService implements IRoomService {
     const ids = rows.map((row) => Number(row.id));
 
     const rooms = ids.length
-      ? await this.roomRepository.find({ where: { id: In(ids) }, relations: { users: true } })
+      ? await this.roomRepository.find({
+          where: { id: In(ids) },
+          relations: { users: true },
+        })
       : [];
-    const items = ids.map((id) => rooms.find((room) => room.id === id)).filter(Boolean);
+    const items = ids
+      .map((id) => rooms.find((room) => room.id === id))
+      .filter(Boolean);
 
     return new Pagination<IRoom>(items, {
       totalItems,
@@ -78,6 +117,18 @@ export class RoomService implements IRoomService {
     return count > 0;
   }
 
+  /** Everyone who shares at least one chat with the user: the people who see their presence. */
+  async findContactIds(userId: number): Promise<number[]> {
+    const rows: { id: number }[] = await this.roomRepository.query(
+      `SELECT DISTINCT other."userId" AS id
+         FROM room_users_user mine
+         JOIN room_users_user other ON other."roomId" = mine."roomId"
+        WHERE mine."userId" = $1 AND other."userId" <> $1`,
+      [userId],
+    );
+    return rows.map((row) => Number(row.id));
+  }
+
   /** Marks the room as active now, so room lists sort by latest activity. */
   async touch(roomId: number): Promise<void> {
     await this.roomRepository.update(roomId, { updated_at: new Date() });
@@ -88,4 +139,8 @@ export class RoomService implements IRoomService {
     room.users = [...users, creator];
     return room;
   }
+}
+
+function directKey(a: number, b: number): string {
+  return a < b ? `${a}:${b}` : `${b}:${a}`;
 }
