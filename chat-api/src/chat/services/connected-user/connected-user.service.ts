@@ -20,9 +20,18 @@ export class ConnectedUserService implements IConnectedUserService {
   async findByUser(user: IUser): Promise<IConnectedUser[]> {
     return this.connectedUserRepository.find({
       where: {
-        user: user,
+        user: { Id: user.Id },
       },
     });
+  }
+
+  async findOnlineUserIds(): Promise<number[]> {
+    const rows = await this.connectedUserRepository
+      .createQueryBuilder('connection')
+      .leftJoin('connection.user', 'user')
+      .select('DISTINCT user.Id', 'id')
+      .getRawMany<{ id: number }>();
+    return rows.map((row) => Number(row.id));
   }
 
   async deleteBySocketId(socketId: string) {

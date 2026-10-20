@@ -29,8 +29,9 @@ export class JoinedRoomService implements IJoinedRoomService {
   async findByRoom(room: IRoom): Promise<IJoinedRoom[]> {
     return this.joinedRoomRepository.find({
       where: {
-        room: room,
+        room: { id: room.id },
       },
+      relations: { user: true },
     });
   }
 

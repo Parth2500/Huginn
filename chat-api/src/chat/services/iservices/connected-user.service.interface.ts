@@ -4,6 +4,7 @@ import { IUser } from 'src/user/entities/user.interface';
 export interface IConnectedUserService {
   create(connectedUser: IConnectedUser): Promise<IConnectedUser>;
   findByUser(user: IUser): Promise<IConnectedUser[]>;
+  findOnlineUserIds(): Promise<number[]>;
   deleteBySocketId(socketId: string);
   deleteAll();
 }

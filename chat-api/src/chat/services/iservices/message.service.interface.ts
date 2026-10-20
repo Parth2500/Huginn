@@ -8,6 +8,7 @@ export interface IMessageService {
     room: IRoom,
     options: IPaginationOptions,
   ): Promise<Pagination<IMessage>>;
+  findLatestForRooms(roomIds: number[]): Promise<Map<number, IMessage>>;
 }
 
 export const MessageToken = 'MessageService';

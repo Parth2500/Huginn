@@ -31,8 +31,37 @@ export class MessageService implements IMessageService {
       .leftJoin('message.room', 'room')
       .where('room.id = :roomId', { roomId: room.id })
       .leftJoinAndSelect('message.user', 'user')
-      .orderBy('message.created_at', 'DESC');
+      // Insertion order: ids are monotonic, created_at can tie under bursts.
+      .orderBy('message.id', 'DESC');
 
     return paginate(query, options);
+  }
+
+  /** Latest message of each room, keyed by room id, for room list previews. */
+  async findLatestForRooms(roomIds: number[]): Promise<Map<number, IMessage>> {
+    const latest = new Map<number, IMessage>();
+    if (roomIds.length === 0) {
+      return latest;
+    }
+    const messages = await this.messageRepository
+      .createQueryBuilder('message')
+      .leftJoinAndSelect('message.room', 'room')
+      .leftJoinAndSelect('message.user', 'user')
+      .where('room.id IN (:...roomIds)', { roomIds })
+      .distinctOn(['room.id'])
+      .orderBy('room.id')
+      .addOrderBy('message.id', 'DESC')
+      .getMany();
+    for (const message of messages) {
+      latest.set(message.room.id, {
+        id: message.id,
+        text: message.text,
+        user: message.user,
+        room: { id: message.room.id },
+        created_at: message.created_at,
+        updated_at: message.updated_at,
+      });
+    }
+    return latest;
   }
 }

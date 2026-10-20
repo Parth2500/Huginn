@@ -9,6 +9,8 @@ export interface IRoomService {
     userId: number,
     options: IPaginationOptions,
   ): Promise<Pagination<IRoom>>;
+  isMember(roomId: number, userId: number): Promise<boolean>;
+  touch(roomId: number): Promise<void>;
   addCreatorToRoom(room: IRoom, creator: IUser): Promise<IRoom>;
 }
 
