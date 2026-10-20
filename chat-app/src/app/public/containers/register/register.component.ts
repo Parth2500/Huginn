@@ -1,4 +1,4 @@
-import { HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, Inject, OnDestroy } from '@angular/core';
 import {
   AbstractControl,
@@ -12,6 +12,11 @@ import {
 import { Router } from '@angular/router';
 import { finalize, Subscription, switchMap } from 'rxjs';
 import { ToastService } from 'src/app/shared/toast/toast.service';
+import { normalizeUsername } from 'src/app/shared/username-policy';
+import {
+  usernameAvailableValidator,
+  usernameShapeValidator,
+} from 'src/app/shared/username.validators';
 import { PasswordStrengthValidator } from '../../helpers/validators/password-strength.validator';
 import {
   ISignOnService,
@@ -35,7 +40,8 @@ export class RegisterComponent implements OnDestroy {
     email: [null, [Validators.required, Validators.email]],
     username: [
       null,
-      [Validators.required, Validators.maxLength(24), Validators.pattern(/^[A-Za-z0-9._-]+$/)],
+      [Validators.required, usernameShapeValidator()],
+      [usernameAvailableValidator(this.http)],
     ],
     password: [
       null,
@@ -71,6 +77,7 @@ export class RegisterComponent implements OnDestroy {
   );
 
   constructor(
+    private http: HttpClient,
     @Inject(SignOnToken) private signOnService: ISignOnService,
     private router: Router,
     private toast: ToastService
@@ -92,7 +99,7 @@ export class RegisterComponent implements OnDestroy {
     const credentials = { email: this.email.value, password: this.password.value };
     let created = false;
     this.signOnService
-      .createUser({ ...credentials, username: this.username.value?.trim() })
+      .createUser({ ...credentials, username: normalizeUsername(this.username.value) })
       .pipe(
         // Sign straight in, so a new account lands in the app rather than back on a form.
         switchMap((user) => {
@@ -112,6 +119,27 @@ export class RegisterComponent implements OnDestroy {
           this.serverError = describeAuthError(error, 'register');
         },
       });
+  }
+
+  /** What to say under the username field: an error, a pending check, availability or a hint. */
+  get usernameMessage(): { kind: 'error' | 'ok' | 'hint' | 'checking'; text: string } {
+    const control = this.username;
+    if (control.hasError('required') && (control.touched || this.submitted)) {
+      return { kind: 'error', text: 'Choose a username.' };
+    }
+    if (control.value && control.hasError('username')) {
+      return { kind: 'error', text: control.getError('username') };
+    }
+    if (control.pending) {
+      return { kind: 'checking', text: 'Checking…' };
+    }
+    if (control.hasError('usernameTaken')) {
+      return { kind: 'error', text: control.getError('usernameTaken') };
+    }
+    if (control.value && control.valid) {
+      return { kind: 'ok', text: `@${normalizeUsername(control.value)} is available.` };
+    }
+    return { kind: 'hint', text: 'How people find you. 3–24 characters: start with a letter; then letters, numbers, . or _.' };
   }
 
   showError(control: FormControl): boolean {

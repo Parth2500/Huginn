@@ -3,11 +3,13 @@ import { CommonModule } from '@angular/common';
 import { IconComponent } from './icon/icon.component';
 import { InitialsPipe, TonePipe } from './pipes/avatar.pipes';
 import { LinkifyPipe } from './pipes/linkify.pipe';
+import { DisplayNamePipe } from './pipes/display-name.pipe';
+import { AvatarComponent } from './avatar/avatar.component';
 import { ToastHostComponent } from './toast/toast-host.component';
 
 @NgModule({
-  declarations: [IconComponent, TonePipe, InitialsPipe, LinkifyPipe, ToastHostComponent],
+  declarations: [IconComponent, TonePipe, InitialsPipe, LinkifyPipe, DisplayNamePipe, AvatarComponent, ToastHostComponent],
   imports: [CommonModule],
-  exports: [IconComponent, TonePipe, InitialsPipe, LinkifyPipe, ToastHostComponent],
+  exports: [IconComponent, TonePipe, InitialsPipe, LinkifyPipe, DisplayNamePipe, AvatarComponent, ToastHostComponent],
 })
 export class SharedModule {}

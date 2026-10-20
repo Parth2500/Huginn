@@ -1,4 +1,4 @@
-<app-auth-layout heading="Create your account" subheading="You'll use your username to find and add people to rooms.">
+<app-auth-layout heading="Create your account" subheading="Pick a username: it's how people find you. Your email stays private.">
   <form class="auth-form" [formGroup]="registrationForm" (ngSubmit)="register()" novalidate>
     <div class="form-alert" *ngIf="serverError" role="alert">
       <app-icon name="alert-circle"></app-icon>
@@ -19,15 +19,15 @@
     <div class="field">
       <label for="reg-username">Username</label>
       <input id="reg-username" class="input" type="text" formControlName="username" autocomplete="username"
-        autocapitalize="off" spellcheck="false" placeholder="e.g. maya" [class.invalid]="showError(username)"
-        [attr.aria-invalid]="showError(username)" aria-describedby="reg-username-help" />
-      <p class="field-error" id="reg-username-help" *ngIf="showError(username); else usernameHint">
-        <app-icon name="alert-circle"></app-icon>
-        {{ username.hasError('required') ? 'Choose a username.' : username.hasError('maxlength') ? 'Keep it to 24 characters or fewer.' : 'Use letters, numbers, dots, dashes or underscores. No spaces.' }}
+        autocapitalize="off" spellcheck="false" placeholder="e.g. maya.r" maxlength="24" [class.invalid]="usernameMessage.kind === 'error'"
+        [attr.aria-invalid]="usernameMessage.kind === 'error'" aria-describedby="reg-username-help" />
+      <p id="reg-username-help" role="status"
+        [ngClass]="usernameMessage.kind === 'error' ? 'field-error' : usernameMessage.kind === 'ok' ? 'field-ok' : 'field-hint'">
+        <app-icon *ngIf="usernameMessage.kind === 'error'" name="alert-circle"></app-icon>
+        <app-icon *ngIf="usernameMessage.kind === 'ok'" name="check"></app-icon>
+        <span class="spinner small" *ngIf="usernameMessage.kind === 'checking'" aria-hidden="true"></span>
+        <span>{{ usernameMessage.text }}</span>
       </p>
-      <ng-template #usernameHint>
-        <p class="field-hint" id="reg-username-help">This is how people find you. Letters, numbers, . _ and -, up to 24 characters.</p>
-      </ng-template>
     </div>
 
     <div class="field">

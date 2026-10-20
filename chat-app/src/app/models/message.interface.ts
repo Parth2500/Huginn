@@ -24,5 +24,5 @@ export interface IRoomActivity {
 
 export interface ITyping {
   roomId: number;
-  user: { Id: number; username: string };
+  user: { Id: number; username: string; displayName?: string | null };
 }
