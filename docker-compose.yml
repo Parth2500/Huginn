@@ -1,53 +1,61 @@
-version: '3.8'
+# Huginn local development stack: API, web app, Postgres and pgAdmin.
+name: huginn
 
 services:
-  chat-api:
+  api:
     build:
-      dockerfile: Dockerfile
-      context: ./chat-api
+      context: ./api
       target: development
     command: npm run start:debug
     volumes:
-      - ./chat-api:/chat-demo/api/src/app
+      - ./api:/huginn/api
+      - /huginn/api/node_modules
     depends_on:
       - postgres
     environment:
-      DATABASE_URL: postgres://user:password@postgres:5432/db
+      DATABASE_URL: postgres://huginn:huginn@postgres:5432/huginn
       NODE_ENV: development
-      JWT_SECRET: 1vYD^T2we%aVKc3t!8T5
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-development-only}
       PORT: 3000
     ports:
       - 3000:3000
       - 9229:9229
-  
-  chat-app:
+
+  web:
     build:
-      dockerfile: Dockerfile
-      context: ./chat-app
+      context: ./web
       target: development
-    command: npm run start
+    command: npm run start -- --poll 1000
     volumes:
-      - ./chat-app:/chat-demo/app/src/app
+      - ./web:/huginn/web
+      - /huginn/web/node_modules
+    environment:
+      API_URL: http://api:3000
     ports:
       - 4200:4200
-    links:
-      - chat-api
+    depends_on:
+      - api
 
   postgres:
-    image: postgres:15.2
+    image: postgres:18-alpine
     environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: db
+      POSTGRES_USER: huginn
+      POSTGRES_PASSWORD: huginn
+      POSTGRES_DB: huginn
+    volumes:
+      - postgres-data:/var/lib/postgresql
     ports:
       - 35000:5432
 
-  postgres_admin:
-    image: dpage/pgadmin4:7.1
+  pgadmin:
+    image: dpage/pgadmin4:9.18
     depends_on:
       - postgres
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_EMAIL: admin@huginn.localhost
       PGADMIN_DEFAULT_PASSWORD: admin
     ports:
       - 5050:80
+
+volumes:
+  postgres-data:
