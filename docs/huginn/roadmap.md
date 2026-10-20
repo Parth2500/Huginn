@@ -36,10 +36,11 @@ tested and demoable, never half-migrated.
 | # | Milestone | Done when |
 |---|---|---|
 | 0.1 | **Rename to Huginn** | The UI, page title, favicon, logo mark, package names, docker services, docs and API Swagger title all say Huginn. "ChatApp" appears nowhere. |
-| 0.2 | **Migrations and upgrades** | TypeORM migrations replace `synchronize`. Angular and NestJS are on current releases. CI runs the build, lint and tests. The old scaffold specs are replaced by real tests. |
+| 0.2 | **Everything on latest** | Angular, NestJS, TypeORM, Socket.IO, TypeScript, Node (current LTS) and Postgres all on current releases. Angular moved to standalone components, signals and the new control flow. TypeORM migrations replace `synchronize`. CI runs the build, lint and tests, and real tests replace the old scaffold specs. |
 | 0.3 | **New data model** | `chat` and `chat_member` (with per-user state and watermarks), `message` with `client_message_id`, `block` and `user_settings` tables, per [architecture.md §3](architecture.md#3-data-model-phase-0-and-1). Existing features work on it. |
 | 0.4 | **Protocol v1** | The event envelope, acknowledgements, idempotent `message.send`, the per-user `update` log with `sync`, and the IndexedDB local store with outbox. Killing the API mid-conversation and restarting it loses nothing, and pending sends complete. |
-| 0.5 | **Heimdall sign-in** | BFF code flow with PKCE, cookie sessions, sockets on cookie auth, back-channel logout, first-run username onboarding. The old password login sits behind a flag (on until Heimdall ships). |
+| 0.5 | **Cookie sessions and the auth seam** | Sign-in moves from a token in `localStorage` to an httpOnly cookie session, and sockets authenticate with the cookie. All sign-in code sits behind an `AuthProvider` interface, with today's password login as `LocalPasswordProvider`. |
+| later | **Heimdall sign-in** (when Heimdall is ready) | `HeimdallOidcProvider`: confidential BFF client, PKCE, `resource` audience, serialised refresh, `/revoke` on sign-out, account linking by verified email. See [architecture.md §2](architecture.md#2-identity-heimdall-integration-when-heimdall-is-ready). It must land before linked devices (2.4), which approve new devices through a real identity provider. |
 
 ---
 
@@ -47,15 +48,16 @@ tested and demoable, never half-migrated.
 
 | # | Milestone | Includes |
 |---|---|---|
-| 1.1 | **Chat list power** | Pin (limit 5, drag to reorder), archive with the Archived view, mute (8h, 1 week, always), mark read/unread, delete chat, clear chat, filters (All, Unread, Groups), row menus, swipe actions, Undo snackbars |
+| 1.1 | **Chat list power** | Pin (limit 5, drag to reorder), the Archived and Message requests folders, mute (8h, 1 week, always), mark read/unread, delete chat, clear chat, filters (All, Unread, Groups), row menus, swipe actions, Undo snackbars |
 | 1.2 | **Multi-select** | Selection mode for chats (bulk archive, mute, read, pin, delete) and for messages (copy, delete) |
 | 1.3 | **Notes to self** | Self chat kind, auto-pin, search entry |
-| 1.4 | **Message actions** | Reply with quote and jump, edit (15 minutes, with "edited"), delete for me, delete for everyone (48 hours; admins always), tombstones, copy, message info |
+| 1.4 | **Message actions** | Reply with quote and jump, edit (15 minutes, with "edited"), delete for me, delete for everyone (15 minutes; admins always), tombstones, copy, message info |
 | 1.5 | **Ticks** | Sent, delivered and read from watermarks; failed with retry; read-receipt privacy with reciprocity |
 | 1.6 | **Timeline polish** | Unread divider and scroll-to-first-unread, drafts per chat, simple formatting, system messages |
 | 1.7 | **Groups, full** | Group info drawer, edit name/photo/description, members list with roles, add and remove, promote and demote, group settings, leave (with owner transfer), delete for everyone, announcements mode |
-| 1.8 | **Safety** | Block and unblock, the blocked list, message requests (accept, delete, block), privacy settings (last seen, photo, groups) |
+| 1.8 | **Safety and presence** | Block and unblock, the blocked list, message requests (accept, delete, block), privacy settings (last seen, photo, groups), last seen with the 60-second grace period and watch-on-open presence |
 | 1.9 | **Notifications** | Permission banner, in-tab notifications, Web Push through the service worker, previews on/off, sounds, per-chat mute, mentions breaking mute, do-not-disturb, app badge |
+| 1.9b | **Grouped search** | Contacts, Groups and New people in one search box, from the server, with "Show all" |
 | 1.10 | **Search in chat** | Device-side index over the local store, highlighted matches with ↑/↓, a results list, "search older messages" |
 | 1.11 | **Settings** | All sections except Devices and security; theme switch; keyboard shortcuts |
 

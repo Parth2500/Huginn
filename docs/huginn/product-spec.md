@@ -11,7 +11,8 @@ what each one looks like; the architecture document shows how it works under the
   - **Group:** three or more people, with a name.
 - **Member:** a person in a chat. Each member has their own *chat state* (pinned, archived,
   muted, cleared, last read), which only they see.
-- **Contact:** anyone you share a chat with. Huginn has no phone book.
+- **Contact:** anyone you share a chat with (an accepted one, not a pending request). Huginn
+  has no phone book and no saved-contacts list.
 - **Device:** a signed-in browser or app. One person can have several.
 
 Phase numbers refer to [roadmap.md](roadmap.md).
@@ -24,8 +25,10 @@ Phase numbers refer to [roadmap.md](roadmap.md).
 
 - Pinned chats come first, in the order you pinned them (you can drag to reorder). Everything
   else follows, newest activity first.
-- An **Archived** row sits above the list when you have archived chats ("Archived · 3"). It
-  opens the archive view.
+- Two folder rows sit above the list when they have something in them:
+  - **Message requests · 2**, with an accent dot when there's a new request
+  - **Archived · 3**
+  Each opens its own view with the same rows, menus and selection as the main list.
 - The self chat is pinned automatically the first time you use it, but you can unpin it.
 - Each row shows:
   - avatar, name, and the time of the last activity
@@ -103,12 +106,22 @@ Phase numbers refer to [roadmap.md](roadmap.md).
 
 ## 2. Starting chats
 
-### 2.1 Search people and chats (built)
+### 2.1 Search people and chats (built; regrouped in Phase 1)
 
-- One search box finds your chats by name and finds people by display name or username. Only
-  usernames are shown, never emails.
-- Picking a person opens your direct chat with them, or a **draft** if you have none. The
-  draft becomes a real chat on your first message, and only then appears on their side.
+One search box, with results grouped like Microsoft Teams:
+
+| Group | What's in it | Picking one |
+|---|---|---|
+| **Contacts** | People you already share a chat with, matched on display name or username | Opens your direct chat with them |
+| **Groups** | Your groups, matched on the group name or a member's name | Opens the group |
+| **New people** | Everyone else, matched on display name or username | Opens a draft (see below) |
+
+- Each group shows at most 5 results, with "Show all" to expand it.
+- Contacts and groups come from the server, so the results are complete even when your chat
+  list hasn't loaded every page.
+- Only display names and usernames are shown, never emails.
+- The **draft:** picking a new person opens a chat that becomes real on your first message, and
+  only then appears on their side (or in their message requests, see 2.3).
 
 ### 2.2 Self chat, "Notes to self" (Phase 1)
 
@@ -117,13 +130,19 @@ Phase numbers refer to [roadmap.md](roadmap.md).
 - It has no ticks, no typing indicator and no presence. It syncs to all your devices, and in
   Phase 2 it's encrypted to your devices only.
 
-### 2.3 Message requests (Phase 1, recommended; see the decisions doc)
+### 2.3 Message requests (Phase 1)
 
 - Anyone can find you by username. So the first message from someone you share no chat with
-  lands in **Message requests**, not your main list. It doesn't notify and doesn't send read
-  receipts.
-- You can **Accept** (it moves to your chats), **Delete**, or **Block**. Until you accept, they
-  see their message as delivered but not read, and they can't see your presence or last seen.
+  lands in the **Message requests** folder, which works like Archived (a folder row above the
+  list). Requests don't notify you and don't send read receipts.
+- Opening a request shows the sender's profile card and their messages. You can:
+  - **Accept:** the chat moves to your main list, and you become contacts.
+  - **Delete:** it's removed. They aren't told.
+  - **Block:** it's removed and they're blocked.
+- Until you accept, they see their messages as delivered but not read, and they can't see
+  your presence or last seen. You replying also counts as accepting.
+- Groups you're added to never go to requests. Who can add you is controlled by
+  *Settings → Privacy → Who can add me to groups*.
 
 ### 2.4 New group (built; extended in Phase 1)
 
@@ -177,7 +196,7 @@ Each of your messages shows one state:
 - **Delete for me:** hides the message on your devices only. Works on any message, any time.
 - **Delete for everyone (unsend):** removes it for everyone, leaving a tombstone that says
   "You deleted this message" or "This message was deleted".
-  - The sender can do this for **48 hours** after sending.
+  - The sender can do this for **15 minutes** after sending, the same window as editing.
   - In groups, admins can delete anyone's message for everyone, at any time. The tombstone
     then says "Deleted by an admin".
 - Both work on several messages at once (see 3.6) and are confirmed when there's more than one.
@@ -192,7 +211,7 @@ Each of your messages shows one state:
 
 - *Select messages* in the chat menu, or a long-press on a phone, turns on checkboxes for
   messages. The bar offers **Copy**, **Delete** (for me, or for everyone if every selected
-  message is still yours to unsend) and **Forward** (Phase 4).
+  message is yours and less than 15 minutes old) and **Forward** (Phase 4).
 
 ### 3.7 Unread divider and jumping (Phase 1)
 
@@ -356,8 +375,14 @@ Each of your messages shows one state:
 | Message requests | On (strangers go to requests) · Off | On |
 
 - **Rule:** if you hide your last seen from someone, you can't see theirs either.
-- "Last seen today at 14:02" appears in the direct chat header, and becomes "online" while
-  they're connected.
+- "Last seen today at 14:02" appears in the direct chat header and the profile, and becomes
+  "online" while they're connected. It's only visible to contacts (people you share a chat
+  with).
+- **How it's worked out** (see [architecture.md §6.1](architecture.md#61-presence-and-last-seen)):
+  - Going offline is never broadcast. Your contacts only learn your last seen when they look
+    (opening your chat or profile).
+  - A short drop in connection (under a minute) doesn't count as going offline, so switching
+    networks doesn't flicker your status.
 
 ---
 

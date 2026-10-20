@@ -34,45 +34,83 @@ changes, and in which phase. Scale concerns are in [../SCALING.md](../SCALING.md
 
 ---
 
-## 2. Identity: Heimdall integration (Phase 0)
+## 2. Identity: Heimdall integration (when Heimdall is ready)
 
-**Pattern: backend-for-frontend (BFF).** The Huginn API is a *confidential* OIDC client of
-Heimdall. The browser never holds Heimdall tokens.
+Heimdall is still in development (repo `Parth2500/heimdall-idp`, .NET 10). So Huginn keeps its
+current email and password sign-in for now. It does put all of it behind one `AuthProvider`
+interface in Phase 0, so switching later touches nothing else.
 
-1. "Sign in" sends the browser to `GET /auth/login`. The API redirects to Heimdall's authorize
-   endpoint with `response_type=code`, PKCE, `state` and `nonce`.
-2. Heimdall redirects back to `/auth/callback`. The API swaps the code for tokens, validates the
-   ID token (against Heimdall's JWKS, plus issuer, audience, nonce and expiry), and then:
-   - looks up or creates the Huginn user by **`sub`**, Heimdall's stable subject id
-   - sets an `httpOnly; Secure; SameSite=Lax` session cookie (opaque id → Redis session)
-3. HTTP requests and the Socket.IO handshake authenticate with that cookie. There are no tokens
-   in `localStorage`, which removes the current XSS token-theft risk.
-4. The API refreshes Heimdall tokens itself while the session lives. Heimdall's **back-channel
-   logout** (or a session check) ends the Huginn session and disconnects its sockets.
+### 2.1 What Heimdall provides (as of 2026-10-19)
 
-**What Huginn stores about identity:**
+- **OAuth 2.1 and OIDC:**
+  - authorization code with **PKCE S256** (required for every client)
+  - refresh tokens with **rotation and family revocation on reuse**
+  - `/userinfo` and `/revoke`, plus discovery and JWKS
+- **Tokens:**
+  - access tokens are RS256 JWTs that live **5 minutes**, with `kid` in the header
+  - refresh tokens are opaque
+  - the issuer `iss` is in the authorization response (RFC 9207)
+- **Tenants:** each tenant is a **host name** with its own issuer, user pool, clients and
+  signing keys. Huginn will be a client in a tenant, e.g. `https://huginn.<heimdall-domain>`.
+- **Clients:**
+  - *public* (PKCE only) or *confidential* (`client_secret_basic`)
+  - exact-match `https` redirect URIs
+  - **one audience per token**, picked with `resource` (RFC 8707)
+- **Sign-in UI:** Heimdall's own Angular login, consent and account pages, with an SSO session
+  cookie (`__Host-`, `SameSite=Lax`).
+- **Not there yet:**
+  - RP-initiated logout (`end_session_endpoint`, their U14)
+  - back-channel logout
+  - DPoP and PAR (their Phase 2)
+  - persisted consent (their Phase 3)
 
-- `user.oidc_subject` (unique) and `user.oidc_issuer`
-- whether the email is verified, if Heimdall asserts it (shown only to the owner)
-- nothing else from Heimdall
+### 2.2 How Huginn connects (backend-for-frontend)
 
-**First sign-in:** a short onboarding asks for a username (the existing policy), then a
-display name and photo (optional).
+- Huginn's API registers as a **confidential client** with:
+  - grants `authorization_code` and `refresh_token`
+  - redirect URI `https://<huginn>/auth/callback`
+  - an allowed audience for Huginn's API, e.g. `https://api.huginn.<domain>`
+  - scopes `openid profile email`
+- The flow:
+  1. `/auth/login` creates the PKCE verifier, `state` and `nonce`, stores them in a short-lived
+     server session, and redirects to Heimdall `/authorize` with `resource=<huginn audience>`.
+  2. `/auth/callback` checks `state` and `iss` (RFC 9207), then exchanges the code at `/token`
+     with client authentication.
+  3. It validates the ID token against the tenant's JWKS: `iss`, `aud`, `nonce` and expiry.
+  4. It links or creates the Huginn user by **`(iss, sub)`**.
+- Huginn sets its own `__Host-huginn_session` cookie (`Secure; HttpOnly; SameSite=Lax`). HTTP and
+  the Socket.IO handshake authenticate with it. The browser never sees Heimdall's tokens.
+- **Refreshing:** the 5-minute access token is refreshed by the server shortly before it expires.
+  Heimdall revokes the whole family when a refresh token is reused, so **refreshes are
+  serialised per session** (a Redis lock). Two tabs or servers refreshing at once must never
+  both send the same refresh token.
+- **Sign-out:** revoke the refresh token at `/revoke` and end Huginn's session.
+  - Until Heimdall has RP-initiated logout, the Heimdall SSO session survives. The next "Sign
+    in" may skip the password, and the sign-out screen says so (as Heimdall's demo SPA does).
+  - Once back-channel logout exists, Huginn subscribes to it and disconnects that session's
+    sockets.
+- **Huginn keeps:**
+  - `user.oidc_issuer` and `user.oidc_subject` (unique together)
+  - the email, if Heimdall returns it (shown only to its owner)
+  - nothing else
+  
+  Usernames, profiles and devices stay Huginn's own.
 
-**What Heimdall needs to provide:**
+### 2.3 Until then
 
-- discovery (`/.well-known/openid-configuration`) and JWKS
-- the code flow with PKCE, and a confidential client
-- refresh tokens
-- back-channel logout
-- the scopes `openid profile email`
-- a stable `sub`
+- Phase 0 adds the `AuthProvider` seam:
+  - `LocalPasswordProvider` (today's behaviour, moved to cookie sessions)
+  - later, `HeimdallOidcProvider`
+- Moving the token out of `localStorage` into a cookie session happens in Phase 0 regardless,
+  because it fixes an XSS exposure today.
+- **Migration:** existing local accounts are linked to Heimdall on first OIDC sign-in by
+  matching the verified email, then the local password is removed.
 
-**Migration:** the current email/password login stays behind a feature flag until Heimdall is
-live, then gets removed. Existing users are linked by verified email on their first Heimdall
-sign-in.
+### 2.4 Asks for the Heimdall roadmap
 
----
+- RP-initiated logout, and back-channel logout (or at least a session-check endpoint).
+- An `email_verified` claim (needed for safe account linking).
+- A stable `sub` per tenant user. Heimdall's user ids already provide it.
 
 ## 3. Data model (Phase 0 and 1)
 
@@ -80,7 +118,7 @@ Postgres. Changes go through **migrations** (TypeORM migrations); `synchronize` 
 
 ```
 user            id PK, oidc_issuer, oidc_subject UNIQUE, username, username_key UNIQUE (C collation),
-                display_name, bio, avatar_url, created_at, deleted_at
+                display_name, bio, avatar_url, last_seen_at, created_at, deleted_at
 
 user_settings   user_id PK/FK, last_seen_visibility, photo_visibility, read_receipts BOOL,
                 group_add_policy, message_requests BOOL, enter_to_send BOOL, keep_archived BOOL,
@@ -221,6 +259,45 @@ Receipts are **watermarks**, not one row per message per reader.
 
 ---
 
+## 6.1 Presence and last seen
+
+**Goal:** accurate "online" and "last seen" for contacts, without broadcasting every disconnect
+to everyone.
+
+- **Online** means the user has at least one live connection. Presence lives in Redis: a
+  per-user connection count, plus a heartbeat that expires after 60 seconds. So a crashed server
+  can't leave people "online" forever.
+- **Going offline:** when the last connection closes, the server waits a **60-second grace
+  period**. If the user reconnects in that time (a network switch, a reload), nothing happens.
+  Otherwise it writes `user.last_seen_at` once.
+  - Nothing is broadcast.
+  - This is one write per real session end, and the time is accurate to the second.
+- **Pull, not push:**
+  - Opening a direct chat or a profile asks for that person's presence once (`presence.get`).
+  - While the chat is open, the client watches that one person (`presence.watch` and
+    `presence.unwatch`) and receives their online/offline changes.
+  - The chat list shows online dots only for visible rows, by watching at most about 50 people.
+  - Nobody receives presence for people they aren't looking at.
+- **Privacy:** the server answers `presence.get` and `presence.watch` only for contacts, and only
+  if the person's *last seen* setting allows it (and, reciprocally, the asker's own setting
+  does). Otherwise it returns nothing, and the UI shows no status line.
+- **Why not work out last seen on the receiver's device?** This was considered (decisions.md
+  D11). A receiver can only notice someone leaving while the receiver itself is online and
+  watching. Different devices would show different times, someone who was offline would see
+  nothing, and staying accurate would need regular polling, which costs more than one write at
+  disconnect.
+
+## 6.2 Search API (Phase 1)
+
+`GET /search?q=` returns three groups, each limited to 5 results, with `hasMore` for "Show all":
+
+- **contacts:** users who share an accepted chat with the searcher
+- **groups:** the searcher's groups, matched on the group name or a member's name
+- **people:** everyone else, excluding blocked users in both directions
+
+It's the same index-only search as today: a prefix step, then trigram, joined to `chat_member`
+for the contact and group checks.
+
 ## 7. End-to-end encryption (Phase 2)
 
 ### 7.1 Choice: MLS
@@ -351,7 +428,7 @@ handlers alike. The UI mirrors it to hide controls, but never relies on that.
 | Remove member | ✓ | ✓ (not admins or the owner) | – |
 | Promote / demote | ✓ | – | – |
 | Change group settings | ✓ | – | – |
-| Delete any message for everyone | ✓ | ✓ | – (own only, within 48 hours) |
+| Delete any message for everyone | ✓ | ✓ | – (own only, within 15 minutes) |
 | Transfer ownership / delete group | ✓ | – | – |
 | Leave | ✓ (after transfer) | ✓ | ✓ |
 

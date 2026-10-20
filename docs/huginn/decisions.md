@@ -85,12 +85,14 @@ costs, and what would change it. Open questions follow at the end.
 |---|---|---|
 | Pinned chats | 5, plus Notes to self | WhatsApp 3, Telegram 5 |
 | Edit window | 15 minutes | WhatsApp |
-| Unsend window | 48 hours (sender); unlimited for group admins | WhatsApp is about 2 days; Telegram is unlimited |
+| Unsend window | 15 minutes, the same as edit (sender); unlimited for group admins | Decided 2026-10-21 |
 | Archived chats on a new message | Stay archived (setting to change) | WhatsApp |
 | Read-receipt privacy | Reciprocal | WhatsApp |
 | Group size | 256 at first | WhatsApp started there |
 | Group creation | At least 2 others; one person is a direct chat | Clean split between kinds |
-| Last-seen visibility | Contacts, by default | Telegram and WhatsApp |
+| Last-seen visibility | Contacts only | Decided 2026-10-21 |
+| Contacts | Anyone you share an accepted chat with; no saved contacts | Decided 2026-10-21 |
+| Message requests | A folder like Archived; first messages from strangers go there | Decided 2026-10-21 |
 
 ## D10. Out of scope
 
@@ -104,19 +106,51 @@ costs, and what would change it. Open questions follow at the end.
 
 ---
 
-## Open questions (answer before or during Phase 1)
+## D11. Last seen: recorded on the server, pulled when you look
 
-1. **Message requests.** Should a first message from someone you share no chat with go to
-   *Message requests* (recommended, because usernames are publicly searchable), or straight into
-   your chats as it does today?
-2. **Unsend window.** Is 48 hours right, or should it be unlimited (Telegram) or shorter?
-3. **"Last seen."** Show it at all? The recommendation is yes, defaulting to Contacts, with an
-   option to switch it off.
-4. **Contacts.** Is "anyone you share a chat with" enough, or do you want an explicit
-   contact list (add or remove contacts, nicknames)? This affects privacy defaults.
-5. **Heimdall timing.** Will Heimdall be ready by the end of Phase 0? If not, milestone 0.5 moves
-   to just before Phase 2. Encryption needs device approval through a real identity provider.
-6. **Hosting.** Where will Huginn run (a single VPS, Kubernetes, a managed platform)? This
-   decides how Redis, object storage and Web Push keys are provisioned in Phase 5.
-7. **Angular upgrade.** OK to upgrade Angular 16 and NestJS 9 to current releases in Phase 0?
-   It's the cheapest moment, before the large Phase 1 build.
+- **Decision:**
+  - Going offline is never broadcast.
+  - After a 60-second grace period (to ride out network blips and reloads), the server records
+    `last_seen_at` once.
+  - Contacts fetch it when they open the chat or profile, and only the open chat is watched
+    live.
+- **Considered:** working it out on the receiver's device, from when it last saw the person
+  online, perhaps with a 5-minute check. That idea's aim (no offline broadcast) is kept. Its
+  mechanism isn't:
+  - A device can only observe while it's online and watching, so devices would disagree.
+  - Anyone who was offline would see nothing.
+  - Staying accurate would need polling, which costs more than one write at disconnect.
+  
+  The 5-minute window becomes the 60-second grace period, which serves the same purpose
+  (ignoring short drops) without the inaccuracy.
+
+## D12. Search grouped like Microsoft Teams
+
+- **Decision:** one search box, with results in three groups: Contacts, Groups and New people.
+  The server provides them, so they're complete even when the chat list is only partly loaded.
+- **Why:** it makes clear at a glance who you already know and who's new. That matters more
+  now that strangers go to message requests.
+
+## D13. Heimdall later, with a seam now
+
+- **Decision:** don't connect Heimdall until it's ready. In Phase 0, move to cookie sessions and
+  put sign-in behind an `AuthProvider` interface. The design for the connection is written
+  against Heimdall's current code (architecture.md §2).
+- **Why:** it fixes today's `localStorage` token exposure now, and makes the switch a contained
+  change.
+
+## Answered (2026-10-21)
+
+1. **Message requests:** yes, as a folder like Archived.
+2. **Unsend window:** 15 minutes, the same as edit.
+3. **Last seen:** yes, for contacts only. Server-recorded and pulled; see D11.
+4. **Contacts:** anyone you share a chat with; no saved contacts. Search is grouped (D12).
+5. **Heimdall:** not yet. Design written against its repo; see D13.
+6. **Hosting:** not decided. Phase 5 stays hosting-neutral (containers, managed Postgres and
+   Redis, S3-compatible storage).
+7. **Upgrades:** everything to latest, in Phase 0 (milestone 0.2).
+
+## Open questions
+
+- **Hosting** (when Phase 5 approaches): this decides how Redis, object storage, Web Push
+  keys and TLS are provisioned.

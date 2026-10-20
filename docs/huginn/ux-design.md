@@ -20,11 +20,11 @@ arrival motion, presence, and the calm slate-and-indigo palette.
 │ ┌─ Search people and chats ────────┐  │          @sam.rivera · online                             │  info     │
 │ └──────────────────────────────────┘  ├──────────────────────────────────────────────────────────┤  drawer   │
 │ [All] [Unread] [Groups]               │                     ── Today ──                           │ (opens on │
-│ ▸ Archived · 3                        │  (S) Morning! Staging is back.          09:12             │  demand)  │
+│ ▸ Requests · 1 ●   ▸ Archived · 3     │  (S) Morning! Staging is back.          09:12             │  demand)  │
 │ 📌 Notes to self                       │                 Great, tagging now. 09:14 ✓✓            │           │
 │ 📌 Launch crew          14:02  [2]    │  ── 3 unread messages ──                                  │           │
 │    Sam Rivera           13:55  ✓✓     │  (S) …                                                    │           │
-│    Message requests · 1               │                                                           │           │
+│                                       │                                                           │           │
 │                                       ├──────────────────────────────────────────────────────────┤           │
 │ (me) maya.test · Online   [⚙] [⇥]     │ [＋] Message Sam Rivera…                         [➤]      │           │
 └───────────────────────────────────────┴──────────────────────────────────────────────────────────┴───────────┘
@@ -35,9 +35,8 @@ arrival motion, presence, and the calm slate-and-indigo palette.
   - the Huginn mark, *New chat* (✎), and the overflow menu (⋯)
   - search
   - filter chips
-  - the Archived row
+  - the folder rows: *Message requests* and *Archived*
   - the chat list
-  - message requests, as the last row when there are any
   - the account bar
 - **The conversation pane** (middle) is for reading and writing.
 - **The drawer** (right) shows chat info, profiles, message info and search results. It slides
@@ -146,7 +145,25 @@ divider.
   preview of their first message, behind a "Show message" tap.
 - Actions: **Accept**, **Delete**, **Block**. Accepting moves the chat to the main list.
 
-### 2.6 Empty and loading states
+### 2.6 Search results
+
+```
+┌─ Search: ma ───────────────────── ✕ ┐
+│ Contacts                            │
+│ (M●) Maya Rao        @maya          │
+│ Groups                              │
+│ (LC) Launch crew     Maya, Sam, +3  │
+│ New people                          │
+│ (M)  Marco Bell      @marco.b    ✉  │   ← "Start a chat" on hover/focus
+│ Show all 12 ›                       │
+└─────────────────────────────────────┘
+```
+
+- Group headings are small muted labels. Each group shows up to 5 rows, then "Show all".
+- Arrow keys move across all groups as one list, and Enter opens the highlighted row.
+- If a group has no results it disappears, rather than showing an empty heading.
+
+### 2.7 Empty and loading states
 
 - **Loading:** skeleton rows (built).
 - **No chats:** the start-chat guide (built), now with "or write in *Notes to self*".
@@ -222,7 +239,7 @@ divider.
 ```
 Delete message?
 ( ) Delete for me
-(•) Delete for everyone        ← only if allowed; explains "within 48 hours of sending"
+(•) Delete for everyone        ← only if allowed; explains "within 15 minutes of sending"
                  [Cancel]  [Delete]
 ```
 
