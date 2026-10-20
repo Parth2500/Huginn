@@ -1,5 +1,22 @@
-<span style="display: flex;" [ngClass]="{ownContainer: message.user?.Id === user.Id}">
-  <p [ngClass]="{ownMessage: message.user?.Id === user.Id}">
-    <em>{{message.user?.username}}</em> <br /> {{message.text}}
-  </p>
-</span>
+<div class="msg" [class.own]="own" [class.first]="first" [class.last]="last" [class.fresh]="fresh"
+  [class.pending]="status === 'pending' || status === 'stalled'">
+  <span class="avatar sm" *ngIf="!own" [class.placeholder]="!last" [ngClass]="message.user?.Id | tone"
+    aria-hidden="true">{{ last ? (message.user?.username | initials) : '' }}</span>
+  <div class="bubble">
+    <p class="sender" *ngIf="!own && first" [ngClass]="message.user?.Id | tone">{{ message.user?.username }}</p>
+    <p class="text"><span class="visually-hidden">{{ own ? 'You' : message.user?.username }}: </span><ng-container *ngFor="let part of message.text | linkify"><a *ngIf="part.href; else plain" [href]="part.href" target="_blank" rel="noopener noreferrer">{{ part.text }}</a><ng-template #plain>{{ part.text }}</ng-template></ng-container><span class="meta">
+        <time [attr.datetime]="message.created_at" [title]="message.created_at | date: 'EEEE d MMMM y, HH:mm'">{{ message.created_at | date: 'HH:mm' }}</time>
+        <ng-container [ngSwitch]="status">
+          <span *ngSwitchCase="'pending'" class="state" title="Sending">
+            <app-icon name="clock"></app-icon><span class="visually-hidden">, sending</span>
+          </span>
+          <span *ngSwitchCase="'stalled'" class="state stalled" title="Not confirmed yet. It will send when the connection allows.">
+            <app-icon name="alert-circle"></app-icon><span class="visually-hidden">, not confirmed yet</span>
+          </span>
+          <span *ngSwitchCase="'sent'" class="state" title="Delivered">
+            <app-icon name="check"></app-icon><span class="visually-hidden">, delivered</span>
+          </span>
+        </ng-container>
+      </span></p>
+  </div>
+</div>

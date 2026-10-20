@@ -1,16 +1,94 @@
-p {
-  font-size: medium;
-  background-color: lightgray;
-  padding: 5px;
-  width: fit-content;
-  border-radius: 5px;
-  margin: 7px;
+:host { display: block; }
+
+.msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding-right: 15%;
+
+  &.first { margin-top: 8px; }
+  &.own { flex-direction: row-reverse; padding-right: 0; padding-left: 15%; }
+  &.fresh { animation: arrive 280ms var(--ease-out); }
 }
 
-.ownContainer {
-  justify-content: flex-end;
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
 }
 
-.ownMessage {
-  background-color: lightblue;
+.avatar.placeholder { visibility: hidden; }
+
+.bubble {
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
+  padding: 7px 12px 8px;
+  border-radius: 18px;
+  background: var(--bubble-in);
+  color: var(--text);
+  box-shadow: var(--shadow-1);
+
+  .msg:not(.first) & { border-top-left-radius: 6px; }
+  .msg:not(.last) & { border-bottom-left-radius: 6px; }
+  .msg.last & { border-bottom-left-radius: 4px; }
+
+  .msg.own & {
+    background: var(--bubble-out);
+    color: var(--on-accent);
+    border-radius: 18px;
+  }
+  .msg.own:not(.first) & { border-top-right-radius: 6px; }
+  .msg.own:not(.last) & { border-bottom-right-radius: 6px; }
+  .msg.own.last & { border-bottom-right-radius: 4px; }
+}
+
+.sender {
+  margin-bottom: 1px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--tone-text);
+}
+
+.text {
+  font-size: 15px;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Floats onto the last line when there is room, like the messengers it follows. */
+.meta {
+  float: right;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 6px 0 -4px 12px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-2);
+  white-space: nowrap;
+  user-select: none;
+
+  .msg.own & { color: var(--on-accent-2); }
+}
+
+.text a {
+  color: var(--link);
+  font-weight: 500;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  overflow-wrap: anywhere;
+  .msg.own & { color: var(--on-accent); }
+}
+
+.state {
+  display: inline-flex;
+  app-icon { width: 14px; height: 14px; }
+}
+
+.msg.pending .bubble { opacity: 0.85; }
+.state.stalled { color: #fde68a; }
+
+@media (max-width: 767px) {
+  .msg { padding-right: 8%; }
+  .msg.own { padding-left: 8%; }
 }

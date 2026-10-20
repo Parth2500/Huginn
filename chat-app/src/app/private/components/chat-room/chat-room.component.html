@@ -1,45 +1,90 @@
-<div *ngIf="chatRoom; else no_chatroom_selected">
-
-  <!-- Header -->
-  <div style="height: 125px;">
-    <span style="display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
-      <h2>{{chatRoom.name}}</h2>
-      <span style="display: flex; flex-direction: row; align-items: center;">
-        <mat-icon>event</mat-icon>
-        <p style="margin-left: 10px;">{{chatRoom.updated_at | date}}</p>
-      </span>
-    </span>
-    <span>
-      <h3 style="color: grey">{{chatRoom.description}}</h3>
-      <span *ngFor="let user of chatRoom.users">{{user.username}}, </span>
-    </span>
-  </div>
-
-  <!-- Messages -->
-  <div #messages class="message">
-    <span *ngFor="let message of (messagesPaginate$ | async)?.items">
-      <app-chat-message [message]="message"></app-chat-message>
-    </span>
-  </div>
-
-  <!-- Add Message -->
-  <div style="position: absolute; bottom: 0; display: flex; flex-direction: row; align-items: center;">
-    <mat-form-field style="width: 350px;">
-      <input matInput [formControl]="chatMessage" type="text">
-    </mat-form-field>
-    <button mat-button [disabled]="!chatMessage.valid" (click)="sendMessage()">
-      <span style="display: flex; flex-direction: row; align-items: center;">
-        <mat-icon style="margin-left: 20px;">send</mat-icon>
-        <p style="margin-left:10px;">Send</p>
-      </span>
+<section class="room" [attr.aria-label]="chatRoom.name">
+  <header class="room-head">
+    <button type="button" class="icon-btn back" (click)="back.emit()" aria-label="Back to rooms">
+      <app-icon name="arrow-left"></app-icon>
     </button>
+    <span class="avatar" *ngIf="partner as person; else roomAvatar" [ngClass]="person.Id | tone"
+      [class.online]="onlineIds?.has(person.Id!)">{{ person.username | initials }}</span>
+    <ng-template #roomAvatar><span class="avatar" [ngClass]="chatRoom.id | tone">{{ chatRoom.name | initials }}</span></ng-template>
+    <div class="titles">
+      <h1>{{ chatRoom.name }}</h1>
+      <p *ngIf="typingLabel; else status" class="typing" aria-live="polite">
+        <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typingLabel }}
+      </p>
+      <ng-template #status><p>{{ statusLine }}</p></ng-template>
+    </div>
+    <div class="people" role="group" [attr.aria-label]="membersLabel" *ngIf="!partner">
+      <span class="stack" aria-hidden="true">
+        <span *ngFor="let member of otherMembers | slice: 0 : 3" class="avatar sm" [ngClass]="member.Id | tone"
+          [class.online]="onlineIds?.has(member.Id!)"
+          [title]="member.username + (onlineIds?.has(member.Id!) ? ' · online' : '')">{{ member.username | initials }}</span>
+        <span class="avatar sm more" *ngIf="otherMembers.length > 3">+{{ otherMembers.length - 3 }}</span>
+      </span>
+    </div>
+  </header>
 
+  <div class="stream" #messages role="log" aria-live="polite" [attr.aria-busy]="!loaded"
+    [attr.aria-label]="'Messages in ' + chatRoom.name" (scroll)="onStreamScroll()">
+    <div class="stream-inner">
+      <!-- Loading -->
+      <div class="loading" *ngIf="!loaded" aria-label="Loading messages">
+        <span class="skeleton b1"></span>
+        <span class="skeleton b2"></span>
+        <span class="skeleton b3 own"></span>
+        <span class="skeleton b4"></span>
+      </div>
+
+      <!-- Empty -->
+      <div class="empty" *ngIf="loaded && rows.length === 0">
+        <span class="empty-icon"><app-icon name="message"></app-icon></span>
+        <p class="title">No messages yet</p>
+        <p>Say hello. Everyone in the room sees it the moment you send it.</p>
+      </div>
+
+      <div class="history-note" *ngIf="truncated">
+        <button type="button" class="older" (click)="loadOlder()" [disabled]="loadingOlder">
+          <span class="spinner" *ngIf="loadingOlder" aria-hidden="true"></span>
+          {{ loadingOlder ? 'Loading…' : 'Load earlier messages' }}
+        </button>
+        <span>{{ shownCount }} of {{ total }} shown</span>
+      </div>
+      <p class="history-note" *ngIf="loaded && !truncated && rows.length > 0">This is the start of {{ chatRoom.name }}.</p>
+
+      <ng-container *ngFor="let row of rows; trackBy: trackRow">
+        <div class="day" *ngIf="row.kind === 'day'"><span>{{ row.label }}</span></div>
+        <app-chat-message *ngIf="row.kind === 'message'" [message]="row.message" [own]="row.own"
+          [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh">
+        </app-chat-message>
+      </ng-container>
+    </div>
   </div>
-</div>
 
+  <div class="jump-wrap">
+    <button type="button" class="jump" *ngIf="unseen > 0" (click)="jumpToLatest()">
+      {{ unseen }} new {{ unseen === 1 ? 'message' : 'messages' }}
+      <app-icon name="arrow-left"></app-icon>
+    </button>
+  </div>
 
-
-
-<ng-template #no_chatroom_selected>
-  <mat-error>No Chatroom Selected</mat-error>
-</ng-template>
+  <form class="composer" (ngSubmit)="sendMessage()">
+    <p class="offline" *ngIf="connection !== 'online'" role="status">
+      <app-icon name="wifi-off"></app-icon>
+      {{ connection === 'connecting' ? 'Connecting to the chat server…' : "You're offline. Messages you send will go out when the connection is back." }}
+    </p>
+    <div class="composer-row">
+      <label class="visually-hidden" for="composer-input">Message {{ chatRoom.name }}</label>
+      <textarea id="composer-input" #composer rows="1" [formControl]="chatMessage"
+        [placeholder]="'Message ' + chatRoom.name" (keydown)="onComposerKeydown($event)"
+        (input)="onComposerInput()" enterkeyhint="send" aria-describedby="composer-hint" maxlength="2000"></textarea>
+      <button type="submit" class="send" [disabled]="!canSend" aria-label="Send message">
+        <app-icon name="send"></app-icon>
+      </button>
+    </div>
+    <p class="hint" id="composer-hint">
+      <span><kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
+      <span class="count tabular" *ngIf="(chatMessage.value?.length ?? 0) > 1800" [class.at-limit]="(chatMessage.value?.length ?? 0) >= 2000">
+        {{ chatMessage.value?.length }} / 2000
+      </span>
+    </p>
+  </form>
+</section>

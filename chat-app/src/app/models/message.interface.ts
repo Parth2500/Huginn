@@ -1,4 +1,4 @@
-import { Meta } from '@angular/platform-browser';
+import { Meta } from './meta.interface';
 import { IRoom } from './room.interface';
 import { IUser } from './user.interface';
 
@@ -12,6 +12,17 @@ export interface IMessage {
 }
 
 export interface IMessagePaginate {
+  roomId?: number;
   items: IMessage[];
   meta: Meta;
+}
+
+export interface IRoomActivity {
+  roomId: number;
+  message: IMessage;
+}
+
+export interface ITyping {
+  roomId: number;
+  user: { Id: number; username: string };
 }

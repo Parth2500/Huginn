@@ -1,37 +1,54 @@
-<div class="container">
+<section class="create" aria-labelledby="create-title">
+  <header class="create-head">
+    <button type="button" class="icon-btn" (click)="cancel.emit()" aria-label="Close, back to rooms">
+      <app-icon name="arrow-left"></app-icon>
+    </button>
+    <h1 id="create-title">New room</h1>
+  </header>
 
-  <div>
-    <div class="dashboard">
-      <a [routerLink]="['../dashboard']">Go to Dashboard</a>
-    </div>
+  <div class="create-body">
+    <form class="create-form" [formGroup]="form" (ngSubmit)="create()" novalidate>
+      <p class="intro">Everyone you add sees the room in their list straight away. Messages arrive live for anyone who has it open.</p>
+      <div class="field">
+        <label for="room-name">Room name</label>
+        <input id="room-name" #nameInput class="input" type="text" formControlName="name" placeholder="e.g. release-train"
+          autocomplete="off" [class.invalid]="showError(name)" [attr.aria-invalid]="showError(name)"
+          aria-describedby="room-name-error" />
+        <p class="field-error" id="room-name-error" *ngIf="showError(name)">
+          <app-icon name="alert-circle"></app-icon>
+          {{ name.hasError('maxlength') ? 'Keep the name under 60 characters.' : 'Give the room a name.' }}
+        </p>
+      </div>
 
-    <div>
-      <mat-card>
-        <mat-card-title>Create Chatroom</mat-card-title>
-        <mat-card-content>
-          <form [formGroup]="form" (ngSubmit)="create()">
+      <div class="field">
+        <label for="room-description">Description <span class="optional">optional</span></label>
+        <input id="room-description" class="input" type="text" formControlName="description"
+          placeholder="What is this room for?" autocomplete="off" [class.invalid]="showError(description)"
+          aria-describedby="room-description-help" />
+        <p class="field-error" id="room-description-help" *ngIf="showError(description); else descHint">
+          <app-icon name="alert-circle"></app-icon>
+          Keep the description under 140 characters.
+        </p>
+        <ng-template #descHint>
+          <p class="field-hint" id="room-description-help">Shown under the room name.</p>
+        </ng-template>
+      </div>
 
-            <mat-form-field>
-              <input type="text" matInput placeholder="Name" formControlName="name">
-              <mat-error *ngIf="name.touched && name.hasError('required')">Name is required</mat-error>
-            </mat-form-field>
+      <div class="field">
+        <span class="label" id="people-label">People</span>
+        <app-select-users [users]="users.value" [me]="me" [onlineIds]="onlineIds" [invalid]="showError(users) && !peoplePending"
+          (addUser)="addUser($event)" (removeUser)="removeUser($event)" (pendingChange)="peoplePending = $event">
+        </app-select-users>
+        <p class="field-error" *ngIf="showError(users) && !peoplePending">
+          <app-icon name="alert-circle"></app-icon>
+          Add at least one person. You're included automatically.
+        </p>
+      </div>
 
-            <mat-form-field>
-              <input type="text" matInput placeholder="Description" formControlName="description">
-            </mat-form-field>
-
-            <app-select-users [users]="users.value" (addUser)="addUser(initUser($event))"
-              (removeUser)="removeUser($event.Id!)"></app-select-users>
-
-            <mat-hint *ngIf="!form.valid"><small>Please fill out all needed information</small></mat-hint>
-
-            <div class="button">
-              <button mat-button type="submit" [disabled]="!form.valid">Create Chatroom</button>
-            </div>
-
-          </form>
-        </mat-card-content>
-      </mat-card>
-    </div>
+      <div class="actions">
+        <button type="submit" class="btn btn-primary">Create room</button>
+        <button type="button" class="btn btn-secondary" (click)="cancel.emit()">Cancel</button>
+      </div>
+    </form>
   </div>
-</div>
+</section>

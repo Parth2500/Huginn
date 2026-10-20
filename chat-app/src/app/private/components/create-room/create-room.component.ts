@@ -1,55 +1,76 @@
-import { Component, Inject } from '@angular/core';
+import { AfterViewInit, Component, ElementRef, EventEmitter, Input, Output, ViewChild } from '@angular/core';
 import { FormArray, FormControl, FormGroup, Validators } from '@angular/forms';
-import { ActivatedRoute, Router } from '@angular/router';
+import { IRoom } from 'src/app/models/room.interface';
 import { IUser } from 'src/app/models/user.interface';
-import {
-  ChatToken,
-  IChatService,
-} from '../../services/iservices/chat.service.interface';
 
 @Component({
   selector: 'app-create-room',
   templateUrl: './create-room.component.html',
   styleUrls: ['./create-room.component.scss'],
 })
-export class CreateRoomComponent {
-  form: FormGroup = new FormGroup({
-    name: new FormControl(null, [Validators.required]),
-    description: new FormControl(null),
-    users: new FormArray([], [Validators.required]),
-  });
-
-  constructor(
-    @Inject(ChatToken) private chatService: IChatService,
-    private router: Router,
-    private activatedRoute: ActivatedRoute
-  ) {}
-
-  create() {
-    if (this.form.valid) {
-      this.chatService.createRoom(this.form.getRawValue());
-      this.router.navigate(['../dashboard'], {
-        relativeTo: this.activatedRoute,
-      });
+export class CreateRoomComponent implements AfterViewInit {
+  @Input() me: IUser = {};
+  @Input() onlineIds: Set<number> | null = null;
+  /** People chosen before the form opened, e.g. from "Start a chat". */
+  @Input() set initialUsers(users: IUser[] | null) {
+    for (const user of users ?? []) {
+      this.addUser(user);
+    }
+    if (users?.length && !this.name.value) {
+      this.name.setValue([this.me.username, ...users.map((u) => u.username)].join(', '));
     }
   }
+  @ViewChild('nameInput') private nameInput: ElementRef<HTMLInputElement>;
+  @Output() created = new EventEmitter<IRoom>();
+  @Output() cancel = new EventEmitter<void>();
 
-  initUser(user: IUser) {
-    return new FormControl({
-      id: user.Id,
-      username: user.username,
-      email: user.email,
+  form: FormGroup = new FormGroup({
+    name: new FormControl<string | null>(null, [Validators.required, Validators.maxLength(60)]),
+    description: new FormControl<string | null>(null, [Validators.maxLength(140)]),
+    users: new FormArray<FormControl<IUser>>([], [Validators.required]),
+  });
+
+  submitted = false;
+  /** True while the picker is looking up or offering a person, so the empty-people error waits. */
+  peoplePending = false;
+
+  ngAfterViewInit() {
+    setTimeout(() => this.nameInput?.nativeElement.focus());
+  }
+
+  create() {
+    this.submitted = true;
+    if (this.form.invalid) {
+      this.form.markAllAsTouched();
+      return;
+    }
+    this.created.emit({
+      name: this.name.value.trim(),
+      description: this.description.value?.trim() || undefined,
+      users: this.users.value,
     });
   }
 
-  addUser(userFormControl: FormControl) {
-    this.users.push(userFormControl);
+  addUser(user: IUser) {
+    if (this.users.value.some((u: IUser) => u.Id === user.Id)) {
+      return;
+    }
+    this.users.push(
+      new FormControl<IUser>({ Id: user.Id, username: user.username, email: user.email }, { nonNullable: true })
+    );
   }
 
-  removeUser(userId: number) {
-    this.users.removeAt(
-      this.users.value.findIndex((user: IUser) => user.Id === userId)
-    );
+  removeUser(user: IUser) {
+    const index = this.users.value.findIndex((u: IUser) => u.Id === user.Id);
+    if (index > -1) {
+      this.users.removeAt(index);
+    }
+  }
+
+  showError(control: FormControl | FormArray): boolean {
+    // The people list has no blur of its own, so it only complains after a submit.
+    const engaged = control instanceof FormArray ? this.submitted : control.touched || this.submitted;
+    return control.invalid && engaged;
   }
 
   get name(): FormControl {

@@ -1,26 +1,21 @@
-<mat-form-field>
-  <form [formGroup]="form">
-    <input matInput placeholder="Search User by Username" [matAutocomplete]="auto" [formControl]="searchUsername">
-  </form>
-  <mat-autocomplete #auto="matAutocomplete" [displayWith]="displayFn"
-    (optionSelected)="setSelectedUser($event.option.value)">
-    <ng-container>
-      <mat-option *ngFor="let user of filteredUsers" [value]="user">
-        <span>{{user.username}}</span>
-        <small> | ID: {{user.Id}}</small>
-      </mat-option>
-    </ng-container>
-  </mat-autocomplete>
-</mat-form-field>
-<button mat-button type="button" [disabled]="!selectedUser" (click)="addUserToForm()">Add User</button>
+<div class="picker">
+  <app-people-search labelledBy="people-label" placeholder="Search by username, e.g. ma" actionLabel="Add"
+    [excludeIds]="excludeIds" [onlineIds]="onlineIds" [invalid]="invalid"
+    (pick)="addUser.emit($event)" (pendingChange)="pendingChange.emit($event)">
+    Type the start of a username. Matches appear as you type.
+  </app-people-search>
 
-<mat-chip-listbox *ngIf="users.length > 0; else no_users">
-  <mat-chip *ngFor="let user of users" (removed)="removeUserFromForm(user)">
-    {{user.username}}
-    <mat-icon matChipRemove>cancel</mat-icon>
-  </mat-chip>
-</mat-chip-listbox>
-
-<ng-template #no_users>
-  <mat-error>No Users added so far</mat-error>
-</ng-template>
+  <ul class="chips" aria-label="People in this room">
+    <li class="chip">
+      <span class="avatar xs" [ngClass]="me.Id | tone">{{ me.username | initials }}</span>
+      <span>{{ me.username }} <span class="you">(you)</span></span>
+    </li>
+    <li class="chip" *ngFor="let user of users; trackBy: trackUser">
+      <span class="avatar xs" [ngClass]="user.Id | tone">{{ user.username | initials }}</span>
+      <span>{{ user.username }}</span>
+      <button type="button" class="remove" (click)="removeUserFromForm(user)" [attr.aria-label]="'Remove ' + user.username">
+        <app-icon name="x"></app-icon>
+      </button>
+    </li>
+  </ul>
+</div>

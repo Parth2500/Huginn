@@ -1,0 +1,44 @@
+.picker { display: grid; gap: 8px; }
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 12px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--surface-2);
+  font-size: 14px;
+  font-weight: 500;
+  animation: chip-in 200ms var(--ease-out);
+
+  &:has(.remove) { padding-right: 2px; }
+  .you { color: var(--text-2); font-weight: 400; }
+}
+
+@keyframes chip-in { from { opacity: 0; transform: scale(0.94); } }
+
+.remove {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-2);
+  cursor: pointer;
+  app-icon { width: 15px; height: 15px; }
+  &:hover { background: var(--line); color: var(--text); }
+}

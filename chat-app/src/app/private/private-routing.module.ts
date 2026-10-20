@@ -1,6 +1,5 @@
 import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
-import { CreateRoomComponent } from './components/create-room/create-room.component';
 import { DashboardComponent } from './containers/dashboard/dashboard.component';
 
 const routes: Routes = [
@@ -14,8 +13,10 @@ const routes: Routes = [
     component: DashboardComponent,
   },
   {
+    // Room creation lives inside the dashboard shell; this keeps old links working.
     path: 'create-room',
-    component: CreateRoomComponent,
+    component: DashboardComponent,
+    data: { create: true },
   },
   {
     path: '**',

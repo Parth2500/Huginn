@@ -1,19 +1,20 @@
-import { Component, Inject, Input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, Input } from '@angular/core';
 import { IMessage } from 'src/app/models/message.interface';
-import { IUser } from 'src/app/models/user.interface';
-import {
-  ISignOnService,
-  SignOnToken,
-} from 'src/app/public/services/iservices/sign-on.service.interface';
+import { MessageStatus } from '../chat-room/chat-room.component';
 
 @Component({
   selector: 'app-chat-message',
   templateUrl: './chat-message.component.html',
   styleUrls: ['./chat-message.component.scss'],
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class ChatMessageComponent {
   @Input() message: IMessage;
-  user: IUser = this.signOnService.getLoggedInUser();
-
-  constructor(@Inject(SignOnToken) private signOnService: ISignOnService) {}
+  @Input() own = false;
+  /** First message of a run from the same person: shows their name. */
+  @Input() first = true;
+  /** Last message of a run: carries the bubble tail and the avatar. */
+  @Input() last = true;
+  @Input() status: MessageStatus = null;
+  @Input() fresh = false;
 }

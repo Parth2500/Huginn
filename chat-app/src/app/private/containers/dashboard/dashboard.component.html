@@ -1,38 +1,104 @@
-<div class="container">
-  <mat-card>
-    <div style="display: flex; flex-direction: row;">
-      <div>
-        <div>
-          <span style="display: flex; flex-direction: row; align-items: baseline;">
-            <h2>My Chatrooms</h2>
-            <small style="margin-left:10px;">Logged in as {{user.username}}</small>
-          </span>
-          <button mat-button [routerLink]="['../create-room']">Create new Room</button>
-        </div>
-
-        <div *ngIf="(rooms$ | async)?.items?.length! > 0; else no_rooms" class="rooms">
-          <mat-selection-list [multiple]="false" (selectionChange)="onSelectRoom($event)">
-            <mat-list-option *ngFor="let room of (rooms$ | async)?.items" [value]="room">
-              Name: {{room.name}} Id: {{room.id}}
-              <mat-divider></mat-divider>
-            </mat-list-option>
-          </mat-selection-list>
-          <mat-paginator [length]="(rooms$ | async)?.meta?.totalItems" [pageIndex]="(rooms$ | async)?.meta?.currentPage"
-            [pageSize]="(rooms$ | async)?.meta?.itemsPerPage" (page)="onPaginateRooms($event)"
-            [pageSizeOptions]="[10,25,50]"></mat-paginator>
-        </div>
+<div class="shell" [class.detail-open]="selectedRoom || creating"
+  [class.empty-start]="rooms?.length === 0 && !creating && !selectedRoom" *ngIf="{ online: onlineIds$ | async, connection: connection$ | async } as live">
+  <aside class="sidebar" aria-label="Rooms">
+    <header class="side-head">
+      <div class="brand">
+        <span class="logo"><app-icon name="message"></app-icon></span>
+        <span>ChatApp</span>
       </div>
+      <button type="button" class="new-room" (click)="openCreate()" [class.active]="creating"
+        [attr.aria-pressed]="creating">
+        <app-icon name="plus"></app-icon>
+        <span>New room</span>
+      </button>
+    </header>
 
-      <div class="chatroom">
-        <app-chat-room [chatRoom]="selectedRoom"></app-chat-room>
-      </div>
-
+    <div class="side-title">
+      <h2>Rooms</h2>
+      <span class="count tabular" *ngIf="meta">{{ meta.totalItems }}</span>
     </div>
-  </mat-card>
-</div>
 
-<ng-template #no_rooms>
-  <div>
-    <mat-error>No Chatrooms for you so far, please create one or get invited</mat-error>
-  </div>
-</ng-template>
+    <nav class="room-list">
+      <!-- Loading -->
+      <ul *ngIf="rooms === null" aria-busy="true" aria-label="Loading rooms">
+        <li *ngFor="let row of [1, 2, 3, 4]" class="room skeleton-row">
+          <span class="avatar skeleton"></span>
+          <span class="lines"><span class="skeleton l1"></span><span class="skeleton l2"></span></span>
+        </li>
+      </ul>
+
+      <!-- Rooms -->
+      <ul *ngIf="rooms && rooms.length > 0">
+        <li *ngFor="let room of rooms; trackBy: trackRoom">
+          <button type="button" class="room" (click)="selectRoom(room)"
+            [class.active]="room.id === selectedRoom?.id && !creating"
+            [class.fresh]="freshRoomIds.has(room.id!)"
+            [class.has-unread]="unread.get(room.id!)"
+            [attr.aria-current]="room.id === selectedRoom?.id && !creating ? 'true' : null">
+            <span class="avatar" *ngIf="directPartner(room) as person; else roomAvatar" [ngClass]="person.Id | tone"
+              [class.online]="live.online?.has(person.Id!)">{{ person.username | initials }}</span>
+            <ng-template #roomAvatar><span class="avatar" [ngClass]="room.id | tone">{{ room.name | initials }}</span></ng-template>
+            <span class="lines">
+              <span class="name-row">
+                <span class="name">{{ room.name }}</span>
+                <time class="when" *ngIf="room.lastMessage" [attr.datetime]="room.lastMessage.created_at">{{ activityLabel(room) }}</time>
+              </span>
+              <span class="preview-row">
+                <span class="preview" [class.empty]="!room.lastMessage">{{ preview(room) }}</span>
+                <span class="badge tabular" *ngIf="unread.get(room.id!) as count"
+                  [attr.aria-label]="count + ' unread'">{{ count > 99 ? '99+' : count }}</span>
+              </span>
+            </span>
+          </button>
+        </li>
+      </ul>
+
+      <!-- Empty -->
+      <div class="side-empty" *ngIf="rooms && rooms.length === 0">
+        <p class="title">No rooms yet</p>
+        <p>Find someone by username to start chatting, or wait for someone to add you.</p>
+        <button type="button" class="btn btn-primary" (click)="openCreate()">
+          <app-icon name="plus"></app-icon> New room
+        </button>
+      </div>
+    </nav>
+
+    <div class="pager" *ngIf="meta && meta.totalPages > 1">
+      <button type="button" class="icon-btn" (click)="goToPage(meta.currentPage - 1)"
+        [disabled]="meta.currentPage <= 0" aria-label="Previous page of rooms">
+        <app-icon name="chevron-left"></app-icon>
+      </button>
+      <span class="tabular">Page {{ meta.currentPage + 1 }} of {{ meta.totalPages }}</span>
+      <button type="button" class="icon-btn" (click)="goToPage(meta.currentPage + 1)"
+        [disabled]="meta.currentPage >= meta.totalPages - 1" aria-label="Next page of rooms">
+        <app-icon name="chevron-right"></app-icon>
+      </button>
+    </div>
+
+    <footer class="me">
+      <span class="avatar sm" [ngClass]="user.Id | tone" [class.online]="live.connection === 'online'">{{ user.username | initials }}</span>
+      <span class="who">
+        <span class="username">{{ user.username }}</span>
+        <span class="status" [attr.data-state]="live.connection" role="status">
+          {{ live.connection === 'online' ? 'Online' : live.connection === 'connecting' ? 'Connecting…' : 'Offline, retrying' }}
+        </span>
+      </span>
+      <button type="button" class="icon-btn" (click)="logout()" aria-label="Sign out" title="Sign out">
+        <app-icon name="log-out"></app-icon>
+      </button>
+    </footer>
+  </aside>
+
+  <main class="detail">
+    <app-create-room *ngIf="creating" [me]="user" [onlineIds]="live.online" [initialUsers]="startWith"
+      (created)="onCreated($event)" (cancel)="closeCreate()">
+    </app-create-room>
+
+    <app-chat-room *ngIf="!creating && selectedRoom" [chatRoom]="selectedRoom" [me]="user"
+      [onlineIds]="live.online" [connection]="live.connection ?? 'connecting'" (back)="closeRoom()">
+    </app-chat-room>
+
+    <app-start-chat *ngIf="!creating && !selectedRoom" [me]="user" [hasRooms]="!!rooms?.length"
+      [onlineIds]="live.online" (pick)="startChatWith($event)"></app-start-chat>
+  </main>
+</div>
