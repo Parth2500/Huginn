@@ -1,0 +1,105 @@
+.auth {
+  display: grid;
+  grid-template-columns: minmax(380px, 5fr) 7fr;
+  min-height: 100dvh;
+  background: var(--surface);
+}
+
+.showcase {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding: 40px clamp(32px, 4vw, 64px);
+  background: var(--side-bg);
+  color: var(--side-text);
+}
+
+.brand, .mobile-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.pitch {
+  margin-top: auto;
+  max-width: 30rem;
+  h2 { font-size: clamp(28px, 2.6vw, 38px); line-height: 1.15; letter-spacing: -0.02em; font-weight: 700; }
+  p { margin-top: 14px; color: var(--side-text-2); font-size: 16px; max-width: 42ch; }
+}
+
+.preview {
+  display: grid;
+  gap: 8px;
+  max-width: 26rem;
+  padding: 14px;
+  border: 1px solid var(--side-line);
+  border-radius: var(--radius-l);
+  background: var(--side-bg-2);
+  font-size: 14px;
+}
+
+.preview-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-bottom: 10px;
+  margin-bottom: 2px;
+  border-bottom: 1px solid var(--side-line);
+  font-weight: 600;
+}
+
+.preview-live {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--side-text-2);
+  font-weight: 500;
+  font-size: 13px;
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+}
+
+.preview-msg {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  p { padding: 7px 11px; border-radius: 14px; max-width: 80%; line-height: 1.35; }
+  b { display: block; font-size: 12px; color: var(--tone-text); }
+  &.in p { background: var(--side-bg); border-bottom-left-radius: 4px; }
+  &.out { justify-content: flex-end; }
+  &.out p { background: var(--accent); color: var(--on-accent); border-bottom-right-radius: 4px; }
+  .ticks { display: inline-flex; margin-left: 8px; vertical-align: -3px; color: var(--on-accent-2); app-icon { width: 15px; height: 15px; } }
+}
+
+.preview b.tone-4 { color: #86efac; }
+.preview b.tone-6 { color: #7dd3fc; }
+
+.stack { color: var(--side-text-2); font-size: 13px; }
+
+.panel {
+  display: grid;
+  place-items: center;
+  padding: 48px 24px;
+}
+
+.panel-inner {
+  width: 100%;
+  max-width: 400px;
+
+  header {
+    margin-bottom: 28px;
+    h1 { font-size: 28px; line-height: 1.2; letter-spacing: -0.02em; font-weight: 700; }
+    p { margin-top: 6px; color: var(--text-2); }
+  }
+}
+
+.mobile-brand { display: none; margin-bottom: 32px; }
+
+@media (max-width: 900px) {
+  .auth { grid-template-columns: 1fr; }
+  .showcase { display: none; }
+  .panel { place-items: start center; padding: 32px 16px 48px; }
+  .mobile-brand { display: flex; }
+}

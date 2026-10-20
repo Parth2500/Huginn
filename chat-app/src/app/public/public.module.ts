@@ -6,33 +6,20 @@ import { LoginComponent } from './containers/login/login.component';
 import { RegisterComponent } from './containers/register/register.component';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 
-import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatInputModule } from '@angular/material/input';
-import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatDividerModule } from '@angular/material/divider';
 import { SignOnService } from './services/sign-on.service';
 import { SignOnToken } from './services/iservices/sign-on.service.interface';
-
-const MaterialImports = [
-  MatCardModule,
-  MatFormFieldModule,
-  MatInputModule,
-  MatButtonModule,
-  MatIconModule,
-  MatDividerModule,
-];
+import { SharedModule } from '../shared/shared.module';
+import { AuthLayoutComponent } from './components/auth-layout/auth-layout.component';
 
 @NgModule({
-  declarations: [LoginComponent, RegisterComponent],
+  declarations: [LoginComponent, RegisterComponent, AuthLayoutComponent],
   imports: [
     CommonModule,
     PublicRoutingModule,
     FormsModule,
     ReactiveFormsModule,
-    ...MaterialImports,
+    SharedModule,
   ],
-  providers: [{ provide: SignOnToken, useClass: SignOnService}],
+  providers: [{ provide: SignOnToken, useClass: SignOnService }],
 })
 export class PublicModule {}

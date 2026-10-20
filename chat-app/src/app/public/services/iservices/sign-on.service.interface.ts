@@ -5,7 +5,8 @@ import { IUser } from 'src/app/models/user.interface';
 
 export interface ISignOnService {
   createUser(user: IUser): Observable<IUser>;
-  findByUsername(username: string): Observable<IUser[]>;
+  findByUsername(username: string): Observable<IUser | null>;
+  searchUsers(query: string): Observable<IUser[]>;
   loginUser(user: IUser): Observable<LoginResponse>;
   getLoggedInUser(): IUser;
   logoutUser(): void;
