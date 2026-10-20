@@ -7,12 +7,11 @@ import { AppComponent } from './app.component';
 import { HttpClientModule } from '@angular/common/http';
 import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
 
-import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { RouterModule } from '@angular/router';
 
 import { JwtModule } from '@auth0/angular-jwt';
+import { SharedModule } from './shared/shared.module';
 
-const MaterialImports = [MatSnackBarModule];
 export const getAccessToken = () => {
   return localStorage.getItem('access_token');
 };
@@ -31,7 +30,7 @@ export const getAccessToken = () => {
         allowedDomains: ['chat-api:3000'],
       },
     }),
-    ...MaterialImports,
+    SharedModule,
   ],
   providers: [],
   bootstrap: [AppComponent],

@@ -1,0 +1,40 @@
+.toasts {
+  position: fixed;
+  z-index: 100;
+  top: 76px;
+  right: 16px;
+  display: grid;
+  gap: 8px;
+  width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
+}
+
+.toast {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  padding: 6px 6px 6px 14px;
+  border-radius: var(--radius-m);
+  background: var(--side-bg);
+  color: var(--side-text);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+  animation: toast-in 280ms var(--ease-out);
+
+  > app-icon { width: 18px; height: 18px; color: var(--side-text-2); }
+  &.success > app-icon { color: #4ade80; }
+  &.error > app-icon { color: #fca5a5; }
+  p { font-size: 14px; line-height: 1.4; padding: 6px 0; }
+  .icon-btn { width: 32px; height: 32px; color: var(--side-text-2); }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(-8px) scale(0.98); }
+}
+
+@media (max-width: 767px) {
+  .toasts { top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); left: 16px; right: 16px; width: auto; }
+  .toast { animation-name: toast-in-up; }
+  @keyframes toast-in-up { from { opacity: 0; transform: translateY(8px); } }
+}
