@@ -448,10 +448,9 @@ handlers alike. The UI mirrors it to hide controls, but never relies on that.
 - **The sync engine** applies `update` events to the stores and to IndexedDB in one place.
 - **The service worker** handles push, notification clicks, an offline app shell, and cached
   avatars.
-- **Upgrade path:**
-  - Angular 16 → a current LTS release in Phase 0 (signals, the new control flow, and standalone
-    components cut a lot of module boilerplate).
-  - NestJS 9 → a current release in the same pass.
+- **Versions (milestone 0.2, done):** Angular 22 (standalone, signal inputs and queries, the new
+  control flow) and NestJS 12. Components still use `ChangeDetectionStrategy.Eager` until their
+  state moves to signals, then the app goes zoneless.
 
 ---
 

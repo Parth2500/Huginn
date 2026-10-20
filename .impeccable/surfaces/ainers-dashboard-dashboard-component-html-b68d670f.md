@@ -1,14 +1,14 @@
 ---
 version: 1
 slug: "ainers-dashboard-dashboard-component-html-b68d670f"
-primary_target: "chat-app/src/app/private/containers/dashboard/dashboard.component.html"
-related_targets: ["chat-app/src/app/public/containers/login/login.component.html","chat-app/src/app/public/containers/register/register.component.html","chat-app/src/app/private/components/create-room/create-room.component.html"]
+primary_target: "web/src/app/private/containers/dashboard/dashboard.component.html"
+related_targets: ["web/src/app/public/containers/login/login.component.html","web/src/app/public/containers/register/register.component.html","web/src/app/private/components/create-room/create-room.component.html"]
 ---
 
 # Chat app shell (login, register, rooms, room view, create room)
 
 ## Scope and mode
-Whole Angular frontend in `chat-app/src/app`. Mode: Operate. Phone width is a hard requirement.
+Whole Angular frontend in `web/src/app`. Mode: Operate. Phone width is a hard requirement.
 
 ## Audience, task, constraints
 Reviewers in a short demo: register → log in → create a room with invited users → exchange live messages, often with two windows side by side. Backend facts the UI must respect (updated 2026-10-20, after the API work):

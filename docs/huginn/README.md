@@ -3,8 +3,8 @@
 > *Huginn and Muninn fly each day over the wide world.* Odin's raven Huginn ("thought") carries
 > word back and forth between the realms. Heimdall guards the gate; Huginn carries the messages.
 
-Huginn is the chat app in this repository, currently called "ChatApp" in the UI. Its
-sign-in comes from **Heimdall**, the separate OIDC provider. This folder is the design for
+Huginn is the chat app in this repository (it was called "ChatApp" until Phase 0). Its
+sign-in will come from **Heimdall**, the separate OIDC provider. This folder is the design for
 turning the current demo into a full chat app, inspired by WhatsApp, Telegram and
 Microsoft Teams.
 

@@ -1,5 +1,5 @@
 ---
-name: ChatApp
+name: Huginn
 description: A conventional three-pane messenger built to the finish of Telegram Web and Discord, with live socket state on show.
 colors:
   conversation-tint: "#eef1f6"
@@ -286,13 +286,13 @@ components:
     backgroundColor: "{colors.surface-raised}"
 ---
 
-# Design System: ChatApp
+# Design System: Huginn
 
 ## Overview
 
 **Creative North Star: "The Well-Kept Messenger"**
 
-ChatApp is the category-standard messenger played straight: a deep slate room rail on the left, a pale conversation pane on the right, the composer docked at the bottom. The bar is the finish of Telegram Web, WhatsApp Web and Discord. Nothing about the layout is novel on purpose. The craft is in the details a reviewer notices without being told: bubbles whose corners tighten where a run of messages joins, a stable colour per person, a send that settles from pending to delivered, a green presence dot on whoever is online, "is typing" in the header, a connection state that tells the truth, and people who are recognisable at a glance by photo or tone, with a profile one click from wherever their name appears.
+Huginn is the category-standard messenger played straight: a deep slate room rail on the left, a pale conversation pane on the right, the composer docked at the bottom. The bar is the finish of Telegram Web, WhatsApp Web and Discord. Nothing about the layout is novel on purpose. The craft is in the details a reviewer notices without being told: bubbles whose corners tighten where a run of messages joins, a stable colour per person, a send that settles from pending to delivered, a green presence dot on whoever is online, "is typing" in the header, a connection state that tells the truth, and people who are recognisable at a glance by photo or tone, with a profile one click from wherever their name appears.
 
 The system is calm and dense in the way messengers are dense. One sans family (Figtree, self-hosted) carries every role. Colour does work: indigo marks what is yours or what you can act on, and the eight member tones tell people apart. Everything else is slate neutrals and 1px hairlines. Depth is close to flat, with soft ambient shadows only on things that float over the stream.
 

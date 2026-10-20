@@ -1,6 +1,6 @@
 # Scaling to a million active users
 
-This note covers what breaks first when ChatApp grows from a demo to a million active users, what
+This note covers what breaks first when Huginn grows from a demo to a million active users, what
 is already handled in the code, and what to build next. Numbers come from measurements on this
 stack (Postgres 15, a laptop) unless marked as estimates.
 

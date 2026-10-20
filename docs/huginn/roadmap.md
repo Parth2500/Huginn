@@ -35,12 +35,31 @@ tested and demoable, never half-migrated.
 
 | # | Milestone | Done when |
 |---|---|---|
-| 0.1 | **Rename to Huginn** | The UI, page title, favicon, logo mark, package names, docker services, docs and API Swagger title all say Huginn. "ChatApp" appears nowhere. |
-| 0.2 | **Everything on latest** | Angular, NestJS, TypeORM, Socket.IO, TypeScript, Node (current LTS) and Postgres all on current releases. Angular moved to standalone components, signals and the new control flow. TypeORM migrations replace `synchronize`. CI runs the build, lint and tests, and real tests replace the old scaffold specs. |
+| 0.1 ✓ | **Rename to Huginn** (done 2026-10-21) | The UI, page title, favicon, logo mark, package names, docker services, docs and API Swagger title all say Huginn. "ChatApp" appears nowhere. |
+| 0.2 ✓ | **Everything on latest** (done 2026-10-21; see the note below) | Angular, NestJS, TypeORM, Socket.IO, TypeScript, Node (current LTS) and Postgres all on current releases. Angular moved to standalone components, signals and the new control flow. TypeORM migrations replace `synchronize`. CI runs the build, lint and tests, and real tests replace the old scaffold specs. |
 | 0.3 | **New data model** | `chat` and `chat_member` (with per-user state and watermarks), `message` with `client_message_id`, `block` and `user_settings` tables, per [architecture.md §3](architecture.md#3-data-model-phase-0-and-1). Existing features work on it. |
 | 0.4 | **Protocol v1** | The event envelope, acknowledgements, idempotent `message.send`, the per-user `update` log with `sync`, and the IndexedDB local store with outbox. Killing the API mid-conversation and restarting it loses nothing, and pending sends complete. |
 | 0.5 | **Cookie sessions and the auth seam** | Sign-in moves from a token in `localStorage` to an httpOnly cookie session, and sockets authenticate with the cookie. All sign-in code sits behind an `AuthProvider` interface, with today's password login as `LocalPasswordProvider`. |
 | later | **Heimdall sign-in** (when Heimdall is ready) | `HeimdallOidcProvider`: confidential BFF client, PKCE, `resource` audience, serialised refresh, `/revoke` on sign-out, account linking by verified email. See [architecture.md §2](architecture.md#2-identity-heimdall-integration-when-heimdall-is-ready). It must land before linked devices (2.4), which approve new devices through a real identity provider. |
+
+**Where 0.1 and 0.2 landed:**
+
+- **Renaming:** folders are now `web/` and `api/`. Docker runs Node 24 and Postgres 18.
+- **Versions:**
+  - Angular 22.2, with standalone components, the `@if`/`@for` control flow, `inject()`, and
+    signal inputs, outputs and queries.
+  - NestJS 12.2, TypeORM 1.1, Socket.IO 4.8 and TypeScript 6.0.
+  - Vitest replaces Karma and Jest. ESLint 10 runs with a flat config.
+- **Database:** TypeORM migrations replace `synchronize`. The baseline is checked against the
+  live schema (identical columns and indexes).
+- **Tests:**
+  - API unit tests (27) and API end-to-end tests against Postgres (13), which caught a
+    presence leak to all users that's now fixed.
+  - Web component tests (21).
+  - CI on GitHub Actions, with actions pinned by SHA, plus Dependabot.
+- **Follow-up:** Angular 22 makes OnPush the default. The existing components are marked
+  `ChangeDetectionStrategy.Eager` for now. Moving their state to signals, then going zoneless,
+  is folded into 0.3 and 0.4, as those milestones rewrite the same components.
 
 ---
 

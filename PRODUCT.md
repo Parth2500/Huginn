@@ -17,7 +17,7 @@ Its value is that the whole thing actually works: a real backend, real auth, per
 
 ## Operating Context
 - Typical session: a scripted or self-guided walkthrough, often with two browser windows or accounts side by side to show live delivery.
-- Runs locally through `docker-compose.yml`: `chat-app` (Angular dev server on :4200), `chat-api` (NestJS on :3000), Postgres and pgAdmin.
+- Runs locally through `docker-compose.yml`: `web` (Angular dev server on :4200), `api` (NestJS on :3000), Postgres and pgAdmin.
 - Reviewers may open it on a phone as well as a laptop.
 
 ## Capabilities and Constraints
@@ -32,7 +32,7 @@ Its value is that the whole thing actually works: a real backend, real auth, per
   - Click any name or photo in a chat to open that person's profile panel (with "Message").
   - Your own profile is edited from the account bar (`/private/profile`).
   - Display names show wherever names appear; @usernames are the unique handle.
-- **Username policy** (`chat-api/src/user/username.policy.ts`, mirrored in the app):
+- **Username policy** (`api/src/user/username.policy.ts`, mirrored in the app):
   - NFKC-normalised; 3–24 ASCII characters; must start with a letter, then letters, digits, `.` or `_`.
   - No `..`, `__`, `._`, `_.` runs, and no trailing separator.
   - A reserved-name list, checked with separators removed.
@@ -49,15 +49,15 @@ Its value is that the whole thing actually works: a real backend, real auth, per
 - Terminology in the code: "room" / "chatroom", "message", "user" (username, email).
 - **Constraint:** layouts must work at phone width. This is a real requirement.
 - The UI is hand-built: plain Angular templates, a token-based global stylesheet and inline SVG icons. Angular Material was removed from the templates on 2026-10-20 with the user's approval. The packages are still in package.json. Do not build a separate component library.
-- Undecided: product name (the page title "ChatApp" is a scaffold default), and whether the author wants any personal attribution or links to the portfolio inside the app.
+- Undecided: whether the author wants any personal attribution or links to the portfolio inside the app.
 
 ## Brand Commitments
-- Name: **Huginn** (chosen 2026-10-20), after Odin's messenger raven. Its sign-in comes from the separate OIDC provider **Heimdall**. The UI still says "ChatApp" until the rename in Phase 0 of `docs/huginn/roadmap.md`.
+- Name: **Huginn** (chosen 2026-10-20), after Odin's messenger raven. Its sign-in will come from the separate OIDC provider **Heimdall**. Renamed from "ChatApp" in Phase 0 (2026-10-21).
 - Goal (chosen 2026-10-20): a feature-complete showpiece first, then hardened into a real product. Priorities: end-to-end encryption first, then media; reactions are nice to have; audio-only calls in the far future (no video).
 - Standing preference (chosen 2026-10-20): the app follows the category-standard messenger layout, not a themed world. Its quality bar is Telegram / WhatsApp Web and Discord. It must still not read as a Slack or Discord clone, a stock template, or something too plain.
 
 ## Evidence on Hand
-- The working app itself is the evidence: source in `chat-app/` and `chat-api/`, with unit tests for services and components.
+- The working app itself is the evidence: source in `web/` and `api/`, with unit tests for services and components.
 - There are no screenshots, users, testimonials, metrics or deployment claims. Future work must not make these up, for example fake user counts or "trusted by" copy.
 
 ## Product Principles
