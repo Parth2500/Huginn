@@ -1,12 +1,9 @@
-import { IsNotEmpty, IsString, Matches, MaxLength } from 'class-validator';
+import { IsNotEmpty, IsString } from 'class-validator';
 import { LoginUserDto } from './login-user.dto';
 
 export class CreateUserDto extends LoginUserDto {
+  // Shape, length and reserved names are checked by username.policy in the service.
   @IsString()
   @IsNotEmpty()
-  @MaxLength(24)
-  @Matches(/^[A-Za-z0-9._-]+$/, {
-    message: 'Usernames can use letters, numbers, dots, dashes and underscores.',
-  })
   username: string;
 }

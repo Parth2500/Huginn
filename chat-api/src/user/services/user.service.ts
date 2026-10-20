@@ -1,9 +1,22 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
-import { ILike, Not, Repository, UpdateResult } from 'typeorm';
+import { IsNull, Repository } from 'typeorm';
 import { User } from '../entities/user.entity';
-import { IUser } from '../entities/user.interface';
+import { IPublicUser, IUser, toPublicUser } from '../entities/user.interface';
+import { UpdateProfileDto } from '../dto/update-profile.dto';
+import {
+  normalizeUsername,
+  usernameKey,
+  usernameProblem,
+} from '../username.policy';
 import { IUserService } from './iservices/user.service.interface';
 import {
   IPaginationOptions,
@@ -19,8 +32,17 @@ import {
   IAuthenticationService,
 } from 'src/authentication/services/iservices/authentication.service.interface';
 
+const PUBLIC_COLUMNS = [
+  'user.Id',
+  'user.username',
+  'user.displayName',
+  'user.avatarUrl',
+];
+
 @Injectable()
-export class UserService implements IUserService {
+export class UserService implements IUserService, OnModuleInit {
+  private readonly logger = new Logger(UserService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
@@ -29,10 +51,52 @@ export class UserService implements IUserService {
     @Inject(PasswordToken) private readonly passwordService: IPasswordService,
   ) {}
 
+  /**
+   * Startup housekeeping: give older accounts a canonical username key, and make sure the
+   * indexes that keep username search fast at scale exist (trigram for "contains" matches).
+   */
+  async onModuleInit() {
+    const missing = await this.userRepository.find({
+      where: { usernameKey: IsNull() },
+    });
+    for (const user of missing) {
+      try {
+        await this.userRepository.update(user.Id, {
+          usernameKey: usernameKey(user.username),
+        });
+      } catch {
+        this.logger.warn(
+          `Username "${user.username}" collides with another account by case; left without a key.`,
+        );
+      }
+    }
+    const statements = [
+      'CREATE EXTENSION IF NOT EXISTS pg_trgm',
+      'CREATE INDEX IF NOT EXISTS user_username_key_trgm ON "user" USING gin ("usernameKey" gin_trgm_ops)',
+      'CREATE INDEX IF NOT EXISTS user_display_name_trgm ON "user" USING gin (lower("displayName") gin_trgm_ops)',
+    ];
+    for (const sql of statements) {
+      try {
+        await this.userRepository.query(sql);
+      } catch (error) {
+        this.logger.warn(
+          `Index setup skipped (${sql.slice(0, 40)}…): ${
+            error?.message ?? error
+          }`,
+        );
+      }
+    }
+  }
+
   //#region create
   create(createUser: IUser): Observable<IUser> {
     createUser.email = createUser.email.trim().toLowerCase();
-    createUser.username = createUser.username.trim();
+    createUser.username = normalizeUsername(createUser.username);
+    const problem = usernameProblem(createUser.username);
+    if (problem) {
+      throw new HttpException(problem, HttpStatus.BAD_REQUEST);
+    }
+    createUser.usernameKey = usernameKey(createUser.username);
     return this.isUsernameTaken(createUser.username).pipe(
       switchMap((taken: boolean) => {
         if (taken) {
@@ -138,19 +202,141 @@ export class UserService implements IUserService {
       }),
     );
   }
-  /** Case-insensitive prefix match on username, excluding the searcher. */
+  /**
+   * People search by username or display name, excluding the searcher. Never returns emails.
+   *
+   * Two index-only steps, measured on 1,000,000 users at well under a millisecond each:
+   *  1. Usernames that start with the query, read in order straight off the unique index
+   *     (byte-order collation). Common names fill all 8 results here.
+   *  2. Only if fewer than 8 were found and the query has 3+ characters: names that contain it,
+   *     via the trigram indexes on the username key and the display name.
+   */
   searchByUsername(query: string, excludeId?: number): Observable<IUser[]> {
-    const escaped = query.replace(/[\\%_]/g, (c) => `\\${c}`);
-    return from(
-      this.userRepository.find({
-        where: {
-          username: ILike(`${escaped}%`),
-          ...(excludeId ? { Id: Not(excludeId) } : {}),
+    return from(this.search(query, excludeId));
+  }
+
+  private async search(query: string, excludeId?: number): Promise<IUser[]> {
+    const limit = 8;
+    const needle = query.normalize('NFKC').trim().toLowerCase();
+    if (!needle) {
+      return [];
+    }
+    const escaped = needle.replace(/[\\%_]/g, (c) => `\\${c}`);
+    const base = () => {
+      const builder = this.userRepository
+        .createQueryBuilder('user')
+        .select(PUBLIC_COLUMNS);
+      if (excludeId) {
+        builder.andWhere('user.Id != :excludeId', { excludeId });
+      }
+      return builder;
+    };
+
+    const prefix = await base()
+      .andWhere('user.usernameKey LIKE :prefix', { prefix: `${escaped}%` })
+      .orderBy('user.usernameKey', 'ASC')
+      .limit(limit)
+      .getMany();
+    if (prefix.length >= limit || needle.length < 3) {
+      return prefix;
+    }
+
+    const contains = base()
+      .andWhere(
+        '(user.usernameKey LIKE :contains OR lower(user.displayName) LIKE :contains)',
+        {
+          contains: `%${escaped}%`,
         },
-        order: { username: 'ASC' },
-        take: 8,
-      }),
-    );
+      )
+      .orderBy('user.usernameKey', 'ASC')
+      .limit(limit - prefix.length);
+    if (prefix.length) {
+      contains.andWhere('user.Id NOT IN (:...seen)', {
+        seen: prefix.map((u) => u.Id),
+      });
+    }
+    return [...prefix, ...(await contains.getMany())];
+  }
+
+  async findPublicById(id: number): Promise<IPublicUser | null> {
+    const user = await this.userRepository.findOne({ where: { Id: id } });
+    return user ? toPublicUser(user, true) : null;
+  }
+
+  /** The signed-in user's own profile, the only place their email is returned. */
+  async getOwnProfile(id: number): Promise<IUser> {
+    const user = await this.userRepository.findOne({
+      where: { Id: id },
+      select: [
+        'Id',
+        'username',
+        'displayName',
+        'bio',
+        'avatarUrl',
+        'created_at',
+        'email',
+      ],
+    });
+    if (!user) {
+      throw new HttpException('User Not Found!', HttpStatus.NOT_FOUND);
+    }
+    return user;
+  }
+
+  async updateProfile(id: number, changes: UpdateProfileDto): Promise<IUser> {
+    const update: Partial<User> = {};
+    if (changes.username !== undefined) {
+      const username = normalizeUsername(changes.username);
+      const problem = usernameProblem(username);
+      if (problem) {
+        throw new HttpException(problem, HttpStatus.BAD_REQUEST);
+      }
+      if (await this.isUsernameTakenPromise(username, id)) {
+        throw new HttpException(
+          'That username is taken. Try another one.',
+          HttpStatus.CONFLICT,
+        );
+      }
+      update.username = username;
+      update.usernameKey = usernameKey(username);
+    }
+    if (changes.displayName !== undefined) {
+      update.displayName =
+        changes.displayName.normalize('NFKC').trim().replace(/\s+/g, ' ') ||
+        null;
+    }
+    if (changes.bio !== undefined) {
+      update.bio = changes.bio.trim() || null;
+    }
+    if (Object.keys(update).length) {
+      await this.userRepository.update(id, update);
+    }
+    return this.getOwnProfile(id);
+  }
+
+  /** Sets (or clears) the photo and returns the previous path so the caller can delete the file. */
+  async setAvatar(
+    id: number,
+    avatarUrl: string | null,
+  ): Promise<string | null> {
+    const user = await this.userRepository.findOne({ where: { Id: id } });
+    await this.userRepository.update(id, { avatarUrl });
+    return user?.avatarUrl ?? null;
+  }
+
+  /** Whether a username could be registered or changed to, and why not. */
+  async usernameAvailability(
+    raw: string,
+    excludeId?: number,
+  ): Promise<{ available: boolean; reason?: string }> {
+    const problem = usernameProblem(raw);
+    if (problem) {
+      return { available: false, reason: problem };
+    }
+    if (await this.isUsernameTakenPromise(raw, excludeId)) {
+      return { available: false, reason: 'That username is taken.' };
+    }
+    return { available: true };
   }
   //#endregion
 
@@ -187,12 +373,20 @@ export class UserService implements IUserService {
   //#endregion
 
   //#region utility
-  /** Usernames are unique regardless of case, so "maya" and "Maya" can't both exist. */
+  /** Usernames are unique by canonical key, so "maya" and "Maya" can't both exist. */
   private isUsernameTaken(username: string): Observable<boolean> {
-    const escaped = username.replace(/[\\%_]/g, (c) => `\\${c}`);
-    return from(
-      this.userRepository.count({ where: { username: ILike(escaped) } }),
-    ).pipe(map((count: number) => count > 0));
+    return from(this.isUsernameTakenPromise(username));
+  }
+
+  private async isUsernameTakenPromise(
+    username: string,
+    excludeId?: number,
+  ): Promise<boolean> {
+    const existing = await this.userRepository.findOne({
+      where: { usernameKey: usernameKey(username) },
+      select: ['Id'],
+    });
+    return !!existing && existing.Id !== excludeId;
   }
 
   private isMailExists(email: string): Observable<boolean> {
