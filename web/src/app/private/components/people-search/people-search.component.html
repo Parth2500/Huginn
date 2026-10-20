@@ -1,0 +1,48 @@
+<div class="search" [class.invalid]="invalid()" [class.open]="open">
+  <app-icon name="search"></app-icon>
+  <input #input type="text" role="combobox" aria-autocomplete="list" [attr.aria-labelledby]="labelledBy()"
+    [attr.aria-label]="labelledBy() ? null : placeholder()" [attr.aria-controls]="uid + '-list'"
+    [attr.aria-expanded]="open" [attr.aria-activedescendant]="open ? optionId(active) : null"
+    [attr.aria-describedby]="uid + '-status'" [formControl]="query" [placeholder]="placeholder()"
+    autocomplete="off" autocapitalize="off" spellcheck="false" (keydown)="onKeydown($event)" />
+  @if (state === 'searching') {
+    <span class="spinner" aria-hidden="true"></span>
+  }
+</div>
+
+@if (open) {
+  <ul class="results" role="listbox" [id]="uid + '-list'" [attr.aria-label]="'People matching ' + term">
+    @for (user of visible; track user; let i = $index) {
+      <li role="option" class="option" [id]="optionId(i)"
+        [class.active]="i === active" [attr.aria-selected]="i === active" (mousedown)="$event.preventDefault()"
+        (mouseenter)="active = i" (click)="choose(user)">
+        <app-avatar [user]="user" size="sm" [online]="!!onlineIds()?.has(user.Id!)"></app-avatar>
+        <span class="who">
+          <span class="name">{{ user | displayName }}</span>
+          <span class="sub">@{{ user.username }}{{ onlineIds()?.has(user.Id!) ? ' · online' : '' }}</span>
+        </span>
+        <span class="action"><app-icon [name]="actionLabel() === 'Add' ? 'plus' : 'message'"></app-icon>{{ actionLabel() }}</span>
+      </li>
+    }
+  </ul>
+}
+
+<p class="status" [id]="uid + '-status'" role="status">
+  @switch (state) {
+    @case ('idle') {
+      <ng-content></ng-content>
+    }
+    @case ('searching') {
+      Searching for “{{ term }}”…
+    }
+    @case ('results') {
+      {{ visible.length }} {{ visible.length === 1 ? 'person' : 'people' }} found. Use ↑ ↓ and Enter, or click.
+    }
+    @case ('empty') {
+      No one else matches “{{ term }}”.
+    }
+    @case ('error') {
+      Couldn't search right now. Check your connection and try again.
+    }
+  }
+</p>

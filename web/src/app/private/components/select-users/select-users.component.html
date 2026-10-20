@@ -1,0 +1,23 @@
+<div class="picker">
+  <app-people-search labelledBy="people-label" placeholder="Search people by name or username" actionLabel="Add"
+    [excludeIds]="excludeIds" [onlineIds]="onlineIds()" [invalid]="invalid()"
+    (pick)="addUser.emit($event)" (pendingChange)="pendingChange.emit($event)">
+    Type any part of a name or username. Matches appear as you type.
+  </app-people-search>
+
+  <ul class="chips" aria-label="Members of this group">
+    <li class="chip">
+      <app-avatar [user]="me()" size="xs" />
+      <span>{{ me() | displayName }} <span class="you">(you)</span></span>
+    </li>
+    @for (user of users(); track trackUser($index, user)) {
+      <li class="chip">
+        <app-avatar [user]="user" size="xs" />
+        <span>{{ user | displayName }}</span>
+        <button type="button" class="remove" (click)="removeUserFromForm(user)" [attr.aria-label]="'Remove ' + (user | displayName)">
+          <app-icon name="x" />
+        </button>
+      </li>
+    }
+  </ul>
+</div>

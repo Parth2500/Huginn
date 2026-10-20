@@ -1,0 +1,153 @@
+<section class="room" [attr.aria-label]="title">
+  <header class="room-head">
+    <button type="button" class="icon-btn back" (click)="back.emit()" aria-label="Back to chats">
+      <app-icon name="arrow-left"></app-icon>
+    </button>
+    <!-- In a direct chat the header is the way into the other person's profile. -->
+    @if (partner; as person) {
+      <button type="button" class="identity" (click)="openProfile.emit(person)"
+        [attr.aria-label]="'View profile of ' + title">
+        <app-avatar [user]="person" [online]="!!onlineIds()?.has(person.Id!)"></app-avatar>
+        <span class="titles">
+          <span class="title-text" role="heading" aria-level="1">{{ title }}</span>
+          @if (typingLabel) {
+            <span class="sub typing" aria-live="polite">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typingLabel }}
+            </span>
+          } @else {
+            <span class="sub">{{ statusLine }}</span>
+          }
+        </span>
+      </button>
+    } @else {
+      <span class="avatar" [ngClass]="chatRoom().id | tone">{{ chatRoom().name | initials }}</span>
+      <div class="titles">
+        <h1>{{ title }}</h1>
+        @if (typingLabel) {
+          <p class="typing" aria-live="polite">
+            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typingLabel }}
+          </p>
+        } @else {
+          <p>{{ statusLine }}</p>
+        }
+      </div>
+    }
+    @if (!partner) {
+      <div class="people" role="group" [attr.aria-label]="membersLabel">
+        <span class="stack">
+          @for (member of otherMembers | slice: 0 : 3; track member) {
+            <button type="button" class="member"
+              (click)="openProfile.emit(member)" [attr.aria-label]="'View profile of ' + (member | displayName)"
+              [title]="(member | displayName) + (onlineIds()?.has(member.Id!) ? ' · online' : '')">
+              <app-avatar [user]="member" size="sm" [online]="!!onlineIds()?.has(member.Id!)"></app-avatar>
+            </button>
+          }
+          @if (otherMembers.length > 3) {
+            <span class="avatar sm more" aria-hidden="true">+{{ otherMembers.length - 3 }}</span>
+          }
+        </span>
+      </div>
+    }
+  </header>
+
+  <div class="stream" #messages role="log" aria-live="polite" [attr.aria-busy]="!loaded"
+    [attr.aria-label]="'Messages with ' + title" (scroll)="onStreamScroll()">
+    <div class="stream-inner">
+      <!-- Loading -->
+      @if (!loaded) {
+        <div class="loading" aria-label="Loading messages">
+          <span class="skeleton b1"></span>
+          <span class="skeleton b2"></span>
+          <span class="skeleton b3 own"></span>
+          <span class="skeleton b4"></span>
+        </div>
+      }
+
+      <!-- Empty -->
+      @if (loaded && rows.length === 0) {
+        <div class="empty">
+          @if (partner; as person) {
+            <button type="button" class="empty-person" (click)="openProfile.emit(person)" [attr.aria-label]="'View profile of ' + title">
+              <app-avatar [user]="person" size="lg" [online]="!!onlineIds()?.has(person.Id!)"></app-avatar>
+            </button>
+            <p class="title">{{ isDraft ? 'Say hi to ' + title : 'No messages yet' }}</p>
+            @if (isDraft) {
+              <p>This chat starts when you send your first message. {{ title }} won't see it until then.</p>
+            }
+            @if (!isDraft) {
+              <p>Messages you send appear for {{ title }} straight away.</p>
+            }
+          } @else {
+            <span class="empty-icon"><app-icon name="users"></app-icon></span>
+            <p class="title">No messages yet</p>
+            <p>Say hello. Everyone in {{ title }} sees it the moment you send it.</p>
+          }
+        </div>
+      }
+
+      @if (truncated) {
+        <div class="history-note">
+          <button type="button" class="older" (click)="loadOlder()" [disabled]="loadingOlder">
+            @if (loadingOlder) {
+              <span class="spinner" aria-hidden="true"></span>
+            }
+            {{ loadingOlder ? 'Loading…' : 'Load earlier messages' }}
+          </button>
+          <span>{{ shownCount }} of {{ total }} shown</span>
+        </div>
+      }
+      @if (loaded && !truncated && rows.length > 0) {
+        <p class="history-note">
+          {{ partner ? 'This is the start of your chat with ' + title + '.' : 'This is the start of ' + title + '.' }}
+        </p>
+      }
+
+      @for (row of rows; track trackRow($index, row)) {
+        @if (row.kind === 'day') {
+          <div class="day"><span>{{ row.label }}</span></div>
+        }
+        @if (row.kind === 'message') {
+          <app-chat-message [message]="row.message" [own]="row.own"
+            [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh" [showSender]="!partner"
+            (openSender)="openProfile.emit($event)">
+          </app-chat-message>
+        }
+      }
+    </div>
+  </div>
+
+  <div class="jump-wrap">
+    @if (unseen > 0) {
+      <button type="button" class="jump" (click)="jumpToLatest()">
+        {{ unseen }} new {{ unseen === 1 ? 'message' : 'messages' }}
+        <app-icon name="arrow-left"></app-icon>
+      </button>
+    }
+  </div>
+
+  <form class="composer" (ngSubmit)="sendMessage()">
+    @if (connection() !== 'online') {
+      <p class="offline" role="status">
+        <app-icon name="wifi-off"></app-icon>
+        {{ connection() === 'connecting' ? 'Connecting to the chat server…' : "You're offline. Messages you send will go out when the connection is back." }}
+      </p>
+    }
+    <div class="composer-row">
+      <label class="visually-hidden" for="composer-input">Message {{ title }}</label>
+      <textarea id="composer-input" #composer rows="1" [formControl]="chatMessage"
+        [placeholder]="'Message ' + title" (keydown)="onComposerKeydown($event)"
+      (input)="onComposerInput()" enterkeyhint="send" aria-describedby="composer-hint" maxlength="2000"></textarea>
+      <button type="submit" class="send" [disabled]="!canSend" aria-label="Send message">
+        <app-icon name="send"></app-icon>
+      </button>
+    </div>
+    <p class="hint" id="composer-hint">
+      <span><kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
+      @if ((chatMessage.value?.length ?? 0) > 1800) {
+        <span class="count tabular" [class.at-limit]="(chatMessage.value?.length ?? 0) >= 2000">
+          {{ chatMessage.value?.length }} / 2000
+        </span>
+      }
+    </p>
+  </form>
+</section>

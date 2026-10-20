@@ -1,0 +1,87 @@
+<app-auth-layout heading="Create your account" subheading="Pick a username: it's how people find you. Your email stays private.">
+  <form class="auth-form" [formGroup]="registrationForm" (ngSubmit)="register()" novalidate>
+    @if (serverError) {
+      <div class="form-alert" role="alert">
+        <app-icon name="alert-circle" />
+        <span>{{ serverError }}</span>
+      </div>
+    }
+
+    <div class="field">
+      <label for="reg-email">Email</label>
+      <input id="reg-email" class="input" type="email" formControlName="email" autocomplete="email"
+        placeholder="you@example.com" [class.invalid]="showError(email)" [attr.aria-invalid]="showError(email)"
+        aria-describedby="reg-email-error" />
+      @if (showError(email)) {
+        <p class="field-error" id="reg-email-error">
+          <app-icon name="alert-circle" />
+          {{ email.hasError('required') ? 'Enter your email address.' : 'Enter a valid email, like you@example.com.' }}
+        </p>
+      }
+    </div>
+
+    <div class="field">
+      <label for="reg-username">Username</label>
+      <input id="reg-username" class="input" type="text" formControlName="username" autocomplete="username"
+        autocapitalize="off" spellcheck="false" placeholder="e.g. maya.r" maxlength="24" [class.invalid]="usernameMessage.kind === 'error'"
+        [attr.aria-invalid]="usernameMessage.kind === 'error'" aria-describedby="reg-username-help" />
+      <p id="reg-username-help" role="status"
+        [ngClass]="usernameMessage.kind === 'error' ? 'field-error' : usernameMessage.kind === 'ok' ? 'field-ok' : 'field-hint'">
+        @if (usernameMessage.kind === 'error') {
+          <app-icon name="alert-circle" />
+        }
+        @if (usernameMessage.kind === 'ok') {
+          <app-icon name="check" />
+        }
+        @if (usernameMessage.kind === 'checking') {
+          <span class="spinner small" aria-hidden="true"></span>
+        }
+        <span>{{ usernameMessage.text }}</span>
+      </p>
+    </div>
+
+    <div class="field">
+      <label for="reg-password">Password</label>
+      <div class="input-wrap">
+        <input id="reg-password" class="input" [type]="showPassword ? 'text' : 'password'" formControlName="password"
+          autocomplete="new-password" [class.invalid]="showError(password)" [attr.aria-invalid]="showError(password)"
+          aria-describedby="reg-password-rules" />
+        <button type="button" class="icon-btn" (click)="showPassword = !showPassword"
+          [attr.aria-label]="showPassword ? 'Hide password' : 'Show password'" [attr.aria-pressed]="showPassword">
+          <app-icon [name]="showPassword ? 'eye-off' : 'eye'" />
+        </button>
+      </div>
+      <ul class="rules" id="reg-password-rules" aria-label="Password requirements">
+        @for (rule of passwordRules; track rule) {
+          <li [class.met]="ruleMet(rule)"
+            [class.unmet-shown]="!ruleMet(rule) && showError(password)">
+            <app-icon [name]="ruleMet(rule) ? 'check' : (showError(password) ? 'x' : 'clock')" />
+            <span>{{ rule.label }}<span class="visually-hidden">{{ ruleMet(rule) ? ', done' : ', not yet' }}</span></span>
+          </li>
+        }
+      </ul>
+    </div>
+
+    <div class="field">
+      <label for="reg-confirm">Confirm password</label>
+      <input id="reg-confirm" class="input" [type]="showPassword ? 'text' : 'password'" formControlName="confirmPassword"
+        autocomplete="new-password" [class.invalid]="showError(confirmPassword)"
+        [attr.aria-invalid]="showError(confirmPassword)" aria-describedby="reg-confirm-error" />
+      @if (showError(confirmPassword)) {
+        <p class="field-error" id="reg-confirm-error">
+          <app-icon name="alert-circle" />
+          {{ confirmPassword.hasError('required') ? 'Type the password again.' : "The passwords don't match." }}
+        </p>
+      }
+    </div>
+
+    <button class="btn btn-primary btn-block" type="submit" [disabled]="submitting">
+      @if (submitting) {
+        <span class="spinner" aria-hidden="true"></span>
+      }
+      {{ submitting ? 'Creating your account…' : 'Create account' }}
+    </button>
+  </form>
+
+  <p class="auth-switch">Already have an account? <a [routerLink]="['/public/login']">Sign in</a></p>
+</app-auth-layout>

@@ -1,0 +1,97 @@
+<section class="edit" aria-labelledby="edit-title">
+  <header class="edit-head">
+    <button type="button" class="icon-btn" (click)="close.emit()" aria-label="Close, back to chats">
+      <app-icon name="arrow-left" />
+    </button>
+    <h1 id="edit-title">Your profile</h1>
+  </header>
+
+  <div class="edit-body">
+    <div class="photo">
+      <div class="photo-preview">
+        <app-avatar [user]="profile ?? me()" size="xl" />
+        @if (uploading) {
+          <span class="photo-busy" aria-hidden="true"><span class="spinner"></span></span>
+        }
+      </div>
+      <div class="photo-text">
+        <p class="preview-name">{{ preview | displayName }}</p>
+        <p class="preview-handle">@{{ preview.username }}</p>
+        <div class="photo-actions">
+          <label class="btn btn-secondary" [class.disabled]="uploading">
+            <app-icon name="plus" />{{ profile?.avatarUrl ? 'Change photo' : 'Add photo' }}
+            <input type="file" accept="image/jpeg,image/png,image/webp" class="visually-hidden"
+              (change)="onPhotoChosen(fileInput)" #fileInput [disabled]="uploading" />
+          </label>
+          @if (profile?.avatarUrl) {
+            <button type="button" class="btn btn-quiet" (click)="removePhoto()" [disabled]="uploading">
+              Remove
+            </button>
+          }
+        </div>
+        <p class="field-hint">Cropped to a square. JPEG, PNG or WebP.</p>
+      </div>
+    </div>
+
+    <form class="edit-form" [formGroup]="form" (ngSubmit)="save()" novalidate>
+      @if (serverError) {
+        <div class="form-alert" role="alert">
+          <app-icon name="alert-circle" /><span>{{ serverError }}</span>
+        </div>
+      }
+
+      <div class="field">
+        <label for="profile-display">Display name <span class="optional">optional</span></label>
+        <input id="profile-display" class="input" formControlName="displayName" maxlength="40"
+          placeholder="How your name appears in chats" autocomplete="name" aria-describedby="profile-display-help" />
+        <p class="field-hint" id="profile-display-help">Shown instead of your username. Up to 40 characters.</p>
+      </div>
+
+      <div class="field">
+        <label for="profile-username">Username</label>
+        <div class="handle-input" [class.invalid]="usernameMessage.kind === 'error'">
+          <span aria-hidden="true">@</span>
+          <input id="profile-username" formControlName="username" maxlength="24" autocomplete="username"
+            autocapitalize="off" spellcheck="false" [attr.aria-invalid]="usernameMessage.kind === 'error'"
+            aria-describedby="profile-username-help" />
+        </div>
+        <p id="profile-username-help" role="status"
+          [ngClass]="usernameMessage.kind === 'error' ? 'field-error' : usernameMessage.kind === 'ok' ? 'field-ok' : 'field-hint'">
+          @if (usernameMessage.kind === 'error') {
+            <app-icon name="alert-circle" />
+          }
+          @if (usernameMessage.kind === 'ok') {
+            <app-icon name="check" />
+          }
+          @if (usernameMessage.kind === 'checking') {
+            <span class="spinner small" aria-hidden="true"></span>
+          }
+          {{ usernameMessage.text }}
+        </p>
+      </div>
+
+      <div class="field">
+        <label for="profile-bio">Bio <span class="optional">optional</span></label>
+        <textarea id="profile-bio" class="input textarea" formControlName="bio" rows="3" maxlength="160"
+        placeholder="A line about you" aria-describedby="profile-bio-help"></textarea>
+        <p class="field-hint counter" id="profile-bio-help"><span>Anyone you chat with can see this.</span><span class="tabular">{{ bio.value.length }} / 160</span></p>
+      </div>
+
+      <div class="field">
+        <span class="label">Email</span>
+        <p class="readonly">{{ profile?.email ?? '…' }}</p>
+        <p class="field-hint">Only you can see this. Sign-in details are managed separately.</p>
+      </div>
+
+      <div class="actions">
+        <button type="submit" class="btn btn-primary" [disabled]="saving || !form.dirty || form.pending">
+          @if (saving) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          {{ saving ? 'Saving…' : 'Save changes' }}
+        </button>
+        <button type="button" class="btn btn-secondary" (click)="close.emit()">Cancel</button>
+      </div>
+    </form>
+  </div>
+</section>

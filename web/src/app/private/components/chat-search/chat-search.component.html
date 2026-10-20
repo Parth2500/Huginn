@@ -1,0 +1,65 @@
+<div class="field" role="search">
+  <app-icon name="search"></app-icon>
+  <input #input type="search" [formControl]="query" placeholder="Search people and chats" aria-label="Search people and chats"
+    role="combobox" aria-autocomplete="list" aria-controls="chat-search-results" [attr.aria-expanded]="!!term"
+    [attr.aria-activedescendant]="term && results.length ? 'chat-search-' + active : null"
+    autocomplete="off" autocapitalize="off" spellcheck="false" (keydown)="onKeydown($event)" />
+  @if (searching) {
+    <span class="spinner" aria-hidden="true"></span>
+  }
+  @if (term && !searching) {
+    <button type="button" class="clear" (click)="clear(); focus()" aria-label="Clear search">
+      <app-icon name="x"></app-icon>
+    </button>
+  }
+</div>
+
+@if (term) {
+  <div class="results" id="chat-search-results" role="listbox" aria-label="Search results">
+    @if (chats.length) {
+      <p class="group-label" role="presentation">Chats</p>
+      @for (room of chats; track room; let i = $index) {
+        <div class="result" role="option" [id]="'chat-search-' + i"
+          [class.active]="active === i" [attr.aria-selected]="active === i" (mouseenter)="active = i"
+          (mousedown)="$event.preventDefault()" (click)="pickChat(room)">
+          @if (partner(room); as person) {
+            <app-avatar [user]="person"
+            [online]="!!onlineIds()?.has(person.Id!)"></app-avatar>
+          } @else {
+            <span class="avatar" [ngClass]="room.id | tone">{{ room.name | initials }}</span>
+          }
+          <span class="lines">
+            <span class="name">{{ title(room) }}</span>
+            <span class="sub">{{ partner(room) ? '@' + partner(room)!.username : (room.users?.length ?? 0) + ' members' }}</span>
+          </span>
+        </div>
+      }
+    }
+    @if (newPeople.length) {
+      <p class="group-label" role="presentation">People</p>
+      @for (user of newPeople; track user; let j = $index) {
+        <div class="result" role="option" [id]="'chat-search-' + (chats.length + j)"
+          [class.active]="active === chats.length + j" [attr.aria-selected]="active === chats.length + j"
+          (mouseenter)="active = chats.length + j" (mousedown)="$event.preventDefault()" (click)="pickPerson(user)">
+          <app-avatar [user]="user" [online]="!!onlineIds()?.has(user.Id!)"></app-avatar>
+          <span class="lines">
+            <span class="name">{{ user | displayName }}</span>
+            <span class="sub">@{{ user.username }}{{ onlineIds()?.has(user.Id!) ? ' · online' : '' }}</span>
+          </span>
+          <app-icon class="go" name="message"></app-icon>
+        </div>
+      }
+    }
+    @if (!searching && !failed && results.length === 0) {
+      <p class="none" role="status">
+        No chats or people match “{{ term }}”.
+      </p>
+    }
+    @if (failed) {
+      <p class="none" role="status">Couldn't search people right now. Check your connection.</p>
+    }
+    @if (searching && results.length === 0) {
+      <p class="none" role="status">Searching…</p>
+    }
+  </div>
+}
