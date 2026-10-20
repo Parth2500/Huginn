@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-20T14:59:18+00:00",
+  "generatedAt": "2026-10-20T18:00:00+00:00",
   "title": "Design System: ChatApp",
   "extensions": {
     "colorMeta": {
@@ -788,7 +788,7 @@
       },
       "headline": {
         "displayName": "Headline",
-        "purpose": "Auth form titles; the start-chat heading steps down to 22px."
+        "purpose": "Auth form titles; the start-chat heading and the profile drawer name step down to 22px."
       },
       "title": {
         "displayName": "Title",
@@ -828,7 +828,7 @@
         "cssVar": "--shadow-2",
         "value": "0 12px 32px -8px rgba(15, 23, 42, 0.22), 0 2px 6px rgba(15, 23, 42, 0.06)",
         "dark": "0 12px 32px -8px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.3)",
-        "purpose": "Toasts, jump-to-latest pill, user search results."
+        "purpose": "Toasts, jump-to-latest pill, user search results, the profile drawer."
       }
     ],
     "focus": [
@@ -904,13 +904,28 @@
         "name": "reduced-motion",
         "value": "animation and transition durations 1ms, one iteration",
         "purpose": "prefers-reduced-motion: reduce."
+      },
+      {
+        "name": "drawer-slide",
+        "value": "280ms var(--ease-out); from opacity 0, translateX(24px)",
+        "purpose": "Profile drawer entrance."
+      },
+      {
+        "name": "scrim-fade",
+        "value": "200ms ease; from opacity 0",
+        "purpose": "Profile drawer scrim."
+      },
+      {
+        "name": "member-lift",
+        "value": "translateY(-1px) on hover",
+        "purpose": "Header member-stack avatars that open a profile."
       }
     ],
     "breakpoints": [
       {
         "name": "phone-max",
         "value": "767px",
-        "purpose": "Rail and room become separate screens; toasts move to bottom; with no rooms the start-chat guide sits between the rail head and account bar."
+        "purpose": "Rail and room become separate screens; toasts move to bottom; with no rooms the start-chat guide sits between the rail head (plus chat search) and account bar, and search results replace it while a query is active; the profile drawer goes full width and the profile editor stacks."
       },
       {
         "name": "tablet",
@@ -935,7 +950,10 @@
       "authFormMeasure": "400px",
       "createFormMeasure": "560px",
       "dotGrid": "18px",
-      "startMeasure": "480px"
+      "startMeasure": "480px",
+      "chatSearchHeight": "40px",
+      "profileDrawerWidth": "360px",
+      "profileEditMeasure": "560px"
     },
     "icons": {
       "source": "inline SVG, paths adapted from Lucide (ISC)",
@@ -949,6 +967,26 @@
     "presence": {
       "dot": "var(--online), 34% of the avatar (min 9px), bottom-right at -2px",
       "ring": "2px solid var(--ring, var(--surface)); the host surface sets --ring for each of its states"
+    },
+    "overlays": [
+      {
+        "name": "drawer-scrim",
+        "value": "rgba(15, 23, 42, 0.18)",
+        "purpose": "Dims the detail pane behind the profile drawer; fades in over 200ms. Same value in both schemes."
+      },
+      {
+        "name": "upload-overlay",
+        "value": "rgba(15, 23, 42, 0.45)",
+        "purpose": "Covers the xl avatar with a white 24px spinner while a photo uploads."
+      }
+    ],
+    "avatarSizes": {
+      "xl": "112px / 38px initials",
+      "lg": "64px / 22px",
+      "default": "40px",
+      "sm": "32px / 13px",
+      "xs": "24px / 11px",
+      "photo": "img fills the circle, object-fit: cover, Surface Raised behind; falls back to initials on error"
     }
   },
   "components": [
@@ -981,7 +1019,7 @@
       "kind": "input",
       "refersTo": "people-search",
       "description": "Username combobox: search field, floating result list with presence and a revealed action on the highlighted option, live status line.",
-      "html": "<div class=\"ds-ps\"><label class=\"ds-field\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"text\" value=\"ma\" placeholder=\"Search people, e.g. ma\" aria-label=\"Search people\"></label><ul class=\"ds-results\" role=\"listbox\"><li class=\"ds-opt ds-on\" role=\"option\" aria-selected=\"true\"><span class=\"ds-av ds-online\" style=\"background:#be185d\">MA</span><span class=\"ds-who\"><span class=\"ds-n\">maya</span><span class=\"ds-sub\">Online</span></span><span class=\"ds-act\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg>Message</span></li><li class=\"ds-opt\" role=\"option\"><span class=\"ds-av\" style=\"background:#a16207\">MA</span><span class=\"ds-who\"><span class=\"ds-n\">marco</span><span class=\"ds-sub\">marco@example.com</span></span><span class=\"ds-act\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg>Message</span></li></ul><p class=\"ds-status\">2 people found. Use \u2191 \u2193 and Enter, or click.</p></div>",
+      "html": "<div class=\"ds-ps\"><label class=\"ds-field\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><circle cx=\"11\" cy=\"11\" r=\"8\"/><path d=\"m21 21-4.3-4.3\"/></svg><input type=\"text\" value=\"ma\" placeholder=\"Search people, e.g. ma\" aria-label=\"Search people\"></label><ul class=\"ds-results\" role=\"listbox\"><li class=\"ds-opt ds-on\" role=\"option\" aria-selected=\"true\"><span class=\"ds-av ds-online\" style=\"background:#be185d\">MA</span><span class=\"ds-who\"><span class=\"ds-n\">maya</span><span class=\"ds-sub\">Online</span></span><span class=\"ds-act\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg>Message</span></li><li class=\"ds-opt\" role=\"option\"><span class=\"ds-av\" style=\"background:#a16207\">MA</span><span class=\"ds-who\"><span class=\"ds-n\">marco</span><span class=\"ds-sub\">marco@example.com</span></span><span class=\"ds-act\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z\"/></svg>Message</span></li></ul><p class=\"ds-status\">2 people found. Use ↑ ↓ and Enter, or click.</p></div>",
       "css": ".ds-ps { display:grid; gap:8px; width:420px; font-family: var(--font, \"Figtree\", system-ui, -apple-system, \"Segoe UI\", sans-serif); color:var(--text,#0f172a); } .ds-field { display:flex; align-items:center; gap:10px; height:44px; padding:0 14px; border:1px solid var(--line-2,#cbd5e1); border-radius:var(--radius-m,10px); background:var(--surface,#fff); color:var(--text-2,#475569); transition:border-color 120ms ease; } .ds-field:hover { border-color:color-mix(in srgb, var(--line-2,#cbd5e1) 50%, var(--text-2,#475569)); } .ds-field:focus-within { border-color:var(--accent,#4f46e5); outline:3px solid var(--accent-soft,#eef2ff); } .ds-field input { flex:1; min-width:0; height:100%; border:0; background:transparent; color:var(--text,#0f172a); font:inherit; font-size:15px; outline:none; } .ds-results { margin:0; padding:4px; list-style:none; border:1px solid var(--line,#e2e8f0); border-radius:var(--radius-m,10px); background:var(--surface,#fff); box-shadow:var(--shadow-2,0 12px 32px -8px rgba(15,23,42,.22),0 2px 6px rgba(15,23,42,.06)); } .ds-opt { --ring:var(--surface,#fff); display:flex; align-items:center; gap:12px; padding:8px 10px; border-radius:var(--radius-s,6px); cursor:pointer; } .ds-opt:hover, .ds-opt.ds-on { background:var(--accent-soft,#eef2ff); } .ds-av { position:relative; display:inline-grid; place-items:center; width:32px; height:32px; flex:none; border-radius:50%; color:#fff; font-weight:700; font-size:13px; } .ds-av.ds-online::after { content:''; position:absolute; right:-2px; bottom:-2px; width:34%; height:34%; min-width:9px; min-height:9px; border-radius:50%; background:var(--online,#22c55e); border:2px solid var(--ring); } .ds-who { display:grid; flex:1; min-width:0; line-height:1.3; } .ds-n { font-weight:600; } .ds-sub { font-size:13px; color:var(--text-2,#475569); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; } .ds-act { display:inline-flex; align-items:center; gap:4px; font-size:13px; font-weight:600; color:var(--accent-ink,#3730a3); visibility:hidden; } .ds-opt:hover .ds-act, .ds-opt.ds-on .ds-act { visibility:visible; } .ds-status { margin:0; font-size:13px; color:var(--text-2,#475569); }"
     },
     {
@@ -1012,7 +1050,7 @@
       "name": "Room Header with Typing",
       "kind": "custom",
       "description": "64px room bar: partner avatar with presence, title, and the status line replaced by the typing indicator.",
-      "html": "<header class=\"ds-head\"><span class=\"ds-av ds-online\" style=\"background:#be185d\">MA</span><div class=\"ds-titles\"><h1>maya</h1><p class=\"ds-typing\" aria-live=\"polite\"><span class=\"ds-dots\" aria-hidden=\"true\"><i></i><i></i><i></i></span>maya is typing\u2026</p></div></header><header class=\"ds-head\"><span class=\"ds-av\" style=\"background:#7e22ce\">DT</span><div class=\"ds-titles\"><h1>Design team</h1><p>Weekly crit \u00b7 2 of 4 others online</p></div></header>",
+      "html": "<header class=\"ds-head\"><span class=\"ds-av ds-online\" style=\"background:#be185d\">MA</span><div class=\"ds-titles\"><h1>maya</h1><p class=\"ds-typing\" aria-live=\"polite\"><span class=\"ds-dots\" aria-hidden=\"true\"><i></i><i></i><i></i></span>maya is typing…</p></div></header><header class=\"ds-head\"><span class=\"ds-av\" style=\"background:#7e22ce\">DT</span><div class=\"ds-titles\"><h1>Design team</h1><p>Weekly crit · 2 of 4 others online</p></div></header>",
       "css": ".ds-head { --ring:var(--surface,#fff); display:flex; align-items:center; gap:12px; height:64px; padding:0 20px; width:520px; border-bottom:1px solid var(--line,#e2e8f0); background:var(--surface,#fff); color:var(--text,#0f172a); font-family: var(--font, \"Figtree\", system-ui, -apple-system, \"Segoe UI\", sans-serif); } .ds-av { position:relative; display:inline-grid; place-items:center; width:40px; height:40px; flex:none; border-radius:50%; color:#fff; font-weight:700; font-size:15px; } .ds-av.ds-online::after { content:''; position:absolute; right:-2px; bottom:-2px; width:34%; height:34%; min-width:9px; min-height:9px; border-radius:50%; background:var(--online,#22c55e); border:2px solid var(--ring); } .ds-titles { min-width:0; flex:1; } .ds-titles h1 { margin:0; font-size:16px; font-weight:700; line-height:1.3; } .ds-titles p { margin:0; font-size:13px; color:var(--text-2,#475569); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .ds-titles p.ds-typing { display:flex; align-items:center; gap:6px; color:var(--accent-ink,#3730a3); font-weight:500; } .ds-dots { display:inline-flex; gap:3px; } .ds-dots i { width:5px; height:5px; border-radius:50%; background:currentColor; animation:ds-dot 1.2s ease-in-out infinite; } .ds-dots i:nth-child(2) { animation-delay:.15s; } .ds-dots i:nth-child(3) { animation-delay:.3s; } @keyframes ds-dot { 0%, 60%, 100% { opacity:.3; transform:none; } 30% { opacity:1; transform:translateY(-2px); } } @media (prefers-reduced-motion: reduce) { .ds-dots i { animation:none; opacity:1; } }"
     },
     {
@@ -1030,18 +1068,44 @@
       "description": "Floating slate notice with Float shadow and dismiss.",
       "html": "<div class=\"ds-toast\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg><p>Room created</p><button class=\"ds-x\" aria-label=\"Dismiss\"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\" aria-hidden=\"true\"><path d=\"M18 6 6 18\"/><path d=\"m6 6 12 12\"/></svg></button></div>",
       "css": ".ds-toast { display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:center; width:340px; padding:6px 6px 6px 14px; border-radius:var(--radius-m,10px); background:var(--side-bg,#1e293b); color:var(--side-text,#f1f5f9); box-shadow:var(--shadow-2,0 12px 32px -8px rgba(15,23,42,.22),0 2px 6px rgba(15,23,42,.06)); font-family: var(--font, \"Figtree\", system-ui, -apple-system, \"Segoe UI\", sans-serif); } .ds-toast > svg { color:#4ade80; } .ds-toast p { margin:0; font-size:14px; line-height:1.4; padding:6px 0; } .ds-x { display:grid; place-items:center; width:32px; height:32px; border:0; border-radius:10px; background:transparent; color:var(--side-text-2,#a7b4c7); cursor:pointer; } .ds-x:hover { background:color-mix(in srgb, currentColor 10%, transparent); } .ds-x:focus-visible { outline:2px solid var(--accent,#4f46e5); outline-offset:2px; }"
+    },
+    {
+      "name": "Chat Search",
+      "kind": "input",
+      "refersTo": "chat-search",
+      "description": "Rail search for people and chats, with inline Chats and People result groups on slate.",
+      "html": "<div class=\"ds-cs\"><div class=\"ds-cs-field\"><svg viewBox=\"0 0 24 24\" width=\"17\" height=\"17\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><circle cx=\"11\" cy=\"11\" r=\"7\"/><path d=\"m20 20-3.5-3.5\"/></svg><input type=\"search\" placeholder=\"Search people and chats\" value=\"ma\"/></div><p class=\"ds-cs-label\">Chats</p><div class=\"ds-cs-row ds-active\"><span class=\"ds-cs-av\" style=\"background:#0369a1\">MA</span><span class=\"ds-cs-lines\"><span class=\"ds-cs-name\">Maya Chen</span><span class=\"ds-cs-sub\">@maya</span></span></div><p class=\"ds-cs-label\">People</p><div class=\"ds-cs-row\"><span class=\"ds-cs-av\" style=\"background:#0f766e\">MR</span><span class=\"ds-cs-lines\"><span class=\"ds-cs-name\">Marco Ruiz</span><span class=\"ds-cs-sub\">@marco · online</span></span></div></div>",
+      "css": ".ds-cs { width:300px; padding:0 0 8px; background:var(--side-bg,#1e293b); color:var(--side-text,#f1f5f9); font-family: var(--font, \"Figtree\", system-ui, -apple-system, \"Segoe UI\", sans-serif); } .ds-cs-field { display:flex; align-items:center; gap:8px; height:40px; margin:12px 12px 4px; padding:0 8px 0 12px; border:1px solid var(--side-line,#334155); border-radius:10px; background:var(--side-bg-2,#273449); color:var(--side-text-2,#a7b4c7); transition:border-color 120ms ease; } .ds-cs-field:focus-within { border-color:var(--side-text-2,#a7b4c7); } .ds-cs-field input { flex:1; min-width:0; height:100%; border:0; background:transparent; color:var(--side-text,#f1f5f9); font:inherit; font-size:14px; outline:none; } .ds-cs-field input::placeholder { color:var(--side-text-2,#a7b4c7); } .ds-cs-label { margin:0; padding:12px 16px 6px; font-size:12px; font-weight:600; color:var(--side-text-2,#a7b4c7); } .ds-cs-row { display:flex; align-items:center; gap:12px; margin:0 8px; padding:8px; border-radius:10px; cursor:pointer; } .ds-cs-row:hover, .ds-cs-row.ds-active { background:var(--side-bg-2,#273449); } .ds-cs-av { display:grid; place-items:center; width:40px; height:40px; flex:none; border-radius:50%; color:#fff; font-weight:700; font-size:15px; } .ds-cs-lines { display:grid; min-width:0; line-height:1.35; } .ds-cs-name { font-weight:600; font-size:15px; } .ds-cs-sub { font-size:13px; color:var(--side-text-2,#a7b4c7); }"
+    },
+    {
+      "name": "Profile Drawer",
+      "kind": "card",
+      "refersTo": "profile-panel",
+      "description": "Right-side 360px drawer over the detail pane: xl avatar, name, @handle, presence, Message, stacked facts.",
+      "html": "<aside class=\"ds-pp\"><header class=\"ds-pp-head\"><h2>Profile</h2><button class=\"ds-pp-x\" aria-label=\"Close profile\"><svg viewBox=\"0 0 24 24\" width=\"20\" height=\"20\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M18 6 6 18M6 6l12 12\"/></svg></button></header><div class=\"ds-pp-body\"><span class=\"ds-pp-av\" style=\"background:#0369a1\">MC</span><h3>Maya Chen</h3><p class=\"ds-pp-handle\">@maya</p><p class=\"ds-pp-presence\">Online</p><button class=\"ds-pp-btn\">Message</button><dl class=\"ds-pp-facts\"><div><dt>Bio</dt><dd>Ships the header on Tuesdays.</dd></div><div><dt>Username</dt><dd>@maya</dd></div><div><dt>Joined</dt><dd>March 2026</dd></div></dl><p class=\"ds-pp-note\">Emails are never shown to other people.</p></div></aside>",
+      "css": ".ds-pp { width:360px; display:flex; flex-direction:column; background:var(--surface,#fff); color:var(--text,#0f172a); border-left:1px solid var(--line,#e2e8f0); box-shadow:var(--shadow-2, 0 12px 32px -8px rgba(15,23,42,.22), 0 2px 6px rgba(15,23,42,.06)); font-family: var(--font, \"Figtree\", system-ui, -apple-system, \"Segoe UI\", sans-serif); font-size:15px; } .ds-pp-head { display:flex; align-items:center; justify-content:space-between; height:64px; padding:0 12px 0 20px; border-bottom:1px solid var(--line,#e2e8f0); } .ds-pp-head h2 { margin:0; font-size:16px; font-weight:700; } .ds-pp-x { display:grid; place-items:center; width:40px; height:40px; border:0; border-radius:10px; background:transparent; color:var(--text-2,#475569); cursor:pointer; transition:background 120ms ease; } .ds-pp-x:hover { background:color-mix(in srgb, currentColor 10%, transparent); } .ds-pp-x:focus-visible, .ds-pp-btn:focus-visible { outline:2px solid var(--accent,#4f46e5); outline-offset:2px; } .ds-pp-body { display:flex; flex-direction:column; align-items:center; padding:32px 24px; text-align:center; } .ds-pp-av { display:grid; place-items:center; width:112px; height:112px; margin-bottom:16px; border-radius:50%; color:#fff; font-weight:700; font-size:38px; } .ds-pp-body h3 { margin:0; font-size:22px; font-weight:700; letter-spacing:-0.01em; line-height:1.25; } .ds-pp-handle { margin:2px 0 0; color:var(--text-2,#475569); } .ds-pp-presence { margin:6px 0 0; font-size:13px; color:var(--text-2,#475569); } .ds-pp-btn { margin-top:20px; min-width:160px; height:40px; padding:0 16px; border:0; border-radius:10px; background:var(--accent,#4f46e5); color:#fff; font:inherit; font-size:14px; font-weight:600; cursor:pointer; transition:background 120ms ease; } .ds-pp-btn:hover { background:var(--accent-strong,#4338ca); } .ds-pp-facts { width:100%; margin:28px 0 0; text-align:left; border-top:1px solid var(--line,#e2e8f0); } .ds-pp-facts div { padding:14px 0; border-bottom:1px solid var(--line,#e2e8f0); } .ds-pp-facts dt { margin-bottom:2px; font-size:12px; font-weight:600; color:var(--text-2,#475569); } .ds-pp-facts dd { margin:0; } .ds-pp-note { margin:16px 0 0; font-size:13px; color:var(--text-2,#475569); }"
+    },
+    {
+      "name": "Username Field",
+      "kind": "input",
+      "refersTo": "handle-input",
+      "description": "@-prefixed username input with the live check line: hint, checking, taken, available.",
+      "html": "<div class=\"ds-uf\"><label for=\"ds-uf-in\">Username</label><div class=\"ds-uf-box\"><span aria-hidden=\"true\">@</span><input id=\"ds-uf-in\" value=\"maya_chen\"/></div><p class=\"ds-uf-ok\"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 6 9 17l-5-5\"/></svg>@maya_chen is available.</p></div>",
+      "css": ".ds-uf { display:grid; gap:6px; width:360px; font-family: var(--font, \"Figtree\", system-ui, -apple-system, \"Segoe UI\", sans-serif); color:var(--text,#0f172a); } .ds-uf label { font-size:14px; font-weight:600; } .ds-uf-box { display:flex; align-items:center; height:44px; padding-left:14px; border:1px solid var(--line-2,#cbd5e1); border-radius:10px; background:var(--surface,#fff); color:var(--text-2,#475569); font-size:15px; } .ds-uf-box:focus-within { border-color:var(--accent,#4f46e5); outline:3px solid var(--accent-soft,#eef2ff); } .ds-uf-box input { flex:1; min-width:0; height:100%; padding:0 14px 0 2px; border:0; background:transparent; color:var(--text,#0f172a); font:inherit; outline:none; } .ds-uf-ok { display:flex; gap:6px; align-items:center; margin:0; font-size:13px; color:var(--success,#15803d); }"
     }
   ],
   "narrative": {
     "northStar": "The Well-Kept Messenger",
-    "overview": "**Creative North Star: \"The Well-Kept Messenger\"**\n\nChatApp is the category-standard messenger played straight: a deep slate room rail on the left, a pale conversation pane on the right, the composer docked at the bottom. The bar is the finish of Telegram Web, WhatsApp Web and Discord. Nothing about the layout is novel on purpose. The craft is in the details a reviewer notices without being told: bubbles whose corners tighten where a run of messages joins, a stable colour per person, a send that settles from pending to delivered, a green presence dot on whoever is online, \"is typing\" in the header, and a connection state that tells the truth.\n\nThe system is calm and dense in the way messengers are dense. One sans family (Figtree, self-hosted) carries every role. Colour does work: indigo marks what is yours or what you can act on, and the eight member tones tell people apart. Everything else is slate neutrals and 1px hairlines. Depth is close to flat, with soft ambient shadows only on things that float over the stream.\n\nThe build rejects the stock admin-template look: Material cards, centred forms floating on grey, and \"Name: x Id: y\" rows. Light and dark schemes are both first-class and follow the OS unless the user picks one.",
+    "overview": "**Creative North Star: \"The Well-Kept Messenger\"**\n\nChatApp is the category-standard messenger played straight: a deep slate room rail on the left, a pale conversation pane on the right, the composer docked at the bottom. The bar is the finish of Telegram Web, WhatsApp Web and Discord. Nothing about the layout is novel on purpose. The craft is in the details a reviewer notices without being told: bubbles whose corners tighten where a run of messages joins, a stable colour per person, a send that settles from pending to delivered, a green presence dot on whoever is online, \"is typing\" in the header, a connection state that tells the truth, and people who are recognisable at a glance by photo or tone, with a profile one click from wherever their name appears.\n\nThe system is calm and dense in the way messengers are dense. One sans family (Figtree, self-hosted) carries every role. Colour does work: indigo marks what is yours or what you can act on, and the eight member tones tell people apart. Everything else is slate neutrals and 1px hairlines. Depth is close to flat, with soft ambient shadows only on things that float over the stream.\n\nThe build rejects the stock admin-template look: Material cards, centred forms floating on grey, and \"Name: x Id: y\" rows. Light and dark schemes are both first-class and follow the OS unless the user picks one.",
     "keyCharacteristics": [
       "Three-pane messenger grammar: 300px slate rail, conversation pane, docked composer; phone collapses to list and room as separate screens.",
       "Indigo is the single accent, reserved for own bubbles, primary actions and selection.",
       "Eight stable hashed member tones for avatars and sender names.",
       "Grouped bubble corners (18px outer, 6px joint, 4px tail).",
       "One Figtree stack, 1px hairlines, inline 2px-stroke SVG icons on a 24px grid.",
-      "Live state is visible: optimistic pending, delivered check, arrival motion, presence dots, typing, unread counts, connection state."
+      "Live state is visible: optimistic pending, delivered check, arrival motion, presence dots, typing, unread counts, connection state.",
+      "Direct chats read as the other person (their name, photo or tone, presence); groups keep a room name and initials.",
+      "Names show as display name first, @username second; every person in the conversation pane opens a profile drawer."
     ],
     "rules": [
       {
@@ -1062,6 +1126,11 @@
       {
         "name": "The Weight Not Family Rule",
         "body": "Build hierarchy with Figtree's 400 / 600 / 700 weights and the sizes above. No second typeface, no uppercase labels, no tracked-out small caps.",
+        "section": "typography"
+      },
+      {
+        "name": "The Name Then Handle Rule",
+        "body": "A person is shown by display name, falling back to their username, everywhere a name appears: rail rows, headers, sender names, chips, search results, typing lines. The username appears only as a secondary \"@username\" line in muted ink. Initials come from the display name when one is set.",
         "section": "typography"
       },
       {
@@ -1090,10 +1159,12 @@
       "**Do** design every screen at phone width first-class, with safe-area insets on docked bars.",
       "**Do** set `--ring` on any surface that hosts an avatar with presence, for every state of that surface.",
       "**Do** keep times 24-hour (HH:mm) and tabular wherever they appear.",
+      "**Do** show people through the display-name pipe, with \"@username\" as the secondary line.",
+      "**Do** make another person's avatar or name in the conversation pane open their profile drawer.",
       "**Do** honour prefers-reduced-motion by collapsing animation and transition to instant."
     ],
     "donts": [
-      "**Don't** use Material cards, centred forms floating on grey, or \"Name: x Id: y\" label rows.",
+      "**Don't** use Material cards, centred forms floating on grey, or \"Name: x Id: y\" label rows. Profile facts stack a small muted label over the value, divided by hairlines.",
       "**Don't** introduce a second typeface or a second accent colour.",
       "**Don't** put a shadow on panes, bars or forms; only floating elements get the Float shadow.",
       "**Don't** hand-pick member colours or reuse indigo as a member tone.",

@@ -23,11 +23,27 @@ Its value is that the whole thing actually works: a real backend, real auth, per
 ## Capabilities and Constraints
 - Frontend: Angular 16 (hand-built UI, see below), `ngx-socket-io`, `@auth0/angular-jwt`. Backend: NestJS, Socket.IO gateway, TypeORM/Postgres, JWT auth.
 - Public module: login, and registration with password-strength and confirm-password validation.
-- Private module (behind the auth guard): a three-pane messenger. The room list shows last-message previews, activity time and per-session unread counts, ordered by latest activity. A "start a chat" screen offers people search. Rooms are created with a name, an optional description and members, and new rooms reach every member live. The room view has live messages, a typing indicator, online presence and "load earlier messages".
+- Private module (behind the auth guard): a Telegram/WhatsApp-style messenger.
+  - **Direct chats:** search a username (sidebar search or the start screen) and pick the person to open a draft chat. The chat is created by the first message, and only then appears in the other person's list. Picking someone you already talk to reopens that chat.
+  - **Groups:** "New group" is the only creation flow, for three or more people (you plus at least two). Members see a new group immediately.
+  - **Chat list:** previews, activity time, per-session unread counts, ordered by latest activity.
+  - **Chat view:** live messages, typing indicator, online presence, and "load earlier messages".
+- **Profiles:** photo, display name, @username, bio and join date.
+  - Click any name or photo in a chat to open that person's profile panel (with "Message").
+  - Your own profile is edited from the account bar (`/private/profile`).
+  - Display names show wherever names appear; @usernames are the unique handle.
+- **Username policy** (`chat-api/src/user/username.policy.ts`, mirrored in the app):
+  - NFKC-normalised; 3–24 ASCII characters; must start with a letter, then letters, digits, `.` or `_`.
+  - No `..`, `__`, `._`, `_.` runs, and no trailing separator.
+  - A reserved-name list, checked with separators removed.
+  - Unique case-insensitively via `usernameKey`, with a live availability check while typing.
+- **Scale:** see `docs/SCALING.md`. Search is index-only (measured under 1 ms on 1,000,000 users), delivery uses Socket.IO rooms, and presence goes to contacts only.
+- **Sign-in** will move to a separate OIDC project; email and password here are temporary.
+- **Privacy:** people are identified by username only. Emails are never sent to anyone but their owner. There is no user listing and no email lookup, and accounts can only be changed or deleted by their owner.
 - API (NestJS + Socket.IO, changed on 2026-10-20 at the user's request):
   - Fixed: the rooms query used `users.id` instead of `Id`, which dropped every socket connection.
   - Fixed: room paging counted member rows, not rooms.
-  - Added: username prefix search (`GET /api/users/search?q=`), membership checks on every room event, message length limits, per-socket ordered sends, room activity bumps, previews, presence, typing, older-message paging, `roomCreated` and `unauthorized` events.
+  - Added: username search, matching anywhere and ranking prefixes first (`GET /api/users/search?q=`); direct chats (`openDirect`, `sendDirectMessage`, `directRoomCreated`; room `type` + unique `directKey`); membership checks on every room event, message length limits, per-socket ordered sends, room activity bumps, previews, presence, typing, older-message paging, `roomCreated` and `unauthorized` events.
   - Usernames are unique regardless of case (letters, numbers, `. _ -`, up to 24 characters). Emails are compared in lower case.
 - Unread counts live in the client for the session; they are not stored on the server.
 - Terminology in the code: "room" / "chatroom", "message", "user" (username, email).
