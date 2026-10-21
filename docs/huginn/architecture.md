@@ -157,7 +157,7 @@ key_package     id PK, device_id FK, package BYTEA, created_at, used_at   -- Pha
 
 push_subscription id PK, device_id FK, endpoint, p256dh, auth, created_at, failed_at
 
-update          (user_id, seq) PK, type, payload JSONB, created_at        -- sync log (§5), pruned at 30 days
+user_update     (user_id, seq) PK, type, data JSONB, created_at           -- sync log (§5), pruned at 30 days
 
 media           id PK, owner_id, chat_id, blob_key, byte_size, mime_hint, created_at   -- Phase 3 (ciphertext only)
 ```
@@ -166,16 +166,18 @@ media           id PK, owner_id, chat_id, blob_key, byte_size, mime_hint, create
 position are *per person*. Keeping them on the membership row makes the chat list one indexed
 query, and nothing about another person leaks into it.
 
-**From today's schema:**
+**Built in 0.3:** `user` (plus `update_seq`), `user_settings`, `chat`, `chat_member`, `message`
+(plaintext `body`), `message_hidden`, `block` and `user_update`. The rest arrive with their
+phases. The migration from the old schema was:
 
-| Today | Becomes |
+| Old | Became |
 |---|---|
 | `room` | `chat` |
 | `room_users_user` | `chat_member` |
 | `type` and `directKey` | `kind` and `direct_key` |
 | `connected_user`, `joined_room` | dropped (Socket.IO rooms replaced them) |
 
-There's no chat data to migrate today, so this is a clean migration.
+Existing rooms and messages were carried over. Each group's earliest sender became its owner.
 
 ---
 
@@ -184,22 +186,36 @@ There's no chat data to migrate today, so this is a clean migration.
 ### 4.1 Transport
 
 - Socket.IO over WebSocket, with long-polling only as a fallback.
-- Every event uses one envelope: `{ v: 1, type, data }`.
-- Client requests use Socket.IO **acknowledgements** (callbacks), instead of the paired
-  "emit, then listen for a different event" pattern used today.
+- The Socket.IO event name is the type (`message.send`) and its argument is the data. The
+  server announces the protocol version in `hello { protocol, seq }` on every connect.
+- Client requests use Socket.IO **acknowledgements** (callbacks). Every ack is
+  `{ ok: true, ...result }` or `{ ok: false, error }`, where `error` is a sentence fit to show.
 
 ### 4.2 Client → server
 
+Built in 0.4:
+
 | Event | Data | Ack |
 |---|---|---|
-| `sync` | `{ sinceSeq }` | `{ updates[], seq, hasMore }` (§5) |
-| `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], cursors }` |
-| `messages.page` | `{ chatId, before?: messageId, around?: messageId, limit }` | `{ messages[], hasMore }` |
-| `message.send` | `{ chatId \| toUserId, clientMessageId, kind, body \| ciphertext, replyTo? }` | `{ messageId, createdAt }` or `{ error }` |
+| `sync` | `{ sinceSeq }` | `{ updates[], seq, hasMore, reset }` (§5) |
+| `chats.list` | – | `{ chats[] }` |
+| `chat.get` | `{ chatId }` | `{ chat }` |
+| `direct.open` | `{ userId }` | `{ partner, chat }`, where `chat` is null until the first message creates it |
+| `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], hasMore }` / `{}` |
+| `messages.page` | `{ chatId, before?: messageId }` | `{ messages[], hasMore }` |
+| `message.send` | `{ chatId \| toUserId, clientMessageId, text }` | `{ message, chatId }` |
+| `chat.read` | `{ chatId, upTo: messageId }` | `{}` |
+| `group.create` | `{ title, description?, memberIds[] }` | `{ chat }` |
+| `typing` | `{ chatId }` | – |
+
+Planned with their features (`message.send` gains `kind`, `replyTo` and later `ciphertext`):
+
+| Event | Data | Ack |
+|---|---|---|
+| `messages.page` | adds `around?: messageId, limit` | `{ messages[], hasMore }` |
 | `message.edit` | `{ messageId, body \| ciphertext }` | ok / error |
 | `message.delete` | `{ messageIds[], scope: 'me' \| 'all' }` | ok / error |
 | `receipt` | `{ chatId, deliveredUpTo?, readUpTo? }` | – |
-| `typing` | `{ chatId }` (throttled to 1 per 2 s) | – |
 | `chat.state` | `{ chatIds[], pin? \| archive? \| mute? \| markUnread? \| hide? \| clear? }` | `{ ok, results[] }` |
 
 Group management (`group.update`, `group.members.add`/`remove`, `group.role`, `group.leave`,
@@ -208,9 +224,12 @@ easy to audit. Their effects reach other people as updates.
 
 ### 4.3 Server → client
 
-- `update { seq, type, data }`: the only push channel for state changes. Types include
-  `message.new`, `message.edited`, `message.deleted`, `chat.updated`, `chat.member`,
-  `chat.state`, `receipt`, `user.updated` and `block`.
+- `update { seq, type, data }`: the only push channel for state changes. Built so far:
+  `chat.new`, `message.new` and `chat.state` (per-member state with the unread count). Coming
+  with their features: `message.edited`, `message.deleted`, `chat.updated`, `chat.member`,
+  `receipt`, `user.updated` and `block`.
+- `hello { protocol, seq }` on every connect, `presence` and `onlineUsers` for who's online,
+  and `userUpdated` for profile changes (it moves into `update` as `user.updated`).
 - `typing` and `presence` are **ephemeral**. They aren't logged in `update` and are never
   replayed.
 
@@ -223,9 +242,10 @@ The aim: nothing is lost when the connection drops, and every device shows the s
 - **Per-user update log.** Every durable change a user should see is appended to `update` with
   a per-user, monotonically increasing `seq`, then pushed live. Each device stores the last
   `seq` it applied.
-- **Reconnect** sends `sync { sinceSeq }`. The server returns the missed updates in pages. If a
-  device has been away longer than the retention window (30 days), the server answers
-  `{ reset: true }`, and the device reloads its chat list and the open chat from scratch.
+- **Reconnect** sends `sync { sinceSeq }`. The server returns the missed updates in pages of
+  200. Updates older than 30 days are pruned hourly. If a device's position falls before the
+  oldest kept update, the server answers `{ reset: true }`, and the device reloads its chat list
+  and the open chat from scratch. A device that sees a gap in live `seq` numbers syncs too.
 - **Idempotent sends.**
   - Every message gets a client-generated `clientMessageId` (a UUID).
   - Retries after a timeout or reconnect are safe: the unique index returns the existing message.
@@ -436,21 +456,24 @@ handlers alike. The UI mirrors it to hide controls, but never relies on that.
 
 ## 11. Client architecture (Angular)
 
-- **Stores.** A small set of RxJS stores (or Angular signals after an upgrade):
-  - `ChatsStore` (list, member state)
-  - `MessagesStore` (per chat, windowed)
-  - `PresenceStore`
-  - `SettingsStore`
-  - `OutboxStore`
+- **Stores** hold state in Angular signals:
+  - `ChatsStore` (list, member state; built)
+  - `MessagesStore` (per chat, windowed; built)
+  - `OutboxStore` (built)
+  - `PresenceStore` and `SettingsStore` (Phase 1)
   - `CryptoService` (a web worker running OpenMLS WASM, Phase 2)
+  
+  `LocalDb` keeps one IndexedDB database per account (chats, recent messages, the outbox and
+  the last applied `seq`), deleted on sign-out.
   
   Components read from the stores, so no more per-component socket subscriptions.
 - **The sync engine** applies `update` events to the stores and to IndexedDB in one place.
 - **The service worker** handles push, notification clicks, an offline app shell, and cached
   avatars.
 - **Versions (milestone 0.2, done):** Angular 22 (standalone, signal inputs and queries, the new
-  control flow) and NestJS 12. Components still use `ChangeDetectionStrategy.Eager` until their
-  state moves to signals, then the app goes zoneless.
+  control flow) and NestJS 12. Since 0.4 every component under the dashboard is OnPush. The
+  public sign-in pages, the root and the toast host are still `Eager` until 0.5 rewrites them,
+  and then the app drops `zone.js`.
 
 ---
 

@@ -9,6 +9,7 @@ import {
   startApp,
   TestApp,
 } from './helpers';
+import { RETENTION_MS, UpdatesService } from '../src/chat/updates.service';
 
 /** Realtime protocol v1 (docs/huginn/architecture.md §4–5). */
 describe('chats over Socket.IO', () => {
@@ -234,5 +235,24 @@ describe('chats over Socket.IO', () => {
       'Sign in again',
     );
     bad.disconnect();
+  });
+
+  // Last: pruning empties every test user's log.
+  it('tells a device to reload once the updates it missed are pruned', async () => {
+    const away = await open(sam);
+    const since = away.hello.seq;
+    away.socket.disconnect();
+    const m = await open(maya);
+    await send(m.socket, { chatId: directId }, 'sent before the prune');
+
+    const pruned = await t.app
+      .get(UpdatesService)
+      .prune(new Date(Date.now() + RETENTION_MS + 1000));
+    expect(pruned).toBeGreaterThan(0);
+
+    const back = await open(sam);
+    const sync = await ask(back.socket, 'sync', { sinceSeq: since });
+    expect(sync.reset).toBe(true);
+    expect(sync.seq).toBe(since + 1);
   });
 });

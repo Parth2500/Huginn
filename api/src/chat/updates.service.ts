@@ -1,11 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { EntityManager, MoreThan, Repository } from 'typeorm';
+import { EntityManager, LessThan, MoreThan, Repository } from 'typeorm';
 import { User } from 'src/user/entities/user.entity';
 import { UserUpdate } from './entities/user-update.entity';
 import { UpdateDto, UpdatePayload } from './chat.types';
 
 const PAGE = 200;
+/** How long the log keeps an update. A device away for longer reloads its state instead. */
+export const RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+const PRUNE_EVERY_MS = 60 * 60 * 1000;
 
 export interface Addressed {
   userId: number;
@@ -17,12 +20,34 @@ export interface Addressed {
  * change and its updates commit together; the gateway pushes them only after that commit.
  */
 @Injectable()
-export class UpdatesService {
+export class UpdatesService implements OnModuleInit, OnModuleDestroy {
+  private pruneTimer: ReturnType<typeof setInterval> | undefined;
+
   constructor(
     @InjectRepository(UserUpdate)
     private readonly updates: Repository<UserUpdate>,
     @InjectRepository(User) private readonly users: Repository<User>,
   ) {}
+
+  onModuleInit() {
+    this.pruneTimer = setInterval(
+      () => void this.prune().catch(() => {}),
+      PRUNE_EVERY_MS,
+    );
+    this.pruneTimer.unref();
+  }
+
+  onModuleDestroy() {
+    clearInterval(this.pruneTimer);
+  }
+
+  /** Drops updates older than the retention window; `since` then answers `reset` for them. */
+  async prune(now = new Date()): Promise<number> {
+    const result = await this.updates.delete({
+      createdAt: LessThan(new Date(now.getTime() - RETENTION_MS)),
+    });
+    return result.affected ?? 0;
+  }
 
   /** Gives each recipient the next sequence number(s) and records the updates. */
   async append(

@@ -37,8 +37,8 @@ tested and demoable, never half-migrated.
 |---|---|---|
 | 0.1 ✓ | **Rename to Huginn** (done 2026-10-21) | The UI, page title, favicon, logo mark, package names, docker services, docs and API Swagger title all say Huginn. "ChatApp" appears nowhere. |
 | 0.2 ✓ | **Everything on latest** (done 2026-10-21; see the note below) | Angular, NestJS, TypeORM, Socket.IO, TypeScript, Node (current LTS) and Postgres all on current releases. Angular moved to standalone components, signals and the new control flow. TypeORM migrations replace `synchronize`. CI runs the build, lint and tests, and real tests replace the old scaffold specs. |
-| 0.3 | **New data model** | `chat` and `chat_member` (with per-user state and watermarks), `message` with `client_message_id`, `block` and `user_settings` tables, per [architecture.md §3](architecture.md#3-data-model-phase-0-and-1). Existing features work on it. |
-| 0.4 | **Protocol v1** | The event envelope, acknowledgements, idempotent `message.send`, the per-user `update` log with `sync`, and the IndexedDB local store with outbox. Killing the API mid-conversation and restarting it loses nothing, and pending sends complete. |
+| 0.3 ✓ | **New data model** (done 2026-10-21) | `chat` and `chat_member` (with per-user state and watermarks), `message` with `client_message_id`, `block` and `user_settings` tables, per [architecture.md §3](architecture.md#3-data-model-phase-0-and-1). Existing features work on it. |
+| 0.4 ✓ | **Protocol v1** (done 2026-10-21) | The event envelope, acknowledgements, idempotent `message.send`, the per-user `update` log with `sync`, and the IndexedDB local store with outbox. Killing the API mid-conversation and restarting it loses nothing, and pending sends complete. |
 | 0.5 | **Cookie sessions and the auth seam** | Sign-in moves from a token in `localStorage` to an httpOnly cookie session, and sockets authenticate with the cookie. All sign-in code sits behind an `AuthProvider` interface, with today's password login as `LocalPasswordProvider`. |
 | later | **Heimdall sign-in** (when Heimdall is ready) | `HeimdallOidcProvider`: confidential BFF client, PKCE, `resource` audience, serialised refresh, `/revoke` on sign-out, account linking by verified email. See [architecture.md §2](architecture.md#2-identity-heimdall-integration-when-heimdall-is-ready). It must land before linked devices (2.4), which approve new devices through a real identity provider. |
 
@@ -60,6 +60,26 @@ tested and demoable, never half-migrated.
 - **Follow-up:** Angular 22 makes OnPush the default. The existing components are marked
   `ChangeDetectionStrategy.Eager` for now. Moving their state to signals, then going zoneless,
   is folded into 0.3 and 0.4, as those milestones rewrite the same components.
+
+**Where 0.3 and 0.4 landed:**
+
+- **Data model:** `chat`, `chat_member` (role, status, pins, archive, mute, clear point, read
+  and delivered watermarks), `message` with `clientMessageId`, `message_hidden`, `block`,
+  `user_settings` and the `user_update` log. The migration carried the existing rooms and
+  messages over instead of starting clean, and made each group's earliest sender its owner.
+- **Protocol:** requests are acknowledged (`{ ok, ... }` or `{ ok: false, error }`), sends are
+  idempotent on `clientMessageId` and ordered per socket, and every durable change is an
+  `update { seq, type, data }` recorded in the same transaction as the change. The log is pruned
+  after 30 days, and a device behind the pruned point is told to reload.
+- **Web client:** signal stores (`ChatsStore`, `MessagesStore`, `OutboxStore`) over an IndexedDB
+  copy per account, cleared on sign-out. `ChatService` is the sync engine. Every component
+  under the dashboard is OnPush.
+- **Verified:** with the API stopped, two messages were sent, the page reloaded, and both were
+  still shown as pending. After a restart each was stored once, in order, delivered to the
+  other person, and the outbox emptied. Tests: 27 API unit, 19 API end-to-end, 23 web.
+- **Carried forward:** going zoneless (`zone.js` is still loaded) once the public sign-in pages
+  are rewritten in 0.5. The automated version of the restart test joins the Playwright suite
+  when it's set up.
 
 ---
 
