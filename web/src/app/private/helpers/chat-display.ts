@@ -39,3 +39,29 @@ export function byActivity(a: Chat, b: Chat): number {
   const diff = Date.parse(b.lastActivityAt) - Date.parse(a.lastActivityAt);
   return diff !== 0 ? diff : b.id - a.id;
 }
+
+/** Muted right now (mutes end on their own when their time runs out). */
+export function isMuted(chat: Chat, now = Date.now()): boolean {
+  return !!chat.me.mutedUntil && new Date(chat.me.mutedUntil).getTime() > now;
+}
+
+/** "Always" is stored as the year 9999. */
+export function mutedForever(chat: Chat): boolean {
+  return !!chat.me.mutedUntil && new Date(chat.me.mutedUntil).getUTCFullYear() >= 9999;
+}
+
+/** The main list's order: pinned chats first, in the order they were pinned, then by activity. */
+export function byListOrder(a: Chat, b: Chat): number {
+  const pa = a.me.pinnedAt ? (a.me.pinOrder ?? 0) : null;
+  const pb = b.me.pinnedAt ? (b.me.pinOrder ?? 0) : null;
+  if (pa !== null || pb !== null) {
+    if (pa === null) {
+      return 1;
+    }
+    if (pb === null) {
+      return -1;
+    }
+    return pa - pb;
+  }
+  return byActivity(a, b);
+}

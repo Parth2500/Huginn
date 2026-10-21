@@ -60,6 +60,22 @@ export interface ChatSummary {
   };
 }
 
+/** How long a mute lasts; `null` unmutes. */
+export type MuteFor = '8h' | '1w' | 'always' | null;
+
+/**
+ * One change to your own state in one or more chats (`chat.state`). Exactly one field is set.
+ * `unread: false` marks the chats read up to their last message.
+ */
+export type ChatStateChange =
+  | { pin: boolean }
+  | { archive: boolean }
+  | { mute: MuteFor }
+  | { unread: boolean };
+
+/** The list's folders. The main list leaves archived chats out. */
+export type ChatFolder = 'main' | 'archived';
+
 /** Durable changes, delivered live and replayed by `sync`. */
 export type UpdatePayload =
   | { type: 'chat.new'; data: { chat: ChatSummary } }

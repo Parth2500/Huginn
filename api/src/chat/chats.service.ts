@@ -14,6 +14,8 @@ import { ChatMember } from './entities/chat-member.entity';
 import { Chat } from './entities/chat.entity';
 import { Message } from './entities/message.entity';
 import {
+  ChatFolder,
+  ChatStateChange,
   ChatSummary,
   MemberDto,
   MyChatState,
@@ -23,6 +25,11 @@ import { toMessageDto } from './chat.mappers';
 import { Addressed, UpdatesService } from './updates.service';
 
 const LIST_PAGE = 30;
+/** Pinned chats per person (product-spec.md §1.2). */
+export const PIN_LIMIT = 5;
+/** "Mute: Always". Postgres could store infinity, but a JavaScript Date can't hold it. */
+const MUTED_FOREVER = new Date('9999-12-31T00:00:00Z');
+const MUTE_MS = { '8h': 8 * 3600_000, '1w': 7 * 24 * 3600_000 } as const;
 const MAX_GROUP_NAME = 60;
 const MAX_GROUP_DESCRIPTION = 500;
 
@@ -47,6 +54,7 @@ export class ChatsService {
   async list(
     userId: number,
     before?: { lastActivityAt: string; id: number },
+    folder: ChatFolder = 'main',
   ): Promise<{
     chats: ChatSummary[];
     next: { lastActivityAt: string; id: number } | null;
@@ -58,6 +66,11 @@ export class ChatsService {
       .where('m.userId = :userId', { userId })
       .andWhere('c.deletedAt IS NULL')
       .andWhere('(m.hiddenAt IS NULL OR c.lastActivityAt > m.hiddenAt)')
+      .andWhere(
+        folder === 'archived'
+          ? 'm.archivedAt IS NOT NULL'
+          : 'm.archivedAt IS NULL',
+      )
       .orderBy('c.lastActivityAt', 'DESC')
       .addOrderBy('c.id', 'DESC')
       .limit(LIST_PAGE + 1);
@@ -70,7 +83,7 @@ export class ChatsService {
     const page = (await query.getMany()).map((m) => m.chatId);
     const hasMore = page.length > LIST_PAGE;
     const ids = page.slice(0, LIST_PAGE);
-    if (!before) {
+    if (!before && folder === 'main') {
       const pinned = await this.members.find({
         where: { userId, pinnedAt: Not(IsNull()) },
         select: { chatId: true },
@@ -93,6 +106,134 @@ export class ChatsService {
             }
           : null,
     };
+  }
+
+  /** What the folder rows show: how many archived chats, and how many of them are unread. */
+  async folders(userId: number) {
+    const [row]: { count: string; unread: string }[] =
+      await this.dataSource.query(
+        `SELECT COUNT(*) AS count,
+                COUNT(*) FILTER (WHERE m."markedUnread" OR EXISTS (
+                  SELECT 1 FROM message msg
+                   WHERE msg."chatId" = m."chatId"
+                     AND msg.id > GREATEST(m."lastReadMessageId", m."clearedBeforeMessageId")
+                     AND (msg."senderId" IS NULL OR msg."senderId" <> $1)
+                     AND msg."deletedForAllAt" IS NULL)) AS unread
+           FROM chat_member m
+           JOIN chat c ON c.id = m."chatId"
+          WHERE m."userId" = $1 AND m.status = 'active'
+            AND m."archivedAt" IS NOT NULL AND c."deletedAt" IS NULL
+            AND (m."hiddenAt" IS NULL OR c."lastActivityAt" > m."hiddenAt")`,
+        [userId],
+      );
+    return {
+      archived: { count: Number(row.count), unread: Number(row.unread) },
+    };
+  }
+
+  /**
+   * Pins, archives, mutes or marks chats read or unread for one person, and records a
+   * `chat.state` update for each, in one transaction. Rules (product-spec.md §1.2–1.7):
+   * at most PIN_LIMIT pins; pinning unarchives; archiving unpins.
+   */
+  async changeState(
+    userId: number,
+    chatIds: number[],
+    change: ChatStateChange,
+  ): Promise<{ chats: ChatSummary[]; updates: Addressed[] }> {
+    return this.dataSource.transaction(async (manager) => {
+      // One change at a time per person, so two devices can't pin past the limit together.
+      await manager.query('SELECT pg_advisory_xact_lock(1, $1)', [userId]);
+      const rows = await manager.find(ChatMember, {
+        where: { userId, chatId: In(chatIds), status: 'active' },
+      });
+      if (rows.length !== chatIds.length) {
+        throw new ChatRuleError("You're not a member of that chat.");
+      }
+      const now = new Date();
+
+      if ('pin' in change) {
+        if (change.pin) {
+          const toPin = rows.filter((r) => !r.pinnedAt);
+          const pinned = await manager.find(ChatMember, {
+            where: { userId, status: 'active', pinnedAt: Not(IsNull()) },
+            select: { chatId: true, pinOrder: true },
+          });
+          if (pinned.length + toPin.length > PIN_LIMIT) {
+            throw new ChatRuleError(
+              `You can pin up to ${PIN_LIMIT} chats. Unpin one to pin this.`,
+            );
+          }
+          let order = Math.max(0, ...pinned.map((p) => p.pinOrder ?? 0));
+          for (const row of toPin) {
+            await manager.update(
+              ChatMember,
+              { chatId: row.chatId, userId },
+              { pinnedAt: now, pinOrder: ++order, archivedAt: null },
+            );
+          }
+        } else {
+          await manager.update(
+            ChatMember,
+            { chatId: In(chatIds), userId },
+            { pinnedAt: null, pinOrder: null },
+          );
+        }
+      } else if ('archive' in change) {
+        await manager.update(
+          ChatMember,
+          { chatId: In(chatIds), userId },
+          change.archive
+            ? { archivedAt: now, pinnedAt: null, pinOrder: null }
+            : { archivedAt: null },
+        );
+      } else if ('mute' in change) {
+        const until =
+          change.mute === null
+            ? null
+            : change.mute === 'always'
+              ? MUTED_FOREVER
+              : new Date(now.getTime() + MUTE_MS[change.mute]);
+        await manager.update(
+          ChatMember,
+          { chatId: In(chatIds), userId },
+          { mutedUntil: until },
+        );
+      } else if (change.unread) {
+        await manager.update(
+          ChatMember,
+          { chatId: In(chatIds), userId },
+          { markedUnread: true },
+        );
+      } else {
+        // Mark as read: up to each chat's last message.
+        await manager.query(
+          `UPDATE chat_member m
+              SET "lastReadMessageId" = GREATEST(m."lastReadMessageId", COALESCE(c."lastMessageId", 0)),
+                  "markedUnread" = false
+             FROM chat c
+            WHERE c.id = m."chatId" AND m."userId" = $1 AND m."chatId" = ANY($2)`,
+          [userId, chatIds],
+        );
+      }
+
+      const chats = await this.summaries(userId, chatIds, manager);
+      const updates = await this.updates.append(
+        manager,
+        chats.map((chat) => ({
+          userId,
+          payload: {
+            type: 'chat.state' as const,
+            data: {
+              chatId: chat.id,
+              me: chat.me,
+              unreadCount: chat.unreadCount,
+            },
+          },
+        })),
+      );
+      return { chats, updates };
+    });
   }
 
   async summary(userId: number, chatId: number, manager?: EntityManager) {

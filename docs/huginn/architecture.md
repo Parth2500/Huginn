@@ -210,7 +210,9 @@ Built in 0.4:
 | Event | Data | Ack |
 |---|---|---|
 | `sync` | `{ sinceSeq }` | `{ updates[], seq, hasMore, reset }` (§5) |
-| `chats.list` | – | `{ chats[] }` |
+| `chats.list` | `{ before?, folder?: 'main' \| 'archived' }` | `{ chats[], next }`; the main list leaves archived chats out, and its first page carries every pin |
+| `chats.folders` | – | `{ archived: { count, unread } }` (1.1) |
+| `chat.state` | `{ chatIds[], pin \| archive \| mute: '8h' \| '1w' \| 'always' \| null \| unread }`, one change | `{ results[]: { chatId, me, unreadCount } }`, plus a `chat.state` update per chat to every device (1.1) |
 | `chat.get` | `{ chatId }` | `{ chat }` |
 | `direct.open` | `{ userId }` | `{ partner, chat }`, where `chat` is null until the first message creates it |
 | `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], hasMore }` / `{}` |
@@ -228,7 +230,6 @@ Planned with their features (`message.send` gains `kind`, `replyTo` and later `c
 | `message.edit` | `{ messageId, body \| ciphertext }` | ok / error |
 | `message.delete` | `{ messageIds[], scope: 'me' \| 'all' }` | ok / error |
 | `receipt` | `{ chatId, deliveredUpTo?, readUpTo? }` | – |
-| `chat.state` | `{ chatIds[], pin? \| archive? \| mute? \| markUnread? \| hide? \| clear? }` | `{ ok, results[] }` |
 
 Group management (`group.update`, `group.members.add`/`remove`, `group.role`, `group.leave`,
 `group.delete`) and blocks go over **REST**, because they're rare, need clear errors, and are

@@ -4,6 +4,8 @@ import {
   Chat,
   ChatCursor,
   ChatMessage,
+  ChatStateChange,
+  ChatStateResult,
   PROTOCOL_VERSION,
   TypingEvent,
   Update,
@@ -136,6 +138,54 @@ export class ChatService {
 
   // ---- Chats ---------------------------------------------------------------------------------
 
+  /**
+   * Pins, archives, mutes, or marks chats read or unread (`chat.state`). Returns null when it
+   * worked, or the reason it didn't, to show as is.
+   */
+  async changeState(chatIds: number[], change: ChatStateChange): Promise<string | null> {
+    const result = await this.socket.request<{ results: ChatStateResult[] }>('chat.state', {
+      chatIds,
+      ...change,
+    });
+    if (!result.ok) {
+      return result.error === 'offline'
+        ? "You're offline. Try again when the connection is back."
+        : result.error;
+    }
+    for (const { chatId, me, unreadCount } of result.results) {
+      this.chats.applyState(chatId, me, unreadCount);
+    }
+    if ('archive' in change || 'pin' in change) {
+      void this.loadFolders();
+    }
+    return null;
+  }
+
+  /** The Archived row's numbers. */
+  async loadFolders() {
+    const result = await this.socket.request<{ archived: { count: number; unread: number } }>(
+      'chats.folders',
+    );
+    if (result.ok) {
+      this.chats.folders.set({ archived: result.archived });
+    }
+  }
+
+  /** The Archived folder: its first page when opened, then older pages on request. */
+  async loadArchived(more = false) {
+    const before = more ? this.chats.nextArchived() : undefined;
+    if (more && !before) {
+      return;
+    }
+    const page = await this.socket.request<{ chats: Chat[]; next: ChatCursor | null }>(
+      'chats.list',
+      { folder: 'archived', ...(before ? { before } : {}) },
+    );
+    if (page.ok) {
+      this.chats.appendArchived(page.chats, page.next);
+    }
+  }
+
   async loadMoreChats() {
     const before = this.chats.next();
     if (!before) {
@@ -248,6 +298,7 @@ export class ChatService {
     }
     await this.catchUp(hello.seq);
     this.connection.set('online');
+    void this.loadFolders();
     void this.flushOutbox();
     await this.refreshOpenChat();
   }
@@ -360,14 +411,22 @@ export class ChatService {
         if (!this.chats.applyMessage(message, !mine && !looking)) {
           void this.fetchChat(message.chatId);
         }
+        if (this.chats.get(message.chatId)?.me.archivedAt) {
+          void this.loadFolders();
+        }
         if (looking && !mine) {
           this.markRead(message.chatId);
         }
         return;
       }
-      case 'chat.state':
+      case 'chat.state': {
+        const wasArchived = !!this.chats.get(update.data.chatId)?.me.archivedAt;
         this.chats.applyState(update.data.chatId, update.data.me, update.data.unreadCount);
+        if (live && (wasArchived || update.data.me.archivedAt)) {
+          void this.loadFolders();
+        }
         return;
+      }
     }
   }
 

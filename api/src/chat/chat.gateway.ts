@@ -24,7 +24,13 @@ import {
   IUserService,
   UserToken,
 } from 'src/user/services/iservices/user.service.interface';
-import { Ack, PROTOCOL_VERSION } from './chat.types';
+import {
+  Ack,
+  ChatFolder,
+  ChatStateChange,
+  MuteFor,
+  PROTOCOL_VERSION,
+} from './chat.types';
 import { ChatRuleError, ChatsService } from './chats.service';
 import { MessagesService } from './messages.service';
 import { Addressed, UpdatesService } from './updates.service';
@@ -147,11 +153,59 @@ export class ChatGateway
   @SubscribeMessage('chats.list')
   onChatsList(
     socket: Socket,
-    request: { before?: { lastActivityAt: string; id: number } },
+    request: {
+      before?: { lastActivityAt: string; id: number };
+      folder?: ChatFolder;
+    },
   ) {
     return this.handle(socket, (user) =>
-      this.chats.list(user.Id, request?.before),
+      this.chats.list(
+        user.Id,
+        request?.before,
+        request?.folder === 'archived' ? 'archived' : 'main',
+      ),
     );
+  }
+
+  /** The folder rows above the list: Archived (and, later, Message requests). */
+  @SubscribeMessage('chats.folders')
+  onChatsFolders(socket: Socket) {
+    return this.handle(socket, (user) => this.chats.folders(user.Id));
+  }
+
+  /** Pin, archive, mute, or mark read or unread: one change for one or more chats. */
+  @SubscribeMessage('chat.state')
+  onChatState(
+    socket: Socket,
+    request: { chatIds?: unknown } & Record<string, unknown>,
+  ) {
+    return this.handle(socket, async (user) => {
+      const chatIds = Array.isArray(request?.chatIds)
+        ? [...new Set(request.chatIds.map(Number))].filter(Number.isInteger)
+        : [];
+      if (chatIds.length === 0 || chatIds.length > 100) {
+        throw new ChatRuleError('Choose between 1 and 100 chats.');
+      }
+      const change = parseStateChange(request);
+      if (!change) {
+        throw new ChatRuleError(
+          'Say what to change: pin, archive, mute or unread.',
+        );
+      }
+      const { chats, updates } = await this.chats.changeState(
+        user.Id,
+        chatIds,
+        change,
+      );
+      this.publish(updates);
+      return {
+        results: chats.map((c) => ({
+          chatId: c.id,
+          me: c.me,
+          unreadCount: c.unreadCount,
+        })),
+      };
+    });
   }
 
   @SubscribeMessage('chat.get')
@@ -431,4 +485,29 @@ export class ChatGateway
     });
     socket.disconnect();
   }
+}
+
+/** Exactly one recognised change, with a valid value; anything else is refused. */
+function parseStateChange(
+  request: Record<string, unknown>,
+): ChatStateChange | null {
+  const keys = ['pin', 'archive', 'mute', 'unread'].filter(
+    (k) => request?.[k] !== undefined,
+  );
+  if (keys.length !== 1) {
+    return null;
+  }
+  const value = request[keys[0]];
+  if (keys[0] === 'mute') {
+    const mutes: MuteFor[] = ['8h', '1w', 'always', null];
+    return mutes.includes(value as MuteFor) ? { mute: value as MuteFor } : null;
+  }
+  if (typeof value !== 'boolean') {
+    return null;
+  }
+  return keys[0] === 'pin'
+    ? { pin: value }
+    : keys[0] === 'archive'
+      ? { archive: value }
+      : { unread: value };
 }

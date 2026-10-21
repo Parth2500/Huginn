@@ -41,6 +41,22 @@ export interface MyChatState {
   clearedBeforeMessageId: number;
 }
 
+/** How long a mute lasts; `null` unmutes. */
+export type MuteFor = '8h' | '1w' | 'always' | null;
+
+/** One change to your own state in chats (`chat.state`); exactly one field. */
+export type ChatStateChange =
+  | { pin: boolean }
+  | { archive: boolean }
+  | { mute: MuteFor }
+  | { unread: boolean };
+
+export interface ChatStateResult {
+  chatId: number;
+  me: MyChatState;
+  unreadCount: number;
+}
+
 export interface Chat {
   id: number;
   kind: ChatKind;

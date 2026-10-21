@@ -112,6 +112,68 @@
   text-align: center;
 }
 
+.badge.muted { background: var(--side-bg-2); color: var(--side-text); }
+.room.active .badge.muted { background: rgb(255 255 255 / 25%); color: #fff; }
+
+/* "Marked as unread": a dot instead of a count. */
+.unread-dot {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  margin: 0 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  &.muted { background: var(--side-text-2); }
+}
+.room.active .unread-dot { background: #fff; }
+
+.row-icon { flex: none; width: 14px; height: 14px; color: var(--side-text-2); }
+.room.active .row-icon { color: var(--on-accent-2); }
+
+/* The row's menu button: shown on hover or focus, in place of the time. */
+.row { position: relative; }
+.row-menu {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: var(--side-bg-2);
+  color: var(--side-text);
+  cursor: pointer;
+  opacity: 0;
+  pointer-events: none;
+  app-icon { width: 16px; height: 16px; }
+  &:hover { background: var(--side-line); }
+}
+.row:hover .row-menu,
+.row:focus-within .row-menu,
+.row.menu-open .row-menu { opacity: 1; pointer-events: auto; }
+.row:hover .when,
+.row:focus-within .when,
+.row.menu-open .when { visibility: hidden; }
+.row:has(.room.active) .row-menu { background: rgb(255 255 255 / 18%); color: #fff; }
+
+/* The Archived folder row and view. */
+.folder-row { margin-bottom: 2px; }
+.folder-icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--side-bg-2);
+  color: var(--side-text-2);
+  app-icon { width: 18px; height: 18px; }
+}
+.folder-note { margin: 0 8px 8px; font-size: 13px; color: var(--side-text-2); }
+.side-title .folder-back { margin: -6px 0 -6px -8px; color: var(--side-text); }
+
 .room.has-unread .name { color: #fff; }
 .room.has-unread .preview { color: var(--side-text); }
 .room.active .badge { background: #fff; color: #3730a3; }

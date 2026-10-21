@@ -1,0 +1,40 @@
+<div class="menu" role="menu" aria-label="Chat actions">
+  <button type="button" role="menuitem" (click)="pick({ pin: !pinned() })">
+    <app-icon [name]="pinned() ? 'pin-off' : 'pin'" />
+    {{ pinned() ? 'Unpin chat' : 'Pin chat' }}
+  </button>
+
+  @if (muted()) {
+    <button type="button" role="menuitem" (click)="pick({ mute: null })">
+      <app-icon name="bell" />
+      <span class="item-text">
+        Unmute
+        <span class="hint">{{ mutedLabel() }}</span>
+      </span>
+    </button>
+  } @else {
+    <button type="button" role="menuitem" data-mute aria-haspopup="menu" [attr.aria-expanded]="muteOpen()"
+      (click)="toggleMute()">
+      <app-icon name="bell-off" />
+      <span class="item-text">Mute notifications</span>
+      <app-icon class="caret" [name]="muteOpen() ? 'chevron-down' : 'chevron-right'" />
+    </button>
+    @if (muteOpen()) {
+      <div class="sub" role="group" aria-label="Mute for">
+        @for (choice of muteChoices; track choice.value) {
+          <button type="button" role="menuitem" (click)="pick({ mute: choice.value })">{{ choice.label }}</button>
+        }
+      </div>
+    }
+  }
+
+  <button type="button" role="menuitem" (click)="pick({ unread: !unread() })">
+    <app-icon [name]="unread() ? 'check-check' : 'message-dot'" />
+    {{ unread() ? 'Mark as read' : 'Mark as unread' }}
+  </button>
+
+  <button type="button" role="menuitem" (click)="pick({ archive: !archived() })">
+    <app-icon [name]="archived() ? 'archive-restore' : 'archive'" />
+    {{ archived() ? 'Unarchive' : 'Archive chat' }}
+  </button>
+</div>

@@ -11,7 +11,7 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
-import { Chat, DraftChat, OpenChat } from 'src/app/models/chat.interface';
+import { Chat, ChatStateChange, DraftChat, OpenChat } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
 import { AuthService } from 'src/app/core/auth.service';
 import { ToastService } from 'src/app/shared/toast/toast.service';
@@ -20,13 +20,14 @@ import { LogoComponent } from 'src/app/shared/logo/logo.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
+import { ChatMenuComponent } from '../../components/chat-menu/chat-menu.component';
 import { ChatRoomComponent } from '../../components/chat-room/chat-room.component';
 import { ChatSearchComponent } from '../../components/chat-search/chat-search.component';
 import { CreateRoomComponent, NewGroup } from '../../components/create-room/create-room.component';
 import { ProfileEditComponent } from '../../components/profile-edit/profile-edit.component';
 import { ProfilePanelComponent } from '../../components/profile-panel/profile-panel.component';
 import { StartChatComponent } from '../../components/start-chat/start-chat.component';
-import { chatPartner, chatTitle, personName } from '../../helpers/chat-display';
+import { chatPartner, chatTitle, isMuted, personName } from '../../helpers/chat-display';
 import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
 
@@ -42,6 +43,7 @@ type Selection = { chatId: number } | { draft: IUser } | null;
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
     LogoComponent,
+    ChatMenuComponent,
     IconComponent,
     ChatSearchComponent,
     AvatarComponent,
@@ -69,7 +71,22 @@ export class DashboardComponent {
   readonly chats = this.store.chats;
   readonly loaded = this.store.loaded;
   readonly fresh = this.store.fresh;
-  readonly hasMoreChats = computed(() => !!this.store.next());
+  /** Which list the rail shows: the main one, or the Archived folder. */
+  readonly folder = signal<'main' | 'archived'>('main');
+  readonly listChats = computed(() =>
+    this.folder() === 'archived' ? this.store.archivedChats() : this.store.mainChats(),
+  );
+  readonly archivedFolder = computed(() => this.store.folders().archived);
+  readonly hasMoreChats = computed(() =>
+    this.folder() === 'archived' ? !!this.store.nextArchived() : !!this.store.next(),
+  );
+  /** The open row menu, where it opened, and what gets focus back when it closes. */
+  readonly menu = signal<{ chat: Chat; at: { x: number; y: number }; returnFocus: HTMLElement } | null>(
+    null,
+  );
+  private longPress: ReturnType<typeof setTimeout> | undefined;
+  /** A long-press opened the menu: the click that follows mustn't open the chat. */
+  private suppressClick = false;
   readonly connection = this.chatService.connection;
   readonly onlineIds = this.chatService.onlineIds;
 
@@ -229,8 +246,114 @@ export class DashboardComponent {
 
   async loadMoreChats() {
     this.loadingMore.set(true);
-    await this.chatService.loadMoreChats();
+    if (this.folder() === 'archived') {
+      await this.chatService.loadArchived(true);
+    } else {
+      await this.chatService.loadMoreChats();
+    }
     this.loadingMore.set(false);
+  }
+
+  // ---- Folders and the row menu --------------------------------------------------------------
+
+  showArchived() {
+    this.folder.set('archived');
+    if (this.store.nextArchived() === undefined) {
+      void this.chatService.loadArchived();
+    }
+  }
+
+  showMain() {
+    this.folder.set('main');
+  }
+
+  onRowClick(chat: Chat) {
+    if (this.suppressClick) {
+      this.suppressClick = false;
+      return;
+    }
+    this.selectChat(chat);
+  }
+
+  /**
+   * Right-click: the menu opens at the pointer. The keyboard's menu key (or Shift+F10) fires
+   * the same event with no pointer position, so then it opens below the row.
+   */
+  openMenuAt(event: MouseEvent, chat: Chat) {
+    event.preventDefault();
+    const row = event.currentTarget as HTMLElement;
+    const fromKeyboard = event.button !== 2 && event.clientX === 0 && event.clientY === 0;
+    const rect = row.getBoundingClientRect();
+    this.menu.set({
+      chat,
+      at: fromKeyboard ? { x: rect.left + 12, y: rect.bottom + 4 } : { x: event.clientX, y: event.clientY },
+      returnFocus: row,
+    });
+  }
+
+  /** The row's chevron: the menu opens below it. */
+  openMenuBelow(event: MouseEvent, chat: Chat) {
+    const button = event.currentTarget as HTMLElement;
+    const rect = button.getBoundingClientRect();
+    this.menu.set({ chat, at: { x: rect.left, y: rect.bottom + 4 }, returnFocus: button });
+  }
+
+  /** A long-press on a touch screen opens the menu where the finger is. */
+  pressStart(event: PointerEvent, chat: Chat) {
+    if (event.pointerType !== 'touch') {
+      return;
+    }
+    const row = event.currentTarget as HTMLElement;
+    const at = { x: event.clientX, y: event.clientY };
+    this.longPress = setTimeout(() => {
+      this.suppressClick = true;
+      this.menu.set({ chat, at, returnFocus: row });
+    }, 500);
+  }
+
+  pressEnd() {
+    clearTimeout(this.longPress);
+  }
+
+  closeMenu() {
+    const open = this.menu();
+    this.menu.set(null);
+    open?.returnFocus.focus();
+  }
+
+  async onMenuChoice(chat: Chat, change: ChatStateChange) {
+    this.closeMenu();
+    // Marking the open chat unread closes it, or it would read itself again at once.
+    if ('unread' in change && change.unread && this.isSelected(chat)) {
+      this.closeChat();
+    }
+    const error = await this.chatService.changeState([chat.id], change);
+    if (error) {
+      this.toast.error(error);
+    } else if ('archive' in change) {
+      this.toast.show(change.archive ? 'Chat archived.' : 'Chat moved back to your chats.');
+    }
+  }
+
+  muted(chat: Chat): boolean {
+    return isMuted(chat);
+  }
+
+  /** What a screen reader hears for a row: name, then its state. */
+  rowLabel(chat: Chat): string {
+    const parts = [this.chatTitle(chat)];
+    if (chat.me.pinnedAt && this.folder() === 'main') {
+      parts.push('pinned');
+    }
+    if (isMuted(chat)) {
+      parts.push('muted');
+    }
+    if (chat.unreadCount) {
+      parts.push(`${chat.unreadCount} unread`);
+    } else if (chat.me.markedUnread) {
+      parts.push('marked unread');
+    }
+    return parts.join(', ');
   }
 
   async logout() {

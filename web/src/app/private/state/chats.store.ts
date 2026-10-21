@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Chat, ChatCursor, ChatMessage, MyChatState } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
-import { byActivity, withUpdatedUser } from '../helpers/chat-display';
+import { byActivity, byListOrder, isMuted, withUpdatedUser } from '../helpers/chat-display';
 import { LocalDb } from './local-db';
 
 /** How long a chat that arrived live keeps its highlight. */
@@ -17,12 +17,28 @@ export class ChatsStore {
   readonly loaded = signal(false);
   /** Where the next page of older chats starts, when the server has more. */
   readonly next = signal<ChatCursor | null>(null);
+  /** The same for the Archived folder; `undefined` until it's first opened. */
+  readonly nextArchived = signal<ChatCursor | null | undefined>(undefined);
+  /** What the folder rows above the list show. */
+  readonly folders = signal({ archived: { count: 0, unread: 0 } });
   /** Chats that arrived live this session, highlighted briefly. */
   readonly fresh = signal(new Set<number>());
 
+  /** Every chat this device holds, archived included (search uses these). */
   readonly chats = computed(() => [...this.byId().values()].sort(byActivity));
+  /** The main list: not archived; pinned first. */
+  readonly mainChats = computed(() =>
+    this.chats()
+      .filter((chat) => !chat.me.archivedAt)
+      .sort(byListOrder),
+  );
+  readonly archivedChats = computed(() => this.chats().filter((chat) => !!chat.me.archivedAt));
+  readonly pinnedCount = computed(() => this.mainChats().filter((chat) => !!chat.me.pinnedAt).length);
+  /** For the tab title: archived and muted chats don't call for attention. */
   readonly totalUnread = computed(() =>
-    this.chats().reduce((sum, chat) => sum + chat.unreadCount, 0),
+    this.mainChats()
+      .filter((chat) => !isMuted(chat))
+      .reduce((sum, chat) => sum + chat.unreadCount, 0),
   );
 
   get(chatId: number): Chat | undefined {
@@ -68,6 +84,11 @@ export class ChatsStore {
   append(chats: Chat[], next: ChatCursor | null) {
     this.upsert(chats);
     this.next.set(next);
+  }
+
+  appendArchived(chats: Chat[], next: ChatCursor | null) {
+    this.upsert(chats);
+    this.nextArchived.set(next);
   }
 
   /**
@@ -130,6 +151,8 @@ export class ChatsStore {
   reset() {
     this.byId.set(new Map());
     this.next.set(null);
+    this.nextArchived.set(undefined);
+    this.folders.set({ archived: { count: 0, unread: 0 } });
     this.loaded.set(false);
     this.fresh.set(new Set());
   }

@@ -16,13 +16,20 @@
       (openChat)="selectChat($event)" (openPerson)="openPerson($event)" />
       @if (!searching()) {
         <div class="side-title">
-          <h2>Chats</h2>
+          @if (folder() === 'archived') {
+            <button type="button" class="folder-back icon-btn" (click)="showMain()" aria-label="Back to chats">
+              <app-icon name="arrow-left" />
+            </button>
+            <h2>Archived</h2>
+          } @else {
+            <h2>Chats</h2>
+          }
           @if (loaded()) {
-            <span class="count tabular">{{ chats().length }}{{ hasMoreChats() ? '+' : '' }}</span>
+            <span class="count tabular">{{ listChats().length }}{{ hasMoreChats() ? '+' : '' }}</span>
           }
         </div>
       }
-      <nav class="room-list" [hidden]="searching()" aria-label="Chats">
+      <nav class="room-list" [hidden]="searching()" [attr.aria-label]="folder() === 'archived' ? 'Archived chats' : 'Chats'">
         <!-- Loading -->
         @if (!loaded()) {
           <ul aria-busy="true" aria-label="Loading chats">
@@ -34,17 +41,40 @@
             }
           </ul>
         }
+        <!-- The Archived folder row, above the main list -->
+        @if (loaded() && folder() === 'main' && archivedFolder().count > 0) {
+          <button type="button" class="room folder-row" (click)="showArchived()"
+            [attr.aria-label]="'Archived, ' + archivedFolder().count + ' chats' + (archivedFolder().unread ? ', ' + archivedFolder().unread + ' unread' : '')">
+            <span class="folder-icon"><app-icon name="archive" /></span>
+            <span class="lines">
+              <span class="name-row"><span class="name">Archived</span></span>
+              <span class="preview-row">
+                <span class="preview">{{ archivedFolder().count }} {{ archivedFolder().count === 1 ? 'chat' : 'chats' }}</span>
+                @if (archivedFolder().unread; as unread) {
+                  <span class="badge muted tabular">{{ unread }}</span>
+                }
+              </span>
+            </span>
+          </button>
+        }
+        @if (loaded() && folder() === 'archived') {
+          <p class="folder-note">Archived chats stay here when new messages arrive.</p>
+        }
         <!-- Chats -->
-        @if (loaded() && chats().length > 0) {
+        @if (loaded() && listChats().length > 0) {
           <ul>
-            @for (chat of chats(); track chat.id) {
-              <li>
-                <button type="button" class="room" (click)="selectChat(chat)"
+            @for (chat of listChats(); track chat.id) {
+              <li class="row" [class.menu-open]="menu()?.chat?.id === chat.id">
+                <button type="button" class="room" (click)="onRowClick(chat)"
+                  (contextmenu)="openMenuAt($event, chat)"
+                  (pointerdown)="pressStart($event, chat)" (pointerup)="pressEnd()" (pointercancel)="pressEnd()"
+                  (pointerleave)="pressEnd()"
                   [class.active]="isSelected(chat)"
                   [class.fresh]="fresh().has(chat.id)"
-                  [class.has-unread]="chat.unreadCount > 0"
+                  [class.has-unread]="chat.unreadCount > 0 || chat.me.markedUnread"
+                  [class.muted]="muted(chat)"
                   [attr.aria-current]="isSelected(chat) ? 'true' : null"
-                  [attr.aria-label]="chatTitle(chat) + (chat.unreadCount ? ', ' + chat.unreadCount + ' unread' : '')">
+                  [attr.aria-label]="rowLabel(chat)">
                   @if (directPartner(chat); as person) {
                     <app-avatar [user]="person"
                     [online]="onlineIds().has(person.Id!)" />
@@ -54,18 +84,30 @@
                   <span class="lines">
                     <span class="name-row">
                       <span class="name">{{ chatTitle(chat) }}</span>
+                      @if (chat.me.pinnedAt && folder() === 'main') {
+                        <app-icon class="row-icon pin" name="pin" />
+                      }
                       @if (chat.lastMessage) {
                         <time class="when" [attr.datetime]="chat.lastMessage.createdAt">{{ activityLabel(chat) }}</time>
                       }
                     </span>
                     <span class="preview-row">
                       <span class="preview" [class.empty]="!chat.lastMessage">{{ preview(chat) }}</span>
+                      @if (muted(chat)) {
+                        <app-icon class="row-icon" name="bell-off" />
+                      }
                       @if (chat.unreadCount; as count) {
-                        <span class="badge tabular"
-                        [attr.aria-label]="count + ' unread'">{{ count > 99 ? '99+' : count }}</span>
+                        <span class="badge tabular" [class.muted]="muted(chat)">{{ count > 99 ? '99+' : count }}</span>
+                      } @else if (chat.me.markedUnread) {
+                        <span class="unread-dot" [class.muted]="muted(chat)"></span>
                       }
                     </span>
                   </span>
+                </button>
+                <button type="button" class="row-menu" (click)="openMenuBelow($event, chat)"
+                  aria-haspopup="menu" [attr.aria-expanded]="menu()?.chat?.id === chat.id"
+                  [attr.aria-label]="'More actions for ' + chatTitle(chat)">
+                  <app-icon name="chevron-down" />
                 </button>
               </li>
             }
@@ -76,8 +118,14 @@
             {{ loadingMore() ? 'Loading…' : 'Show older chats' }}
           </button>
         }
+        @if (loaded() && folder() === 'archived' && listChats().length === 0 && !hasMoreChats()) {
+          <div class="side-empty">
+            <p class="title">No archived chats</p>
+            <p>Archive a chat to keep your list tidy without leaving it.</p>
+          </div>
+        }
         <!-- Empty -->
-        @if (loaded() && chats().length === 0) {
+        @if (loaded() && folder() === 'main' && chats().length === 0) {
           <div class="side-empty">
             <p class="title">No chats yet</p>
             <p>Search for someone above and send them a message. Chats people start with you appear here too.</p>
@@ -100,6 +148,9 @@
         </button>
       </footer>
     </aside>
+    @if (menu(); as open) {
+      <app-chat-menu [chat]="open.chat" [at]="open.at" (choose)="onMenuChoice(open.chat, $event)" (close)="closeMenu()" />
+    }
     <main class="detail">
       @if (editingProfile()) {
         <app-profile-edit [me]="user()" (saved)="onProfileSaved($event)" (close)="closeProfileEditor()" />

@@ -1,6 +1,15 @@
 import { Chat } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
-import { byActivity, chatPartner, chatTitle, personName, withUpdatedUser } from './chat-display';
+import {
+  byActivity,
+  byListOrder,
+  chatPartner,
+  chatTitle,
+  isMuted,
+  mutedForever,
+  personName,
+  withUpdatedUser,
+} from './chat-display';
 
 const me: IUser = { Id: 1, username: 'maya' };
 const sam: IUser = { Id: 2, username: 'sam', displayName: 'Sam Rivera' };
@@ -83,5 +92,34 @@ describe('chat display helpers', () => {
     const newer = makeChat({ id: 2, lastActivityAt: '2026-10-20T11:00:00Z' });
     const tie = makeChat({ id: 3, lastActivityAt: '2026-10-20T11:00:00Z' });
     expect([older, newer, tie].sort(byActivity).map((c) => c.id)).toEqual([3, 2, 1]);
+  });
+});
+
+describe('chat list order and mute', () => {
+  const at = (id: number, lastActivityAt: string, pinOrder: number | null = null) =>
+    makeChat({
+      id,
+      lastActivityAt,
+      me: { ...makeChat({}).me, pinnedAt: pinOrder ? '2026-10-20T00:00:00Z' : null, pinOrder },
+    });
+
+  it('puts pinned chats first in pin order, then the rest by activity', () => {
+    const chats = [
+      at(1, '2026-10-21T10:00:00Z'),
+      at(2, '2026-10-01T10:00:00Z', 2),
+      at(3, '2026-10-21T12:00:00Z'),
+      at(4, '2026-09-01T10:00:00Z', 1),
+    ];
+    expect(chats.sort(byListOrder).map((c) => c.id)).toEqual([4, 2, 3, 1]);
+  });
+
+  it('knows when a mute has run out, and when it is for always', () => {
+    const now = Date.parse('2026-10-21T12:00:00Z');
+    const mutedUntil = (value: string | null) => makeChat({ me: { ...makeChat({}).me, mutedUntil: value } });
+    expect(isMuted(mutedUntil('2026-10-21T13:00:00Z'), now)).toBe(true);
+    expect(isMuted(mutedUntil('2026-10-21T11:00:00Z'), now)).toBe(false);
+    expect(isMuted(mutedUntil(null), now)).toBe(false);
+    expect(mutedForever(mutedUntil('9999-12-31T00:00:00Z'))).toBe(true);
+    expect(mutedForever(mutedUntil('2026-10-21T13:00:00Z'))).toBe(false);
   });
 });
