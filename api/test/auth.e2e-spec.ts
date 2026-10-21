@@ -78,7 +78,8 @@ describe('sessions', () => {
     const out = await api(t.base, account.cookie, '/auth/logout', {
       method: 'POST',
     });
-    expect(out.status).toBe(204);
+    expect(out.status).toBe(200);
+    expect(await out.json()).toEqual({ provider: 'local' });
     expect(out.headers.getSetCookie()[0]).toMatch(/huginn_session=;/);
     expect((await ended).message).toBe('You signed out.');
     await new Promise((r) => setTimeout(r, 200));
@@ -94,7 +95,7 @@ describe('sessions', () => {
     expect(
       (await api(t.base, account.cookie, '/auth/logout', { method: 'POST' }))
         .status,
-    ).toBe(204);
+    ).toBe(200);
   });
 
   it('refuses changes and sockets from another site', async () => {

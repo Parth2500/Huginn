@@ -139,6 +139,17 @@ costs, and what would change it. Open questions follow at the end.
 - **Why:** it fixes today's `localStorage` token exposure now, and makes the switch a contained
   change.
 
+## D14. Heimdall now, beside passwords, linked only by the owner
+
+- **Decision (2026-10-21):** connect Heimdall now as a second sign-in method. Keep email and
+  password. Link a Heimdall identity to an existing account only when that account's owner,
+  signed in, asks to. Never match accounts by email. Keep no Heimdall tokens after sign-in.
+- **Why:** Heimdall can sign people in, but it has no sign-up and its emails aren't verified.
+  Matching by an unverified email would hand someone's chats to whoever claims their address.
+  Huginn only needs the identity at sign-in, so storing and refreshing Heimdall's tokens would
+  add risk (refresh-token reuse revokes the family) for nothing.
+- **Replaces:** the "link by verified email, then remove the password" plan in D13.
+
 ## Answered (2026-10-21)
 
 1. **Message requests:** yes, as a folder like Archived.

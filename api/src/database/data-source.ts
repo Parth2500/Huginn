@@ -1,6 +1,8 @@
 import 'reflect-metadata';
 import { DataSource, DataSourceOptions } from 'typeorm';
+import { PendingSignup } from '../auth/pending-signup.entity';
 import { Session } from '../auth/session.entity';
+import { UserIdentity } from '../auth/user-identity.entity';
 import { Block } from '../chat/entities/block.entity';
 import { ChatMember } from '../chat/entities/chat-member.entity';
 import { Chat } from '../chat/entities/chat.entity';
@@ -13,6 +15,7 @@ import { InitialSchema1792524417068 } from './migrations/1792524417068-InitialSc
 import { SearchAndHistoryIndexes1792524417069 } from './migrations/1792524417069-SearchAndHistoryIndexes';
 import { ChatsAndMembers1792524417070 } from './migrations/1792524417070-ChatsAndMembers';
 import { Sessions1792601612272 } from './migrations/1792601612272-Sessions';
+import { HeimdallIdentities1792603478066 } from './migrations/1792603478066-HeimdallIdentities';
 
 /**
  * One database configuration for the app and the TypeORM CLI. Schema changes go through
@@ -33,12 +36,15 @@ export const dataSourceOptions: DataSourceOptions = {
     Block,
     UserUpdate,
     Session,
+    UserIdentity,
+    PendingSignup,
   ],
   migrations: [
     InitialSchema1792524417068,
     SearchAndHistoryIndexes1792524417069,
     ChatsAndMembers1792524417070,
     Sessions1792601612272,
+    HeimdallIdentities1792603478066,
   ],
   // gen_random_uuid() is built into Postgres 13+, so no extension is needed for UUID keys.
   uuidExtension: 'pgcrypto',

@@ -41,6 +41,10 @@ export class AppModule implements NestModule {
         { path: '/auth/register', method: RequestMethod.POST },
         { path: '/auth/login', method: RequestMethod.POST },
         { path: '/auth/logout', method: RequestMethod.POST },
+        { path: '/auth/providers', method: RequestMethod.GET },
+        { path: '/auth/heimdall/start', method: RequestMethod.GET },
+        { path: '/auth/heimdall/callback', method: RequestMethod.GET },
+        { path: '/auth/signup', method: RequestMethod.ALL },
         { path: '/users/username-available', method: RequestMethod.GET },
       )
       .forRoutes('');

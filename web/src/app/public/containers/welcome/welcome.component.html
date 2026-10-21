@@ -1,0 +1,73 @@
+@switch (pending()) {
+  @case (undefined) {
+    <app-auth-layout heading="Welcome to Huginn" subheading="Getting your sign-in ready…">
+      <p class="loading"><span class="spinner" aria-hidden="true"></span>One moment.</p>
+    </app-auth-layout>
+  }
+  @case (null) {
+    <app-auth-layout heading="That sign-in has expired" subheading="Choosing a username has a 30-minute limit, and each sign-in can be used once.">
+      <a class="btn btn-primary btn-block heimdall" href="/api/auth/heimdall/start">
+        <app-icon name="shield" />
+        Continue with Heimdall again
+      </a>
+      <p class="auth-switch">Have a password? <a [routerLink]="['/public/login']">Sign in</a></p>
+    </app-auth-layout>
+  }
+  @default {
+    <app-auth-layout heading="Choose your username"
+      subheading="You're signed in with Heimdall. Pick how people find you here.">
+      @if (pending()?.email; as email) {
+        <p class="signed-in-as">
+          <app-icon name="shield" />
+          <span>Heimdall account <b>{{ email }}</b>. It stays private; nobody on Huginn sees it.</span>
+        </p>
+      }
+
+      <form class="auth-form" [formGroup]="form" (ngSubmit)="finish()" novalidate>
+        @if (serverError(); as error) {
+          <div class="form-alert" role="alert">
+            <app-icon name="alert-circle" />
+            <span>{{ error }}</span>
+          </div>
+        }
+
+        <div class="field">
+          <label for="welcome-username">Username</label>
+          <input id="welcome-username" class="input" type="text" formControlName="username" autocomplete="username"
+            autocapitalize="off" spellcheck="false" placeholder="e.g. maya.r" maxlength="24"
+            [class.invalid]="usernameMessage().kind === 'error'" [attr.aria-invalid]="usernameMessage().kind === 'error'"
+            aria-describedby="welcome-username-help" />
+          <p id="welcome-username-help" role="status"
+            [ngClass]="usernameMessage().kind === 'error' ? 'field-error' : usernameMessage().kind === 'ok' ? 'field-ok' : 'field-hint'">
+            @if (usernameMessage().kind === 'error') {
+              <app-icon name="alert-circle" />
+            }
+            @if (usernameMessage().kind === 'ok') {
+              <app-icon name="check" />
+            }
+            @if (usernameMessage().kind === 'checking') {
+              <span class="spinner small" aria-hidden="true"></span>
+            }
+            <span>{{ usernameMessage().text }}</span>
+          </p>
+        </div>
+
+        <div class="field">
+          <label for="welcome-display">Display name <span class="optional">optional</span></label>
+          <input id="welcome-display" class="input" formControlName="displayName" maxlength="40"
+            placeholder="How your name appears in chats" autocomplete="name" aria-describedby="welcome-display-help" />
+          <p class="field-hint" id="welcome-display-help">Shown instead of your username. You can change both later.</p>
+        </div>
+
+        <button class="btn btn-primary btn-block" type="submit" [disabled]="submitting()">
+          @if (submitting()) {
+            <span class="spinner" aria-hidden="true"></span>
+          }
+          {{ submitting() ? 'Creating your account…' : 'Create account' }}
+        </button>
+      </form>
+
+      <p class="auth-switch">Already have a Huginn account? <a [routerLink]="['/public/login']">Sign in with your password</a>, then link Heimdall from your profile.</p>
+    </app-auth-layout>
+  }
+}

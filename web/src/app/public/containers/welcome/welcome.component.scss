@@ -1,0 +1,20 @@
+.auth-form { display: grid; gap: 20px; }
+.btn-block { margin-top: 4px; }
+.auth-switch { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--text-2); }
+.heimdall { gap: 8px; text-decoration: none; }
+.optional { font-weight: 400; color: var(--text-2); margin-left: 4px; }
+
+.signed-in-as {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  margin: 0 0 24px;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  b { font-weight: 600; overflow-wrap: anywhere; }
+  app-icon { flex: none; margin-top: 1px; }
+}
+
+.loading { display: flex; gap: 10px; align-items: center; color: var(--text-2); }

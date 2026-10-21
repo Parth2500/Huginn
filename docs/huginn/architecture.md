@@ -34,11 +34,12 @@ changes, and in which phase. Scale concerns are in [../SCALING.md](../SCALING.md
 
 ---
 
-## 2. Identity: Heimdall integration (when Heimdall is ready)
+## 2. Identity: Heimdall integration
 
-Heimdall is still in development (repo `Parth2500/heimdall-idp`, .NET 10). So Huginn keeps its
-current email and password sign-in for now. It does put all of it behind one `AuthProvider`
-interface in Phase 0, so switching later touches nothing else.
+Heimdall is the user's own OIDC provider (repo `Parth2500/heimdall-idp`, .NET 10), still in
+development. Since 2026-10-21 Huginn offers **both** sign-in methods: its own email and password,
+and "Continue with Heimdall". Both sit behind the `AuthProvider` interface, so neither the
+sessions nor the rest of the app depend on which one signed someone in.
 
 ### 2.1 What Heimdall provides (as of 2026-10-19)
 
@@ -64,57 +65,63 @@ interface in Phase 0, so switching later touches nothing else.
   - DPoP and PAR (their Phase 2)
   - persisted consent (their Phase 3)
 
-### 2.2 How Huginn connects (backend-for-frontend)
+### 2.2 How Huginn connects (backend-for-frontend, built 2026-10-21)
 
-- Huginn's API registers as a **confidential client** with:
-  - grants `authorization_code` and `refresh_token`
-  - redirect URI `https://<huginn>/auth/callback`
-  - an allowed audience for Huginn's API, e.g. `https://api.huginn.<domain>`
-  - scopes `openid profile email`
-- The flow:
-  1. `/auth/login` creates the PKCE verifier, `state` and `nonce`, stores them in a short-lived
-     server session, and redirects to Heimdall `/authorize` with `resource=<huginn audience>`.
-  2. `/auth/callback` checks `state` and `iss` (RFC 9207), then exchanges the code at `/token`
-     with client authentication.
-  3. It validates the ID token against the tenant's JWKS: `iss`, `aud`, `nonce` and expiry.
-  4. It links or creates the Huginn user by **`(iss, sub)`**.
-- Huginn sets its own `__Host-huginn_session` cookie (`Secure; HttpOnly; SameSite=Lax`). HTTP and
-  the Socket.IO handshake authenticate with it. The browser never sees Heimdall's tokens.
-- **Refreshing:** the 5-minute access token is refreshed by the server shortly before it expires.
-  Heimdall revokes the whole family when a refresh token is reused, so **refreshes are
-  serialised per session** (a Redis lock). Two tabs or servers refreshing at once must never
-  both send the same refresh token.
-- **Sign-out:** revoke the refresh token at `/revoke` and end Huginn's session.
-  - Until Heimdall has RP-initiated logout, the Heimdall SSO session survives. The next "Sign
-    in" may skip the password, and the sign-out screen says so (as Heimdall's demo SPA does).
-  - Once back-channel logout exists, Huginn subscribes to it and disconnects that session's
-    sockets.
-- **Huginn keeps:**
-  - `user.oidc_issuer` and `user.oidc_subject` (unique together)
-  - the email, if Heimdall returns it (shown only to its owner)
-  - nothing else
-  
-  Usernames, profiles and devices stay Huginn's own.
+- **Client:** Huginn's API is a **confidential client** in the tenant (`client_secret_basic`),
+  with the `authorization_code` grant only, scopes `openid email`, and the redirect URI
+  `<app origin>/api/auth/heimdall/callback`. Heimdall has no client registration API yet, so its
+  `seed-dev` registers the `huginn` client and prints the secret once.
+- **The flow** (`api/src/auth/heimdall-oidc.provider.ts`, built on `openid-client`):
+  1. `GET /api/auth/heimdall/start` creates the PKCE verifier (S256), `state` and `nonce`. It keeps
+     them in a 10-minute httpOnly cookie, then redirects to Heimdall `/authorize`.
+  2. Heimdall shows its own sign-in page, then redirects to `/api/auth/heimdall/callback`.
+  3. The callback checks `state` and the `iss` response parameter (RFC 9207), and exchanges the
+     code at `/token` with the client secret. It checks the ID token against the tenant's
+     JWKS: signature, `iss`, `aud`, `nonce` and expiry.
+  4. It reads `email` from `/userinfo`, then decides the account (below).
+- **No Heimdall tokens are kept.** Huginn needs Heimdall only to learn who someone is. After the
+  callback, Huginn's own session cookie carries them, as with a password. So there's no refresh
+  token, no `resource` audience and no serialised refresh. The earlier plan needed a Redis lock
+  for those, because Heimdall revokes the whole family when a refresh token is reused.
+- **Accounts** (`identities.service.ts`, table `user_identity (issuer, subject) → user`):
+  - A known `(iss, sub)` signs in.
+  - An unknown one gets a 30-minute sign-up ticket (`pending_signup`, cookie, SHA-256 stored)
+    and the welcome page, where the person picks a username. The account then has **no email and
+    no password**. The email Heimdall reported stays on `user_identity`, shown only to its owner.
+  - **Accounts are never matched by email.** Heimdall's `email_verified` is always `false`, so
+    matching would give anyone with someone's address their chats. Instead, a signed-in person
+    links Heimdall from their profile (`?intent=link`), which proves both identities. An
+    identity already linked to another account is refused.
+  - Unlinking is allowed only while the account has a password, so nobody locks themselves out.
+- **Sign-out** ends Huginn's session. Heimdall has no RP-initiated logout yet, so its own session
+  survives, and "Continue with Heimdall" may skip the password. The sign-in page says so after a
+  Heimdall session signs out. When back-channel logout exists, Huginn can subscribe to it and end
+  the matching sessions.
+- **Development TLS:** Heimdall serves `https://acme.localhost:7200` with the ASP.NET
+  development certificate, which is issued for `localhost`. `HEIMDALL_CA_FILE` pins that
+  certificate for the API's requests, checked against the name in `HEIMDALL_TLS_NAME` (default
+  `localhost`). `*.localhost` resolves to loopback. Certificate checks stay on. Browsers show a
+  warning for `acme.localhost` once, as with Heimdall's own demo.
 
-### 2.3 Until then
+### 2.3 Sessions and the seam (milestone 0.5)
 
-- Milestone 0.5 added the `AuthProvider` seam (`api/src/auth/`):
-  - `LocalPasswordProvider` (email and password, in Huginn's own database)
-  - later, `HeimdallOidcProvider`
-- **Sessions (0.5):** a random 32-byte token in an httpOnly, `SameSite=Lax` cookie
+- `api/src/auth/` holds `LocalPasswordProvider` and `HeimdallOidcProvider`.
+- **Sessions:** a random 32-byte token in an httpOnly, `SameSite=Lax` cookie
   (`__Host-huginn_session` when Secure). The `session` table stores its SHA-256, the user, the
   provider and `providerData`. Sessions end after 30 days unused or 90 days in all. HTTP requests
   and the Socket.IO handshake both read the cookie, so the app, API and socket share one origin.
   Sign-out deletes the session and disconnects its sockets.
 - **Cross-site requests:** non-GET requests and socket handshakes whose `Origin` isn't in
   `APP_ORIGINS`, or that say `Sec-Fetch-Site: cross-site`, are refused.
-- **Migration:** existing local accounts are linked to Heimdall on first OIDC sign-in by
-  matching the verified email, then the local password is removed.
+- **Heimdall-only later:** once Heimdall has registration and verified emails, local sign-up can
+  close and the password route can go, with existing accounts linked by their owners first.
 
 ### 2.4 Asks for the Heimdall roadmap
 
 - RP-initiated logout, and back-channel logout (or at least a session-check endpoint).
-- An `email_verified` claim (needed for safe account linking).
+- Registration, email verification, and a real `email_verified` claim (today it's always
+  `false`). Until then Huginn keeps its own sign-up, and links accounts only by the owner's action.
+- A client registration API (today `seed-dev` creates Huginn's client).
 - A stable `sub` per tenant user. Heimdall's user ids already provide it.
 
 ## 3. Data model (Phase 0 and 1)

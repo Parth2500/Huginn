@@ -104,3 +104,28 @@
   .photo-actions { justify-content: center; }
   .actions { flex-direction: column; .btn { width: 100%; height: 44px; } }
 }
+
+.methods {
+  display: grid;
+  gap: 10px;
+  margin-top: 32px;
+  padding-top: 24px;
+  border-top: 1px solid var(--line);
+
+  ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  li {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-m);
+    background: var(--surface);
+    > app-icon { flex: none; color: var(--text-2); }
+  }
+  h2 { margin: 0; }
+}
+
+.method-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
+.method-name { font-weight: 600; }
+.method-detail { color: var(--text-2); font-size: 14px; overflow-wrap: anywhere; }

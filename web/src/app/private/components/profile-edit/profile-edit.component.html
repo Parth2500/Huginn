@@ -79,8 +79,8 @@
 
       <div class="field">
         <span class="label">Email</span>
-        <p class="readonly">{{ profile?.email ?? '…' }}</p>
-        <p class="field-hint">Only you can see this. Sign-in details are managed separately.</p>
+        <p class="readonly">{{ profile ? (profile.email ?? 'None: you sign in with Heimdall.') : '…' }}</p>
+        <p class="field-hint">Only you can see this.</p>
       </div>
 
       <div class="actions">
@@ -93,5 +93,45 @@
         <button type="button" class="btn btn-secondary" (click)="close.emit()">Cancel</button>
       </div>
     </form>
+
+    @if (methods(); as m) {
+      <section class="methods" aria-labelledby="methods-title">
+        <h2 id="methods-title" class="label">How you sign in</h2>
+        <ul>
+          <li>
+            <app-icon name="key" />
+            <div class="method-text">
+              <span class="method-name">Password</span>
+              <span class="method-detail">{{ m.password ? 'Email and password' : 'Not set' }}</span>
+            </div>
+          </li>
+          @if (m.heimdall.available || m.heimdall.linked) {
+            <li>
+              <app-icon name="shield" />
+              <div class="method-text">
+                <span class="method-name">Heimdall</span>
+                <span class="method-detail">
+                  @if (m.heimdall.linked) {
+                    Linked{{ m.heimdall.email ? ': ' + m.heimdall.email : '' }}
+                  } @else {
+                    Not linked. Link it to sign in with Heimdall too.
+                  }
+                </span>
+              </div>
+              @if (!m.heimdall.linked) {
+                <a class="btn btn-secondary" href="/api/auth/heimdall/start?intent=link">Link</a>
+              } @else if (m.password) {
+                <button type="button" class="btn btn-quiet" (click)="unlinkHeimdall()" [disabled]="unlinking()">
+                  {{ unlinking() ? 'Unlinking…' : 'Unlink' }}
+                </button>
+              }
+            </li>
+          }
+        </ul>
+        @if (m.heimdall.linked && !m.password) {
+          <p class="field-hint">Heimdall is your only way to sign in, so it stays linked.</p>
+        }
+      </section>
+    }
   </div>
 </section>

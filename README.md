@@ -45,6 +45,21 @@ paths to the API from the same host. API settings for sessions:
 | `APP_ORIGINS` | `http://localhost:4200` | Comma-separated origins the app is served from. Changes and sockets from any other site are refused. |
 | `SESSION_COOKIE_SECURE` | `true` when `NODE_ENV=production` | Secure `__Host-` cookie. Set `false` only to serve over plain HTTP. |
 
+### Sign in with Heimdall (optional)
+
+Huginn also offers "Continue with Heimdall" when these are set (in `api/.env`, which git ignores):
+
+| Variable | Example |
+|---|---|
+| `HEIMDALL_ISSUER` | `https://acme.localhost:7200` |
+| `HEIMDALL_CLIENT_ID` | `huginn` |
+| `HEIMDALL_CLIENT_SECRET` | printed once by Heimdall's `seed-dev` |
+| `HEIMDALL_REDIRECT_URI` | `http://localhost:4200/api/auth/heimdall/callback` |
+| `HEIMDALL_CA_FILE` | development only: the ASP.NET dev certificate, from `dotnet dev-certs https --export-path .local/heimdall-dev-ca.pem --format PEM --no-password` (delete the `.key` file it also writes) |
+
+Start Heimdall as its README says (`seed-dev`, then `dotnet run --launch-profile https`). The
+first visit to `https://acme.localhost:7200` shows a certificate warning; accept it.
+
 ## Test
 
 ```

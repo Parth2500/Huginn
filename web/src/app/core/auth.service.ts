@@ -48,14 +48,48 @@ export class AuthService {
     return user;
   }
 
-  /** Ends the session on the server (and every socket using it), then forgets it here. */
-  async logout(): Promise<void> {
+  /** Which sign-in methods the server offers. Password only, if it can't be asked. */
+  async providers(): Promise<{ password: boolean; heimdall: boolean }> {
     try {
-      await firstValueFrom(this.http.post('api/auth/logout', {}));
+      return await firstValueFrom(
+        this.http.get<{ password: boolean; heimdall: boolean }>('api/auth/providers'),
+      );
+    } catch {
+      return { password: true, heimdall: false };
+    }
+  }
+
+  /** A first sign-in through Heimdall waiting for a username, or null if there's none. */
+  async pendingSignup(): Promise<{ email: string | null } | null> {
+    try {
+      return await firstValueFrom(this.http.get<{ email: string | null }>('api/auth/signup'));
+    } catch {
+      return null;
+    }
+  }
+
+  /** Creates the account for that sign-in and signs it in. */
+  async completeSignup(choice: { username: string; displayName?: string }): Promise<IUser> {
+    const user = await firstValueFrom(this.http.post<IUser>('api/auth/signup', choice));
+    this.checked = Promise.resolve(this.signedIn(user));
+    return user;
+  }
+
+  /**
+   * Ends the session on the server (and every socket using it), then forgets it here. Returns
+   * the provider that had signed it in, when the server could say.
+   */
+  async logout(): Promise<string | null> {
+    let provider: string | null = null;
+    try {
+      ({ provider } = await firstValueFrom(
+        this.http.post<{ provider: string | null }>('api/auth/logout', {}),
+      ));
     } catch {
       // Offline: the cookie stays until the session expires, but this device forgets it now.
     }
     this.signedOut();
+    return provider;
   }
 
   /** Called when the server says the session is gone. */

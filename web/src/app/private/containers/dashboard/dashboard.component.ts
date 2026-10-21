@@ -232,14 +232,14 @@ export class DashboardComponent {
   }
 
   async logout() {
-    await this.auth.logout();
-    await this.leave();
+    const provider = await this.auth.logout();
+    await this.leave(provider === 'heimdall' ? { signedOut: 'heimdall' } : {});
   }
 
   /** Signed out here or elsewhere: this account's data leaves the device. */
-  private async leave() {
+  private async leave(queryParams: Record<string, string> = {}) {
     await this.chatService.signOut();
-    void this.router.navigate(['/public/login']);
+    void this.router.navigate(['/public/login'], { queryParams });
   }
 
   isSelected(chat: Chat): boolean {

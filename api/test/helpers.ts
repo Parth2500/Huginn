@@ -1,6 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { Test } from '@nestjs/testing';
+import { Test, TestingModuleBuilder } from '@nestjs/testing';
 import { AddressInfo } from 'net';
 import { io, Socket } from 'socket.io-client';
 import { TEST_DATABASE_URL } from './global-setup';
@@ -12,12 +12,14 @@ export interface TestApp {
 }
 
 /** Boots the real application (migrations included) on a random port against the test database. */
-export async function startApp(): Promise<TestApp> {
+export async function startApp(
+  configure: (builder: TestingModuleBuilder) => TestingModuleBuilder = (b) => b,
+): Promise<TestApp> {
   process.env.DATABASE_URL = TEST_DATABASE_URL;
   const { AppModule } = await import('../src/app.module');
-  const moduleRef = await Test.createTestingModule({
-    imports: [AppModule],
-  }).compile();
+  const moduleRef = await configure(
+    Test.createTestingModule({ imports: [AppModule] }),
+  ).compile();
   const app = moduleRef.createNestApplication<NestExpressApplication>();
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe());

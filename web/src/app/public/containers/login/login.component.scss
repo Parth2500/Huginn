@@ -1,3 +1,25 @@
 .auth-form { display: grid; gap: 20px; }
 .btn-block { margin-top: 4px; }
 .auth-switch { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--text-2); }
+
+.or {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 16px;
+  color: var(--text-2);
+  font-size: 13px;
+  &::before, &::after { content: ''; flex: 1; border-top: 1px solid var(--line); }
+}
+
+.heimdall { gap: 8px; text-decoration: none; }
+.heimdall-hint { margin-top: 8px; text-align: center; }
+
+.form-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: var(--radius-m);
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  font-size: 14px;
+}

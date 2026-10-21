@@ -1,7 +1,8 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, input, output, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { Component, OnInit, inject, input, output, signal, ChangeDetectionStrategy, ChangeDetectorRef } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import { FormControl, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { finalize, firstValueFrom } from 'rxjs';
 import { IUser } from 'src/app/models/user.interface';
 import { ToastService } from 'src/app/shared/toast/toast.service';
 import { normalizeUsername } from 'src/app/shared/username-policy';
@@ -16,6 +17,22 @@ import { NgClass } from '@angular/common';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 
 const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
+
+/** How the person can sign in (GET api/auth/methods). */
+interface SignInMethods {
+  password: boolean;
+  heimdall: { available: boolean; linked: boolean; email: string | null };
+}
+
+/** What `?heimdall=` means when the API's Heimdall callback sends the browser back here. */
+const LINK_OUTCOMES: Record<string, { ok: boolean; text: string }> = {
+  linked: { ok: true, text: 'Heimdall is linked. You can sign in with it now.' },
+  'already-linked': { ok: true, text: 'Heimdall was already linked to your account.' },
+  taken: { ok: false, text: 'That Heimdall account is already linked to another Huginn account.' },
+  cancelled: { ok: false, text: 'Linking Heimdall was cancelled.' },
+  failed: { ok: false, text: "Heimdall couldn't confirm the sign-in. Try again." },
+  unavailable: { ok: false, text: "Can't reach Heimdall right now. Try again later." },
+};
 
 /** The signed-in user's own profile: photo, display name, username and bio. */
 @Component({
@@ -38,6 +55,11 @@ export class ProfileEditComponent implements OnInit {
   private cdr = inject(ChangeDetectorRef);
   private http = inject(HttpClient);
   private toast = inject(ToastService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
+
+  readonly methods = signal<SignInMethods | null>(null);
+  readonly unlinking = signal(false);
 
   readonly me = input<IUser>({});
   readonly saved = output<IUser>();
@@ -60,6 +82,17 @@ export class ProfileEditComponent implements OnInit {
   });
 
   ngOnInit(): void {
+    void this.loadMethods();
+    const outcome = LINK_OUTCOMES[this.route.snapshot.queryParamMap.get('heimdall') ?? ''];
+    if (outcome) {
+      if (outcome.ok) {
+        this.toast.success(outcome.text);
+      } else {
+        this.toast.error(outcome.text);
+      }
+      // Drop the query, so a reload doesn't repeat the message.
+      void this.router.navigate([], { queryParams: { heimdall: null }, queryParamsHandling: 'merge', replaceUrl: true });
+    }
     this.profiles.loadMe().subscribe({
       next: (profile) => {
         this.reset(profile);
@@ -70,6 +103,28 @@ export class ProfileEditComponent implements OnInit {
         this.cdr.markForCheck();
       },
     });
+  }
+
+  async unlinkHeimdall() {
+    this.unlinking.set(true);
+    try {
+      await firstValueFrom(this.http.delete('api/auth/heimdall/link'));
+      this.toast.show('Heimdall is unlinked. Sign in with your password from now on.');
+      await this.loadMethods();
+    } catch (error) {
+      const message = (error as HttpErrorResponse).error?.message;
+      this.toast.error(typeof message === 'string' ? message : "Couldn't unlink Heimdall. Try again.");
+    } finally {
+      this.unlinking.set(false);
+    }
+  }
+
+  private async loadMethods() {
+    try {
+      this.methods.set(await firstValueFrom(this.http.get<SignInMethods>('api/auth/methods')));
+    } catch {
+      // The section just doesn't show; the rest of the profile still works.
+    }
   }
 
   get username(): FormControl<string> {

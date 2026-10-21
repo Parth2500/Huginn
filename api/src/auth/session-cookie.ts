@@ -10,20 +10,35 @@ const secure = () =>
     String(process.env.NODE_ENV === 'production')) === 'true';
 
 /** `__Host-` makes the browser refuse the cookie unless it's Secure, host-only and for path /. */
-export const sessionCookieName = () =>
-  secure() ? '__Host-huginn_session' : 'huginn_session';
+export const cookieName = (base: string) =>
+  secure() ? `__Host-${base}` : base;
 
-export const sessionCookieOptions = (): CookieOptions => ({
+export const sessionCookieName = () => cookieName('huginn_session');
+
+/** httpOnly, SameSite=Lax (sent on the redirect back from Heimdall), whole site. */
+export const cookieOptions = (maxAge: number): CookieOptions => ({
   httpOnly: true,
   secure: secure(),
   sameSite: 'lax',
   path: '/',
-  maxAge: SESSION_IDLE_MS,
+  maxAge,
 });
 
-/** The session token from a Cookie header (HTTP requests and the Socket.IO handshake alike). */
-export function readSessionToken(cookieHeader?: string): string | undefined {
-  const name = sessionCookieName();
+export const sessionCookieOptions = () => cookieOptions(SESSION_IDLE_MS);
+
+/** Options that clear a cookie set with cookieOptions. */
+export const clearCookieOptions = (): CookieOptions => ({
+  httpOnly: true,
+  secure: secure(),
+  sameSite: 'lax',
+  path: '/',
+});
+
+/** One cookie from a Cookie header (HTTP requests and the Socket.IO handshake alike). */
+export function readCookie(
+  cookieHeader: string | undefined,
+  name: string,
+): string | undefined {
   for (const part of cookieHeader?.split(';') ?? []) {
     const eq = part.indexOf('=');
     if (eq > 0 && part.slice(0, eq).trim() === name) {
@@ -32,6 +47,9 @@ export function readSessionToken(cookieHeader?: string): string | undefined {
   }
   return undefined;
 }
+
+export const readSessionToken = (cookieHeader?: string) =>
+  readCookie(cookieHeader, sessionCookieName());
 
 /** Where the app is served from. Requests that change things must come from one of these. */
 export const appOrigins = () =>

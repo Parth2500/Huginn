@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
+import { ChangeDetectorRef, Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { AuthService } from 'src/app/core/auth.service';
@@ -7,6 +7,13 @@ import { describeAuthError } from '../../services/sign-on.service';
 import { AuthLayoutComponent } from '../../components/auth-layout/auth-layout.component';
 
 import { IconComponent } from '../../../shared/icon/icon.component';
+
+/** What `?heimdall=` on this page means (set by the API's Heimdall callback). */
+const HEIMDALL_OUTCOMES: Record<string, string> = {
+  cancelled: 'Sign-in with Heimdall was cancelled. Try again, or use your password.',
+  failed: "Heimdall couldn't confirm the sign-in. Try again.",
+  unavailable: "Can't reach Heimdall right now. Try again, or sign in with your password.",
+};
 
 @Component({
   changeDetection: ChangeDetectionStrategy.Eager,
@@ -23,6 +30,7 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 })
 export class LoginComponent implements OnInit {
   private auth = inject(AuthService);
+  private cdr = inject(ChangeDetectorRef);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
 
@@ -36,6 +44,10 @@ export class LoginComponent implements OnInit {
   submitted = false;
   serverError: string | null = null;
   showPassword = false;
+  /** Whether this server offers sign-in with Heimdall. */
+  heimdall = false;
+  /** Information, not an error: shown above the form. */
+  notice: string | null = null;
 
   ngOnInit(): void {
     // Already signed in (another tab, or a refresh): go straight to the app.
@@ -44,6 +56,20 @@ export class LoginComponent implements OnInit {
         void this.router.navigate(['/private/dashboard']);
       }
     });
+    void this.auth.providers().then((offered) => {
+      this.heimdall = offered.heimdall;
+      this.cdr.markForCheck();
+    });
+    // Back from Heimdall without signing in: say why.
+    const outcome = this.route.snapshot.queryParamMap.get('heimdall');
+    if (outcome) {
+      this.serverError = HEIMDALL_OUTCOMES[outcome] ?? HEIMDALL_OUTCOMES['failed'];
+    }
+    if (this.route.snapshot.queryParamMap.get('signedOut') === 'heimdall') {
+      // Heimdall has no RP-initiated logout yet, so its own session outlives Huginn's.
+      this.notice =
+        "You're signed out of Huginn. Heimdall may still remember you, so Continue with Heimdall can sign you straight back in.";
+    }
     const email = this.route.snapshot.queryParamMap.get('email');
     if (email) {
       this.email.setValue(email);

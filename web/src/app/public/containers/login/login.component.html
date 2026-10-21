@@ -1,5 +1,8 @@
 <app-auth-layout heading="Sign in" subheading="Pick up your conversations where you left them.">
   <form class="auth-form" [formGroup]="loginForm" (ngSubmit)="login()" novalidate>
+    @if (notice) {
+      <p class="form-note" role="status">{{ notice }}</p>
+    }
     @if (serverError) {
       <div class="form-alert" role="alert">
         <app-icon name="alert-circle" />
@@ -46,6 +49,15 @@
       {{ submitting ? 'Signing in…' : 'Sign in' }}
     </button>
   </form>
+
+  @if (heimdall) {
+    <div class="or" role="separator"><span>or</span></div>
+    <a class="btn btn-secondary btn-block heimdall" href="/api/auth/heimdall/start">
+      <app-icon name="shield" />
+      Continue with Heimdall
+    </a>
+    <p class="field-hint heimdall-hint">New to Huginn? Heimdall sign-in creates your account; you pick a username next.</p>
+  }
 
   <p class="auth-switch">New here? <a [routerLink]="['/public/register']">Create an account</a></p>
 </app-auth-layout>

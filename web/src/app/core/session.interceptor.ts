@@ -4,7 +4,7 @@ import { catchError, throwError } from 'rxjs';
 import { AuthService } from './auth.service';
 
 /** Requests whose 401 is an answer, not a sign the session ended. */
-const ANSWERS_WITH_401 = ['api/auth/session', 'api/auth/login'];
+const ANSWERS_WITH_401 = ['api/auth/session', 'api/auth/login', 'api/auth/signup'];
 
 /** A 401 from anything else means the session expired or was revoked elsewhere. */
 export const sessionInterceptor: HttpInterceptorFn = (req, next) => {

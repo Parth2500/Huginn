@@ -7,8 +7,8 @@ export interface IUser {
   avatarUrl?: string | null;
   created_at?: Date;
   /** Private: only in the owner's own profile. */
-  email?: string;
-  password?: string;
+  email?: string | null;
+  password?: string | null;
 }
 
 /** What anyone may see about a user. */

@@ -47,10 +47,12 @@ export class User implements IUser {
   @Column({ type: 'int', default: 0, select: false })
   updateSeq: number;
 
-  // Private: only ever returned to its owner (login token payload is built without it).
-  @Column({ unique: true, select: false })
-  email: string;
+  // Private: only ever returned to its owner. Null for accounts made through Heimdall, whose
+  // email is unverified (it stays on user_identity instead).
+  @Column({ type: 'varchar', unique: true, nullable: true, select: false })
+  email: string | null;
 
-  @Column({ select: false })
-  password: string;
+  /** bcrypt hash. Null when the person signs in only through Heimdall. */
+  @Column({ type: 'varchar', nullable: true, select: false })
+  password: string | null;
 }
