@@ -44,7 +44,8 @@
   &.active { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 }
 
-.brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 17px; }
+// The lockup (docs/brand/README.md): half the tile's width between mark and word.
+.brand { display: flex; align-items: center; gap: 16px; font-weight: 700; font-size: 17px; letter-spacing: -0.02em; }
 
 .side-title {
   display: flex;

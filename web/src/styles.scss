@@ -357,19 +357,6 @@ time, .tabular { font-variant-numeric: tabular-nums; }
   }
 }
 
-/* Logo */
-
-.logo {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: var(--accent);
-  color: var(--on-accent);
-  app-icon { width: 18px; height: 18px; }
-}
-
 /* Skeletons */
 
 .skeleton {

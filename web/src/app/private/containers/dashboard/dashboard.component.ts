@@ -16,6 +16,7 @@ import { IUser } from 'src/app/models/user.interface';
 import { AuthService } from 'src/app/core/auth.service';
 import { ToastService } from 'src/app/shared/toast/toast.service';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
+import { LogoComponent } from 'src/app/shared/logo/logo.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
@@ -40,6 +41,7 @@ type Selection = { chatId: number } | { draft: IUser } | null;
   styleUrls: ['./dashboard.component.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
+    LogoComponent,
     IconComponent,
     ChatSearchComponent,
     AvatarComponent,

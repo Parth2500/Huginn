@@ -17,9 +17,11 @@
 .brand, .mobile-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  // The lockup (docs/brand/README.md): half the tile's width between mark and word.
+  gap: 16px;
   font-weight: 700;
   font-size: 18px;
+  letter-spacing: -0.02em;
 }
 
 .pitch {

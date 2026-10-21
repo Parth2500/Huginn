@@ -400,6 +400,16 @@ Bubbles have their own geometry: 18px corners, with the corner on the sender's s
 
 Borders are always 1px. Dashed hairlines mark empty placeholders (the empty room list).
 
+## Logo
+
+The carved raven: Huginn, Odin's raven of thought, as a head cut in flat facets, facing right toward the conversation. The full brand book, the four SVGs and the tokens are in [`docs/brand/`](docs/brand/README.md).
+
+- **Files:** `huginn-mark.svg` (default: white raven on the indigo tile; favicon, rail head, auth showcase), `huginn-mark-night.svg` (dark contexts outside the app; the app uses the default mark in both themes), `huginn-raven.svg` (no tile, on light surfaces), `huginn-raven-mono.svg` (one ink).
+- **Tile:** the tile belongs to the mark (64 units at rx 18, the 32px tile at 9px). The app draws it with `app-logo`; never put an icon on a CSS square.
+- **Lockup:** the tile, then "Huginn" in Figtree 700 at -0.02em, 16px apart (half the tile).
+- **Minimum size** 16px; **clear space** a quarter of the tile on every side.
+- **Never** recolour it outside indigo, white, ink or the night pair, put it in a speech bubble, add a gradient or shadow, or flip it to face left.
+
 ## Components
 
 ### Buttons

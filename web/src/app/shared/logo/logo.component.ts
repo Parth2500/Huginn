@@ -1,0 +1,25 @@
+import { ChangeDetectionStrategy, Component } from '@angular/core';
+
+/**
+ * The Huginn mark: the carved raven on its indigo tile (docs/brand/README.md, "Logo").
+ * Drawn inline from docs/brand/logos/huginn-mark.svg so it needs no request and never flashes.
+ * The tile is part of the mark; the 64-unit square at rx 18 is the 32px tile at 9px radius.
+ */
+@Component({
+  selector: 'app-logo',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+  template: `
+    <svg viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+      <rect width="64" height="64" rx="18" fill="#4f46e5" />
+      <path
+        d="M60 32 58 26.5 52 20.5 44 16.5 37 14 27 13 19 17 13 26 10 38 8 55 17 52 20 46 26 50 28 43 34 45 35 38 42 35.5 55 33.5z"
+        fill="#ffffff"
+      />
+      <path d="M19 19 27 25 17 44 12 41z" fill="#c7d2fe" />
+      <path d="M42.5 29 57 31.2" stroke="#4f46e5" stroke-width="1.5" />
+      <circle cx="35" cy="21.5" r="1.7" fill="#4f46e5" />
+    </svg>
+  `,
+  styles: [':host{display:inline-block;width:32px;height:32px;flex:none;line-height:0}svg{width:100%;height:100%}'],
+})
+export class LogoComponent {}
