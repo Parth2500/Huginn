@@ -98,11 +98,16 @@ interface in Phase 0, so switching later touches nothing else.
 
 ### 2.3 Until then
 
-- Phase 0 adds the `AuthProvider` seam:
-  - `LocalPasswordProvider` (today's behaviour, moved to cookie sessions)
+- Milestone 0.5 added the `AuthProvider` seam (`api/src/auth/`):
+  - `LocalPasswordProvider` (email and password, in Huginn's own database)
   - later, `HeimdallOidcProvider`
-- Moving the token out of `localStorage` into a cookie session happens in Phase 0 regardless,
-  because it fixes an XSS exposure today.
+- **Sessions (0.5):** a random 32-byte token in an httpOnly, `SameSite=Lax` cookie
+  (`__Host-huginn_session` when Secure). The `session` table stores its SHA-256, the user, the
+  provider and `providerData`. Sessions end after 30 days unused or 90 days in all. HTTP requests
+  and the Socket.IO handshake both read the cookie, so the app, API and socket share one origin.
+  Sign-out deletes the session and disconnects its sockets.
+- **Cross-site requests:** non-GET requests and socket handshakes whose `Origin` isn't in
+  `APP_ORIGINS`, or that say `Sec-Fetch-Site: cross-site`, are refused.
 - **Migration:** existing local accounts are linked to Heimdall on first OIDC sign-in by
   matching the verified email, then the local password is removed.
 

@@ -29,12 +29,21 @@ and pgAdmin at http://localhost:5050.
 
 ```
 docker compose up -d postgres
-cd api && npm ci && DATABASE_URL=postgres://huginn:huginn@localhost:35000/huginn JWT_SECRET=dev npm run start:dev
-cd web && npm ci && npm start          # proxies /api to http://localhost:3000 (override with API_URL)
+cd api && npm ci && DATABASE_URL=postgres://huginn:huginn@localhost:35000/huginn npm run start:dev
+cd web && npm ci && npm start          # proxies /api and /socket.io to http://localhost:3000 (override with API_URL)
 ```
 
 On drives where file watching is unreliable (some external or network drives), add `--poll 1000`
 to `npm start`, and set `TSC_WATCHFILE=DynamicPriorityPolling` for the API.
+
+Sign-in uses an httpOnly session cookie, so the app, the API and the socket must share one origin.
+The dev server proxies `/api` and `/socket.io`. In production, serve the app and route both
+paths to the API from the same host. API settings for sessions:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `APP_ORIGINS` | `http://localhost:4200` | Comma-separated origins the app is served from. Changes and sockets from any other site are refused. |
+| `SESSION_COOKIE_SECURE` | `true` when `NODE_ENV=production` | Secure `__Host-` cookie. Set `false` only to serve over plain HTTP. |
 
 ## Test
 

@@ -1,8 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { JwtHelperService } from '@auth0/angular-jwt';
-import { catchError, map, Observable, of, tap, throwError } from 'rxjs';
-import { LoginResponse } from 'src/app/models/login-response.interface';
+import { catchError, map, Observable, of, throwError } from 'rxjs';
 import { IUser } from 'src/app/models/user.interface';
 import { ISignOnService } from './iservices/sign-on.service.interface';
 
@@ -13,9 +11,6 @@ export function describeAuthError(error: HttpErrorResponse, action: 'login' | 'r
   }
   if (action === 'login' && error.status === 401) {
     return "That email and password don't match. Check them and try again.";
-  }
-  if (action === 'login' && error.status === 404) {
-    return 'No account uses that email. Check the spelling or create an account.';
   }
   const message = error.error?.message;
   if (action === 'register' && error.status === 409) {
@@ -37,11 +32,9 @@ export function describeAuthError(error: HttpErrorResponse, action: 'login' | 'r
 })
 export class SignOnService implements ISignOnService {
   private httpService = inject(HttpClient);
-  private jwtService = inject(JwtHelperService);
-
 
   createUser(user: IUser): Observable<IUser> {
-    return this.httpService.post<IUser>('api/users', user);
+    return this.httpService.post<IUser>('api/auth/register', user);
   }
 
   /** The API matches usernames exactly and answers 404 when nobody matches. */
@@ -61,21 +54,5 @@ export class SignOnService implements ISignOnService {
     return this.httpService
       .get<IUser[]>('api/users/search', { params: { q: query } })
       .pipe(map((users) => (Array.isArray(users) ? users : [])));
-  }
-
-  loginUser(user: IUser): Observable<LoginResponse> {
-    return this.httpService.post<LoginResponse>('api/users/login', user).pipe(
-      tap((response: LoginResponse) => {
-        localStorage.setItem('access_token', response.access_token);
-      })
-    );
-  }
-
-  logoutUser() {
-    localStorage.clear();
-  }
-
-  getLoggedInUser(): IUser {
-    return this.jwtService.decodeToken()?.user ?? {};
   }
 }

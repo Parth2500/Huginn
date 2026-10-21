@@ -1,48 +1,41 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  NestMiddleware,
-} from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 import { Request, Response } from 'express';
+import { Session } from 'src/auth/session.entity';
 import {
-  AuthenticationToken,
-  IAuthenticationService,
-} from 'src/authentication/services/iservices/authentication.service.interface';
+  readSessionToken,
+  sessionCookieName,
+  sessionCookieOptions,
+} from 'src/auth/session-cookie';
+import { SessionsService } from 'src/auth/sessions.service';
 import { IUser } from 'src/user/entities/user.interface';
-import {
-  IUserService,
-  UserToken,
-} from 'src/user/services/iservices/user.service.interface';
 
 export interface RequestModel extends Request {
   user: IUser;
+  session: Session;
 }
 
+/** Signs each request in from the session cookie. */
 @Injectable()
 export class AuthMiddleWare implements NestMiddleware {
-  constructor(
-    @Inject(AuthenticationToken) private authService: IAuthenticationService,
-    @Inject(UserToken) private userService: IUserService,
-  ) {}
+  constructor(private readonly sessions: SessionsService) {}
 
   async use(req: RequestModel, res: Response, next: (error?: any) => void) {
-    try {
-      const tokens: string[] = req.headers['authorization'].split(' ');
-      const decodedToken = (await this.authService.validateJwt(tokens[1])) as {
-        user?: IUser;
-      };
-      const user: IUser = await this.userService.findByIdPromise(
-        decodedToken?.user?.Id,
-      );
-      if (!user) {
-        throw new HttpException('Unauthorized!', HttpStatus.UNAUTHORIZED);
-      }
-      req.user = user;
-      next();
-    } catch {
-      throw new HttpException('Unauthorized!', HttpStatus.UNAUTHORIZED);
+    const resolved = await this.sessions.resolve(
+      readSessionToken(req.headers.cookie),
+    );
+    if (!resolved) {
+      throw new UnauthorizedException('Your session has ended. Sign in again.');
     }
+    if (resolved.extended) {
+      res.cookie(
+        sessionCookieName(),
+        readSessionToken(req.headers.cookie),
+        sessionCookieOptions(),
+      );
+    }
+    req.user = resolved.user;
+    req.session = resolved.session;
+    next();
   }
 }

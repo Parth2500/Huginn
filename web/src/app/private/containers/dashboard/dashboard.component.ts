@@ -13,10 +13,7 @@ import { Title } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
 import { Chat, DraftChat, OpenChat } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
-import {
-  ISignOnService,
-  SignOnToken,
-} from 'src/app/public/services/iservices/sign-on.service.interface';
+import { AuthService } from 'src/app/core/auth.service';
 import { ToastService } from 'src/app/shared/toast/toast.service';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
@@ -30,7 +27,6 @@ import { ProfilePanelComponent } from '../../components/profile-panel/profile-pa
 import { StartChatComponent } from '../../components/start-chat/start-chat.component';
 import { chatPartner, chatTitle, personName } from '../../helpers/chat-display';
 import { ChatService } from '../../services/chat.service';
-import { ProfileService } from '../../services/profile.service';
 import { ChatsStore } from '../../state/chats.store';
 
 const APP_TITLE = 'Huginn';
@@ -61,13 +57,13 @@ type Selection = { chatId: number } | { draft: IUser } | null;
 export class DashboardComponent {
   private chatService = inject(ChatService);
   private store = inject(ChatsStore);
-  private signOnService = inject<ISignOnService>(SignOnToken);
+  private auth = inject(AuthService);
   private toast = inject(ToastService);
   private router = inject(Router);
   private title = inject(Title);
-  private profiles = inject(ProfileService);
 
-  readonly user = signal<IUser>(this.signOnService.getLoggedInUser());
+  // The route guard has checked the session, so someone is signed in.
+  readonly user = signal<IUser>(this.auth.me()!);
   readonly chats = this.store.chats;
   readonly loaded = this.store.loaded;
   readonly fresh = this.store.fresh;
@@ -124,9 +120,10 @@ export class DashboardComponent {
     this.chatService.notices.pipe(takeUntilDestroyed()).subscribe(({ kind, text }) =>
       kind === 'error' ? this.toast.error(text) : this.toast.show(text),
     );
-    this.chatService.unauthorized.pipe(takeUntilDestroyed()).subscribe((message) => {
+    this.chatService.unauthorized.pipe(takeUntilDestroyed()).subscribe((message) => this.auth.expire(message));
+    this.auth.ended.pipe(takeUntilDestroyed()).subscribe((message) => {
       this.toast.error(message);
-      void this.logout();
+      void this.leave();
     });
     this.chatService.userUpdated.pipe(takeUntilDestroyed()).subscribe((updated) => {
       if (updated.Id === this.user().Id) {
@@ -145,8 +142,6 @@ export class DashboardComponent {
     });
     destroyRef.onDestroy(() => this.title.setTitle(APP_TITLE));
 
-    // The token carries a snapshot from sign-in; the profile (photo, display name) is fetched fresh.
-    this.profiles.loadMe().subscribe({ next: (me) => this.user.update((u) => ({ ...u, ...me })) });
     void this.chatService.start(this.user());
   }
 
@@ -237,8 +232,13 @@ export class DashboardComponent {
   }
 
   async logout() {
+    await this.auth.logout();
+    await this.leave();
+  }
+
+  /** Signed out here or elsewhere: this account's data leaves the device. */
+  private async leave() {
     await this.chatService.signOut();
-    this.signOnService.logoutUser();
     void this.router.navigate(['/public/login']);
   }
 

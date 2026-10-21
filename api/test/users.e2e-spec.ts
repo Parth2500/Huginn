@@ -9,7 +9,7 @@ describe('accounts, profiles and privacy', () => {
   afterAll(() => t.close());
 
   const post = (body: object) =>
-    fetch(`${t.base}/api/users`, {
+    fetch(`${t.base}/api/auth/register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ password: 'Secret#123', ...body }),
@@ -42,18 +42,18 @@ describe('accounts, profiles and privacy', () => {
     const owner = await register(t.base, 'ivy.e2e');
     const viewer = await register(t.base, 'oak.e2e');
 
-    const me = await (await api(t.base, owner.token, '/users/me')).json();
+    const me = await (await api(t.base, owner.cookie, '/users/me')).json();
     expect(me.email).toBe('ivye2e@e2e.test');
     expect(me.password).toBeUndefined();
 
     const profile = await (
-      await api(t.base, viewer.token, `/users/${owner.id}/profile`)
+      await api(t.base, viewer.cookie, `/users/${owner.id}/profile`)
     ).json();
     expect(profile.username).toBe('ivy.e2e');
     expect(profile.email).toBeUndefined();
 
     const search = await (
-      await api(t.base, viewer.token, '/users/search?q=ivy')
+      await api(t.base, viewer.cookie, '/users/search?q=ivy')
     ).json();
     expect(search.map((u: any) => u.username)).toEqual(['ivy.e2e']);
     expect(search[0].email).toBeUndefined();
@@ -65,7 +65,7 @@ describe('accounts, profiles and privacy', () => {
     await register(t.base, 'old.harbor');
 
     const prefix = await (
-      await api(t.base, me.token, '/users/search?q=harb')
+      await api(t.base, me.cookie, '/users/search?q=harb')
     ).json();
     expect(prefix.map((u: any) => u.username)).toEqual([
       'harbor.light',
@@ -73,7 +73,7 @@ describe('accounts, profiles and privacy', () => {
     ]);
 
     const self = await (
-      await api(t.base, me.token, '/users/search?q=searcher')
+      await api(t.base, me.cookie, '/users/search?q=searcher')
     ).json();
     expect(self).toEqual([]);
   });
@@ -81,13 +81,13 @@ describe('accounts, profiles and privacy', () => {
   it('lets people change only their own account', async () => {
     const a = await register(t.base, 'pine.e2e');
     const b = await register(t.base, 'fir.e2e');
-    const other = await api(t.base, a.token, `/users/${b.id}`, {
+    const other = await api(t.base, a.cookie, `/users/${b.id}`, {
       method: 'PATCH',
       body: JSON.stringify({ username: 'hijacked' }),
     });
     expect(other.status).toBe(403);
 
-    const mine = await api(t.base, a.token, '/users/me', {
+    const mine = await api(t.base, a.cookie, '/users/me', {
       method: 'PATCH',
       body: JSON.stringify({
         displayName: '  Pine   Tree ',
@@ -101,9 +101,9 @@ describe('accounts, profiles and privacy', () => {
 
   it('has no routes that list users or look them up by email', async () => {
     const a = await register(t.base, 'elm.e2e');
-    expect((await api(t.base, a.token, '/users')).status).toBe(404);
+    expect((await api(t.base, a.cookie, '/users')).status).toBe(404);
     expect(
-      (await api(t.base, a.token, '/users/email/elme2e@e2e.test')).status,
+      (await api(t.base, a.cookie, '/users/email/elme2e@e2e.test')).status,
     ).toBe(404);
   });
 
@@ -117,7 +117,7 @@ describe('accounts, profiles and privacy', () => {
     );
     const res = await fetch(`${t.base}/api/users/me/avatar`, {
       method: 'POST',
-      headers: { authorization: `Bearer ${a.token}` },
+      headers: { cookie: a.cookie },
       body: form,
     });
     expect(res.status).toBe(400);

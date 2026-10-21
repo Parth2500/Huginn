@@ -228,7 +228,7 @@ describe('chats over Socket.IO', () => {
   it('turns away a socket without a valid session', async () => {
     const { io } = await import('socket.io-client');
     const bad = io(t.base, {
-      extraHeaders: { Authorization: 'not-a-token' },
+      extraHeaders: { cookie: 'huginn_session=not-a-session' },
       transports: ['websocket'],
     });
     expect((await once(bad, 'unauthorized')).message).toContain(

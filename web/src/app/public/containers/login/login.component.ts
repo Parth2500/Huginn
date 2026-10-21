@@ -2,12 +2,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Component, OnInit, inject, ChangeDetectionStrategy } from '@angular/core';
 import { FormBuilder, FormControl, FormGroup, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { JwtHelperService } from '@auth0/angular-jwt';
-import { finalize } from 'rxjs';
-import {
-  ISignOnService,
-  SignOnToken,
-} from '../../services/iservices/sign-on.service.interface';
+import { AuthService } from 'src/app/core/auth.service';
 import { describeAuthError } from '../../services/sign-on.service';
 import { AuthLayoutComponent } from '../../components/auth-layout/auth-layout.component';
 
@@ -27,10 +22,9 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 ],
 })
 export class LoginComponent implements OnInit {
-  private signOnService = inject<ISignOnService>(SignOnToken);
+  private auth = inject(AuthService);
   private router = inject(Router);
   private route = inject(ActivatedRoute);
-  private jwtService = inject(JwtHelperService);
 
   formBuilder: FormBuilder = new FormBuilder();
   loginForm: FormGroup = this.formBuilder.group({
@@ -44,15 +38,12 @@ export class LoginComponent implements OnInit {
   showPassword = false;
 
   ngOnInit(): void {
-    // Already signed in (another tab, or a refresh): go straight to the app instead of signing out.
-    const token = localStorage.getItem('access_token');
-    if (token && !this.jwtService.isTokenExpired(token)) {
-      this.router.navigate(['/private/dashboard']);
-      return;
-    }
-    if (token) {
-      this.signOnService.logoutUser();
-    }
+    // Already signed in (another tab, or a refresh): go straight to the app.
+    void this.auth.check().then((me) => {
+      if (me) {
+        void this.router.navigate(['/private/dashboard']);
+      }
+    });
     const email = this.route.snapshot.queryParamMap.get('email');
     if (email) {
       this.email.setValue(email);
@@ -68,17 +59,13 @@ export class LoginComponent implements OnInit {
     }
 
     this.submitting = true;
-    this.signOnService
-      .loginUser({
-        email: this.email.value,
-        password: this.password.value,
-      })
-      .pipe(finalize(() => (this.submitting = false)))
-      .subscribe({
-        next: () => this.router.navigate(['/private/dashboard']),
-        error: (error: HttpErrorResponse) =>
-          (this.serverError = describeAuthError(error, 'login')),
-      });
+    this.auth
+      .login({ email: this.email.value, password: this.password.value })
+      .then(
+        () => this.router.navigate(['/private/dashboard']),
+        (error: HttpErrorResponse) => (this.serverError = describeAuthError(error, 'login')),
+      )
+      .finally(() => (this.submitting = false));
   }
 
   showError(control: FormControl): boolean {

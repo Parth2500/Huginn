@@ -19,19 +19,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { randomBytes } from 'crypto';
 import { mkdir, unlink, writeFile } from 'fs/promises';
 import { join } from 'path';
-import { map, Observable, of, switchMap } from 'rxjs';
+import { Observable, of } from 'rxjs';
 import { RequestModel } from 'src/middleware/auth.middleware';
-import { CreateUserDto } from '../dto/create-user.dto';
-import { LoginUserDto } from '../dto/login-user.dto';
 import { UpdateUserDto } from '../dto/update-user.dto';
-import { LoginResponse } from '../entities/login-response.interface';
 import { IUser, toPublicUser } from '../entities/user.interface';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import { UserEventsService } from '../services/user-events.service';
-import {
-  IUserHelperService,
-  UserHelperToken,
-} from '../services/iservices/user-helper.service.interface';
 import {
   IUserService,
   UserToken,
@@ -51,17 +44,10 @@ export class UserController {
   constructor(
     @Inject(UserToken)
     private readonly userService: IUserService,
-    @Inject(UserHelperToken)
-    private readonly userHelperService: IUserHelperService,
     private readonly userEvents: UserEventsService,
   ) {}
 
-  @Post()
-  create(@Body() createUserDto: CreateUserDto): Observable<IUser> {
-    return this.userHelperService
-      .createUserDtoToEntity(createUserDto)
-      .pipe(switchMap((user: IUser) => this.userService.create(user)));
-  }
+  // Accounts are created and signed in through /auth (AuthController).
 
   // There is deliberately no "list every user" or "find by email" route: people are found by
   // username search only, and emails stay private to their owner.
@@ -179,24 +165,6 @@ export class UserController {
     if (req.user?.Id !== id) {
       throw new ForbiddenException('You can only change your own account.');
     }
-  }
-
-  @Post('login')
-  login(@Body() loginUserDto: LoginUserDto): Observable<LoginResponse> {
-    return this.userHelperService.loginUserDtoToEntity(loginUserDto).pipe(
-      switchMap((user: IUser) => {
-        return this.userService.login(user).pipe(
-          map((jwt: string) => {
-            const response: LoginResponse = {
-              access_token: jwt,
-              type: 'JWT',
-              expires_in: 3600, // matches signOptions.expiresIn ('1h')
-            };
-            return response;
-          }),
-        );
-      }),
-    );
   }
 }
 

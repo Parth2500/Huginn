@@ -4,6 +4,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { join } from 'path';
 import { AppModule } from './app.module';
+import { appOrigins } from './auth/session-cookie';
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
@@ -24,7 +25,8 @@ async function bootstrap() {
     .build();
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document);
-  app.enableCors();
+  // The app is served from the same origin (through a proxy), so this only matters for tools.
+  app.enableCors({ origin: appOrigins(), credentials: true });
   await app.listen(3000);
 }
 void bootstrap();

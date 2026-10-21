@@ -9,9 +9,11 @@ import {
 import { Subscription } from 'rxjs';
 import { Server, Socket } from 'socket.io';
 import {
-  AuthenticationToken,
-  IAuthenticationService,
-} from 'src/authentication/services/iservices/authentication.service.interface';
+  appOrigins,
+  isForeignOrigin,
+  readSessionToken,
+} from 'src/auth/session-cookie';
+import { SessionsService } from 'src/auth/sessions.service';
 import {
   IPublicUser,
   IUser,
@@ -30,6 +32,8 @@ import { Addressed, UpdatesService } from './updates.service';
 /** Socket.IO room per user (all their tabs) and per open chat. */
 const userChannel = (userId: number) => `user:${userId}`;
 const chatChannel = (chatId: number) => `chat:${chatId}`;
+/** Every socket signed in with one session, so signing out disconnects them all. */
+const sessionChannel = (sessionId: string) => `session:${sessionId}`;
 
 /**
  * Realtime protocol v1 (docs/huginn/architecture.md §4–5).
@@ -39,7 +43,7 @@ const chatChannel = (chatId: number) => `chat:${chatId}`;
  *   log first, so a device that was away catches up with `sync { sinceSeq }`.
  * - Typing and presence are ephemeral and never replayed.
  */
-@WebSocketGateway({ cors: { origin: ['http://localhost:4200'] } })
+@WebSocketGateway({ cors: { origin: appOrigins(), credentials: true } })
 export class ChatGateway
   implements
     OnGatewayConnection,
@@ -53,11 +57,10 @@ export class ChatGateway
   private readonly logger = new Logger(ChatGateway.name);
   /** Per-socket send queue, so one sender's messages are stored in the order they were sent. */
   private readonly sendQueues = new Map<string, Promise<unknown>>();
-  private profileUpdates: Subscription;
+  private subscriptions: Subscription[] = [];
 
   constructor(
-    @Inject(AuthenticationToken)
-    private readonly authService: IAuthenticationService,
+    private readonly sessions: SessionsService,
     @Inject(UserToken) private readonly userService: IUserService,
     private readonly chats: ChatsService,
     private readonly messages: MessagesService,
@@ -66,27 +69,33 @@ export class ChatGateway
   ) {}
 
   onModuleInit() {
-    this.profileUpdates = this.userEvents.profileUpdated.subscribe(
-      (user) => void this.onProfileUpdated(user),
+    this.subscriptions.push(
+      this.userEvents.profileUpdated.subscribe(
+        (user) => void this.onProfileUpdated(user),
+      ),
+      this.sessions.ended.subscribe((sessionId) => this.endSession(sessionId)),
     );
   }
 
   onModuleDestroy() {
-    this.profileUpdates?.unsubscribe();
+    this.subscriptions.forEach((s) => s.unsubscribe());
   }
 
   async handleConnection(socket: Socket) {
     try {
-      const header = socket.handshake.headers.authorization ?? '';
-      const token = header.startsWith('Bearer ') ? header.slice(7) : header;
-      const decoded = (await this.authService.validateJwt(token)) as {
-        user?: IUser;
-      };
-      const user = await this.userService.findByIdPromise(decoded?.user?.Id);
-      if (!user) {
-        return this.reject(socket);
+      const headers = socket.handshake.headers;
+      if (isForeignOrigin(headers)) {
+        return this.reject(socket, 'it came from another site');
       }
+      const resolved = await this.sessions.resolve(
+        readSessionToken(headers.cookie),
+      );
+      if (!resolved) {
+        return this.reject(socket, 'no valid session');
+      }
+      const { user, session } = resolved;
       socket.data.user = user;
+      await socket.join(sessionChannel(session.id));
       const wasOnline = await this.isOnline(user.Id);
       await socket.join(userChannel(user.Id));
 
@@ -408,8 +417,15 @@ export class ChatGateway
     return socket.data?.user as IUser | undefined;
   }
 
-  private reject(socket: Socket) {
-    this.logger.warn(`Rejected socket ${socket.id}: missing or invalid token`);
+  /** Signed out (or the session was revoked): its sockets stop at once, in every tab. */
+  private endSession(sessionId: string) {
+    const channel = this.server?.to(sessionChannel(sessionId));
+    channel?.emit('unauthorized', { message: 'You signed out.' });
+    channel?.disconnectSockets(true);
+  }
+
+  private reject(socket: Socket, reason = 'no valid session') {
+    this.logger.warn(`Rejected socket ${socket.id}: ${reason}`);
     socket.emit('unauthorized', {
       message: 'Your session has ended. Sign in again.',
     });

@@ -11,11 +11,12 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AppServiceToken } from './app.service.interface';
 import { UserModule } from './user/user.module';
-import { AuthenticationModule } from './authentication/authentication.module';
+import { AuthModule } from './auth/auth.module';
 import { AuthMiddleWare } from './middleware/auth.middleware';
+import { OriginMiddleware } from './middleware/origin.middleware';
 import { ChatModule } from './chat/chat.module';
 
-const modules = [UserModule, AuthenticationModule, ChatModule];
+const modules = [UserModule, AuthModule, ChatModule];
 
 const providers = [
   { provide: AppServiceToken, useClass: AppService },
@@ -33,11 +34,13 @@ const providers = [
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
+    consumer.apply(OriginMiddleware).forRoutes('');
     consumer
       .apply(AuthMiddleWare)
       .exclude(
-        { path: '/users', method: RequestMethod.POST },
-        { path: '/users/login', method: RequestMethod.POST },
+        { path: '/auth/register', method: RequestMethod.POST },
+        { path: '/auth/login', method: RequestMethod.POST },
+        { path: '/auth/logout', method: RequestMethod.POST },
         { path: '/users/username-available', method: RequestMethod.GET },
       )
       .forRoutes('');

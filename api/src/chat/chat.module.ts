@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { AuthenticationModule } from 'src/authentication/authentication.module';
+import { AuthModule } from 'src/auth/auth.module';
 import { User } from 'src/user/entities/user.entity';
 import { UserModule } from 'src/user/user.module';
 import { ChatGateway } from './chat.gateway';
@@ -25,7 +25,7 @@ import { UpdatesService } from './updates.service';
       UserUpdate,
       User,
     ]),
-    AuthenticationModule,
+    AuthModule,
     UserModule,
   ],
   providers: [ChatGateway, ChatsService, MessagesService, UpdatesService],

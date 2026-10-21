@@ -20,7 +20,6 @@ export interface IUserService {
   ): Promise<{ available: boolean; reason?: string }>;
   update(id: number, updateUser: IUser): Observable<IUser>;
   removeById(id: number): Observable<IUser>;
-  login(loginUser: IUser): Observable<string>;
 }
 
 export const UserToken = 'UserService';

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { from, Observable } from 'rxjs';
 import * as bcrypt from 'bcryptjs';
-import { IPasswordService } from './iservices/password.service.interface';
+import { IPasswordService } from './password.service.interface';
 
 @Injectable()
 export class PasswordService implements IPasswordService {

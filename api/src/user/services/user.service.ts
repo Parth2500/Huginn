@@ -1,4 +1,4 @@
-import { HttpException, HttpStatus, Inject, Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { catchError, from, map, Observable, of, switchMap } from 'rxjs';
 import { Repository } from 'typeorm';
@@ -11,14 +11,6 @@ import {
   usernameProblem,
 } from '../username.policy';
 import { IUserService } from './iservices/user.service.interface';
-import {
-  IPasswordService,
-  PasswordToken,
-} from 'src/authentication/services/iservices/password.service.interface';
-import {
-  AuthenticationToken,
-  IAuthenticationService,
-} from 'src/authentication/services/iservices/authentication.service.interface';
 
 const PUBLIC_COLUMNS = [
   'user.Id',
@@ -32,12 +24,10 @@ export class UserService implements IUserService {
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @Inject(AuthenticationToken)
-    private readonly authService: IAuthenticationService,
-    @Inject(PasswordToken) private readonly passwordService: IPasswordService,
   ) {}
 
   //#region create
+  /** Stores a new account. `password` must already be hashed (see LocalPasswordProvider). */
   create(createUser: IUser): Observable<IUser> {
     createUser.email = createUser.email.trim().toLowerCase();
     createUser.username = normalizeUsername(createUser.username);
@@ -58,13 +48,8 @@ export class UserService implements IUserService {
       }),
       switchMap((exists: boolean) => {
         if (!exists) {
-          return this.passwordService.hashPassword(createUser.password).pipe(
-            switchMap((hashedPassword: string) => {
-              createUser.password = hashedPassword;
-              return from(this.userRepository.save(createUser)).pipe(
-                switchMap((user: IUser) => this.findById(user.Id)),
-              );
-            }),
+          return from(this.userRepository.save(createUser)).pipe(
+            switchMap((user: IUser) => this.findById(user.Id)),
           );
         } else {
           throw new HttpException(
@@ -345,36 +330,5 @@ export class UserService implements IUserService {
     ).pipe(map((user: IUser) => (user ? true : false)));
   }
 
-  //#endregion
-
-  //#region  login
-  login(loginUser: IUser): Observable<string> {
-    return this.findByEmailForLogin(loginUser.email.trim().toLowerCase()).pipe(
-      switchMap((foundUser: IUser) => {
-        if (foundUser) {
-          return this.passwordService
-            .validatePassword(loginUser.password, foundUser.password)
-            .pipe(
-              switchMap((match: boolean) => {
-                if (match) {
-                  return this.findById(foundUser.Id).pipe(
-                    switchMap((payload: IUser) =>
-                      this.authService.generateJwt(payload),
-                    ),
-                  );
-                } else {
-                  throw new HttpException(
-                    'Login was not successful, wrong credentials!',
-                    HttpStatus.UNAUTHORIZED,
-                  );
-                }
-              }),
-            );
-        } else {
-          throw new HttpException('No User Found!', HttpStatus.NOT_FOUND);
-        }
-      }),
-    );
-  }
   //#endregion
 }

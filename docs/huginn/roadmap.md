@@ -39,7 +39,7 @@ tested and demoable, never half-migrated.
 | 0.2 ✓ | **Everything on latest** (done 2026-10-21; see the note below) | Angular, NestJS, TypeORM, Socket.IO, TypeScript, Node (current LTS) and Postgres all on current releases. Angular moved to standalone components, signals and the new control flow. TypeORM migrations replace `synchronize`. CI runs the build, lint and tests, and real tests replace the old scaffold specs. |
 | 0.3 ✓ | **New data model** (done 2026-10-21) | `chat` and `chat_member` (with per-user state and watermarks), `message` with `client_message_id`, `block` and `user_settings` tables, per [architecture.md §3](architecture.md#3-data-model-phase-0-and-1). Existing features work on it. |
 | 0.4 ✓ | **Protocol v1** (done 2026-10-21) | The event envelope, acknowledgements, idempotent `message.send`, the per-user `update` log with `sync`, and the IndexedDB local store with outbox. Killing the API mid-conversation and restarting it loses nothing, and pending sends complete. |
-| 0.5 | **Cookie sessions and the auth seam** | Sign-in moves from a token in `localStorage` to an httpOnly cookie session, and sockets authenticate with the cookie. All sign-in code sits behind an `AuthProvider` interface, with today's password login as `LocalPasswordProvider`. |
+| 0.5 ✓ | **Cookie sessions and the auth seam** (done 2026-10-21) | Sign-in moves from a token in `localStorage` to an httpOnly cookie session, and sockets authenticate with the cookie. All sign-in code sits behind an `AuthProvider` interface, with today's password login as `LocalPasswordProvider`. |
 | later | **Heimdall sign-in** (when Heimdall is ready) | `HeimdallOidcProvider`: confidential BFF client, PKCE, `resource` audience, serialised refresh, `/revoke` on sign-out, account linking by verified email. See [architecture.md §2](architecture.md#2-identity-heimdall-integration-when-heimdall-is-ready). It must land before linked devices (2.4), which approve new devices through a real identity provider. |
 
 **Where 0.1 and 0.2 landed:**
@@ -60,6 +60,24 @@ tested and demoable, never half-migrated.
 - **Follow-up:** Angular 22 makes OnPush the default. The existing components are marked
   `ChangeDetectionStrategy.Eager` for now. Moving their state to signals, then going zoneless,
   is folded into 0.3 and 0.4, as those milestones rewrite the same components.
+
+**Where 0.5 landed:**
+
+- **Sessions** are rows in `session` (only a SHA-256 of the token is stored), behind an httpOnly,
+  `SameSite=Lax` cookie (`__Host-huginn_session` in production). They end after 30 days unused
+  or 90 days in all. Signing out deletes the row and disconnects that session's sockets in every
+  tab, and other browsers stay signed in.
+- **Cross-site protection:** changes and socket handshakes from an origin outside `APP_ORIGINS`
+  are refused.
+- **The seam:** `AuthProvider` with `LocalPasswordProvider`, chosen in one line of `AuthModule`.
+  Routes moved to `/api/auth/{register,login,session,logout}`. Sign-in gives one answer for an
+  unknown email and a wrong password, and takes the same time for both. JWT is gone.
+- **Web:** `AuthService` asks `/api/auth/session` who is signed in. The socket goes through the
+  same origin as the app. Only a non-secret profile is remembered, so the app still opens from
+  the device's copy when the server is down.
+- **Verified:** 30 API unit, 26 API end-to-end and 28 web tests, plus a two-browser run: sign-in,
+  no script-visible cookie or stored token, live messages over the cookie socket, reload,
+  second tab, sign-out reaching the other tab, and offline start with reconnect.
 
 **Where 0.3 and 0.4 landed:**
 

@@ -14,7 +14,6 @@ export interface TestApp {
 /** Boots the real application (migrations included) on a random port against the test database. */
 export async function startApp(): Promise<TestApp> {
   process.env.DATABASE_URL = TEST_DATABASE_URL;
-  process.env.JWT_SECRET = 'e2e-secret';
   const { AppModule } = await import('../src/app.module');
   const moduleRef = await Test.createTestingModule({
     imports: [AppModule],
@@ -30,7 +29,8 @@ export async function startApp(): Promise<TestApp> {
 export interface Account {
   id: number;
   username: string;
-  token: string;
+  /** The Cookie header that carries this account's session. */
+  cookie: string;
 }
 
 export async function register(
@@ -38,7 +38,7 @@ export async function register(
   username: string,
 ): Promise<Account> {
   const email = `${username.replace(/[._]/g, '')}@e2e.test`;
-  const created = await fetch(`${base}/api/users`, {
+  const created = await fetch(`${base}/api/auth/register`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ email, username, password: 'Secret#123' }),
@@ -48,28 +48,40 @@ export async function register(
       `register ${username}: ${created.status} ${await created.text()}`,
     );
   }
-  const login = await fetch(`${base}/api/users/login`, {
+  const { cookie, me } = await signIn(base, email);
+  return { id: me.Id, username, cookie };
+}
+
+/** Signs in and returns the session cookie and the response body. */
+export async function signIn(
+  base: string,
+  email: string,
+  password = 'Secret#123',
+) {
+  const response = await fetch(`${base}/api/auth/login`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ email, password: 'Secret#123' }),
+    body: JSON.stringify({ email, password }),
   });
-  const { access_token } = (await login.json()) as { access_token: string };
-  const me = (await (await api(base, access_token, '/users/me')).json()) as {
-    Id: number;
+  const setCookie = response.headers.getSetCookie()[0] ?? '';
+  return {
+    response,
+    setCookie,
+    cookie: setCookie.split(';')[0],
+    me: (await response.json()) as { Id: number; email?: string },
   };
-  return { id: me.Id, username, token: access_token };
 }
 
 export function api(
   base: string,
-  token: string,
+  cookie: string,
   path: string,
   init: RequestInit = {},
 ) {
   return fetch(`${base}/api${path}`, {
     ...init,
     headers: {
-      authorization: `Bearer ${token}`,
+      cookie,
       'content-type': 'application/json',
       ...init.headers,
     },
@@ -79,7 +91,7 @@ export function api(
 /** A connected socket that records every event it receives, ready once the server says hello. */
 export async function connect(base: string, account: Account) {
   const socket: Socket = io(base, {
-    extraHeaders: { Authorization: account.token },
+    extraHeaders: { cookie: account.cookie },
     transports: ['websocket'],
   });
   const events: { name: string; data: any }[] = [];

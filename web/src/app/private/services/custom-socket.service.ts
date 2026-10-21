@@ -5,8 +5,10 @@ import { Ack } from 'src/app/models/chat.interface';
 /** How long a request waits for its acknowledgement before it counts as failed. */
 const ACK_TIMEOUT_MS = 10_000;
 
+// Same origin as the app (the dev server and the production proxy forward /socket.io to the API),
+// so the browser sends the session cookie with the handshake.
 const config: SocketIoConfig = {
-  url: 'http://localhost:3000/',
+  url: '/',
   options: {
     autoConnect: false,
   },
@@ -20,18 +22,23 @@ export class CustomSocketService extends Socket {
     super(config, inject(ApplicationRef));
   }
 
-  /** (Re)connect with the current access token, so switching accounts in one tab works. */
-  connectWithToken(token: string) {
-    const manager = this.ioSocket.io;
-    const current = manager.opts.extraHeaders?.['Authorization'];
-    if (this.ioSocket.connected && current === token) {
+  private userId: number | undefined;
+
+  /** (Re)connect as this person; switching accounts in one tab starts a fresh connection. */
+  connectAs(userId: number) {
+    if (this.ioSocket.active && this.userId === userId) {
       return;
     }
-    if (this.ioSocket.connected || this.ioSocket.active) {
+    if (this.ioSocket.active) {
       this.disconnect();
     }
-    manager.opts.extraHeaders = { Authorization: token };
+    this.userId = userId;
     this.connect();
+  }
+
+  override disconnect() {
+    this.userId = undefined;
+    return super.disconnect();
   }
 
   /**

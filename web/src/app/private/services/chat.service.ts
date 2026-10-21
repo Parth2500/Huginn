@@ -1,6 +1,5 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { Subject } from 'rxjs';
-import { getAccessToken } from 'src/app/core/access-token';
 import {
   Chat,
   ChatCursor,
@@ -89,7 +88,7 @@ export class ChatService {
   /** Shows the device's copy at once, then connects and catches up. */
   async start(me: IUser) {
     if (this.started && this.me?.Id === me.Id) {
-      this.socket.connectWithToken(getAccessToken() ?? '');
+      this.socket.connectAs(me.Id!);
       return;
     }
     this.stop();
@@ -108,7 +107,7 @@ export class ChatService {
     this.outbox.restore(outbox);
     this.seq = seq ?? 0;
     this.connection.set('connecting');
-    this.socket.connectWithToken(getAccessToken() ?? '');
+    this.socket.connectAs(me.Id!);
   }
 
   stop() {

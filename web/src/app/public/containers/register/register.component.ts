@@ -2,7 +2,8 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, OnDestroy, inject, ChangeDetectionStrategy } from '@angular/core';
 import { AbstractControl, FormBuilder, FormControl, FormGroup, ValidationErrors, ValidatorFn, Validators, FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
-import { finalize, Subscription, switchMap } from 'rxjs';
+import { finalize, from, Subscription, switchMap } from 'rxjs';
+import { AuthService } from 'src/app/core/auth.service';
 import { ToastService } from 'src/app/shared/toast/toast.service';
 import { normalizeUsername } from 'src/app/shared/username-policy';
 import {
@@ -43,6 +44,7 @@ export class RegisterComponent implements OnDestroy {
   private signOnService = inject<ISignOnService>(SignOnToken);
   private router = inject(Router);
   private toast = inject(ToastService);
+  private auth = inject(AuthService);
 
   formBuilder: FormBuilder = new FormBuilder();
   registrationForm: FormGroup = this.formBuilder.group({
@@ -107,7 +109,7 @@ export class RegisterComponent implements OnDestroy {
         switchMap((user) => {
           created = true;
           this.toast.success(`Welcome, ${user.username ?? 'there'}. Your account is ready.`);
-          return this.signOnService.loginUser(credentials);
+          return from(this.auth.login(credentials));
         }),
         finalize(() => (this.submitting = false))
       )
