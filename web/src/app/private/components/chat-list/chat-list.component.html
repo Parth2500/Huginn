@@ -114,9 +114,30 @@
 
 <!-- One chat row: the row button and its menu chevron. -->
 <ng-template #rowBody let-chat>
+  @if (swipe()?.chat?.id === chat.id) {
+    <!-- What a swipe uncovers: Pin and Mute on the left, Archive on the right. -->
+    <div class="swipe-under" [class.archiving]="swipeOffset(chat) < 0">
+      @if (swipeOffset(chat) > 0) {
+        <button type="button" class="swipe-btn pin" (click)="swipeAction(chat, 'pin')">
+          <app-icon [name]="chat.me.pinnedAt ? 'pin-off' : 'pin'" />{{ chat.me.pinnedAt ? 'Unpin' : 'Pin' }}
+        </button>
+        <button type="button" class="swipe-btn mute" (click)="swipeAction(chat, 'mute')">
+          <app-icon [name]="muted(chat) ? 'bell' : 'bell-off'" />{{ muted(chat) ? 'Unmute' : 'Mute' }}
+        </button>
+      } @else {
+        <span class="swipe-archive" aria-hidden="true">
+          <app-icon [name]="chat.me.archivedAt ? 'archive-restore' : 'archive'" />{{ chat.me.archivedAt ? 'Unarchive' : 'Archive' }}
+        </span>
+      }
+    </div>
+  }
   <button type="button" class="room" (click)="onRowClick(chat)"
     (contextmenu)="openMenuAt($event, chat)"
-    (pointerdown)="pressStart($event, chat)" (pointerup)="pressEnd()" (pointercancel)="pressEnd()"
+    [style.transform]="swipeOffset(chat) ? 'translateX(' + swipeOffset(chat) + 'px)' : null"
+    [class.swiped]="swipeOffset(chat) !== 0"
+    [class.swiping]="swipe()?.chat?.id === chat.id && !swipe()?.revealed"
+    (pointerdown)="pressStart($event, chat)" (pointermove)="swipeMove($event)"
+    (pointerup)="pressEnd(); swipeEnd()" (pointercancel)="pressEnd(); swipeEnd()"
     (pointerleave)="pressEnd()"
     [class.active]="isSelected(chat)"
     [class.fresh]="fresh().has(chat.id)"

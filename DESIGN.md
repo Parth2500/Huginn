@@ -432,6 +432,12 @@ Quiet, solid and compact.
 ### Pin Reordering
 - In the full main list (no filter), pinned rows drag with a mouse or pen (Angular CDK, vertical only, `grab` cursor). The lifted row takes Slate Rail Raised, the Float shadow and no chevron; its slot stays at 35% opacity, and the other rows slide 200ms on the ease-out curve. On touch screens the long-press menu does it instead.
 
+### Swipe Actions (phones)
+- A touch row follows the finger sideways after 10px (vertical moves stay scrolls) and snaps back over 200ms on the ease-out curve. While it moves, the row takes the rail colour so it covers what it uncovers.
+- **Left** uncovers an indigo Archive (or Unarchive) panel on the right; letting go past 96px archives, with Undo.
+- **Right** uncovers two 72px Slate Rail Raised buttons, Pin and Mute (or Unpin and Unmute), each an 18px icon over a 12px 600 label; past half their width the row stays open on them until a tap. Mute from a swipe means Always, with Undo (an Unmute of a timed mute has none, as it can't be put back exactly).
+- Every swipe has a menu equivalent.
+
 ### Confirmation Dialog
 - A native modal dialog: at most 400px wide, 24px padding, 16px radius, hairline, Float shadow, over the Scrim. It rises 6px and fades in over 200ms.
 - An 18px 650-weight title that names the result ("Delete chat with Sam Rivera?"), one muted sentence of consequence, then Cancel (secondary) and the action (danger) right-aligned, 8px apart. Below 480px wide the buttons stack, action on top, at 44px.

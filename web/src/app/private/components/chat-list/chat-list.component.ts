@@ -19,10 +19,17 @@ import { ToastService } from 'src/app/shared/toast/toast.service';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
-import { chatPartner, chatTitle, isMuted, personName } from '../../helpers/chat-display';
+import { chatPartner, chatTitle, isMuted, mutedForever, personName } from '../../helpers/chat-display';
 import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
 import { ChatMenuComponent } from '../chat-menu/chat-menu.component';
+
+/** Past this many pixels sideways, a touch is a swipe rather than a tap or a scroll. */
+const SWIPE_SLOP = 10;
+/** Swipe left this far to archive. */
+const SWIPE_ARCHIVE = 96;
+/** Swipe right this far to show Pin and Mute (their width). */
+const SWIPE_REVEAL = 144;
 
 type ChatFilter = 'all' | 'unread' | 'groups';
 
@@ -124,6 +131,10 @@ export class ChatListComponent {
   private longPress: ReturnType<typeof setTimeout> | undefined;
   /** A long-press opened the menu: the click that follows mustn't open the chat. */
   private suppressClick = false;
+  /** The row being swiped (or left open on its Pin and Mute buttons) and how far. */
+  readonly swipe = signal<{ chat: Chat; offset: number; revealed: boolean } | null>(null);
+  private swipeStart: { chat: Chat; x: number; y: number; base: number } | null = null;
+  private swiping = false;
 
   // ---- Folders and paging --------------------------------------------------------------------
 
@@ -155,6 +166,10 @@ export class ChatListComponent {
       this.suppressClick = false;
       return;
     }
+    if (this.swipe()) {
+      this.swipe.set(null); // a tap on a swiped-open row closes it
+      return;
+    }
     this.open.emit(chat);
   }
 
@@ -183,11 +198,17 @@ export class ChatListComponent {
 
   /** A long-press on a touch screen opens the menu where the finger is. */
   pressStart(event: PointerEvent, chat: Chat) {
+    // A swipe often ends with no click at all, so the flag can't wait for one to clear it.
+    this.suppressClick = false;
     if (event.pointerType !== 'touch') {
       return;
     }
     const row = event.currentTarget as HTMLElement;
     const at = { x: event.clientX, y: event.clientY };
+    if (this.swipe()?.revealed && this.swipe()?.chat.id !== chat.id) {
+      this.swipe.set(null);
+    }
+    this.swipeStart = { chat, x: at.x, y: at.y, base: this.swipeOffset(chat) };
     this.longPress = setTimeout(() => {
       this.suppressClick = true;
       this.menu.set({ chat, at, returnFocus: row });
@@ -196,6 +217,77 @@ export class ChatListComponent {
 
   pressEnd() {
     clearTimeout(this.longPress);
+  }
+
+  // ---- Swipe (phones, ux-design.md §1.2): left archives, right shows Pin and Mute -------------
+
+  /** Follows a finger sideways; vertical moves stay page scrolls (`touch-action: pan-y`). */
+  swipeMove(event: PointerEvent) {
+    const start = this.swipeStart;
+    if (!start || event.pointerType !== 'touch') {
+      return;
+    }
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    if (!this.swiping) {
+      if (Math.abs(dx) < SWIPE_SLOP || Math.abs(dx) < Math.abs(dy)) {
+        return;
+      }
+      this.swiping = true;
+      clearTimeout(this.longPress);
+      (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+    }
+    const offset = Math.max(-SWIPE_ARCHIVE * 1.5, Math.min(SWIPE_REVEAL * 1.2, start.base + dx));
+    this.swipe.set({ chat: start.chat, offset, revealed: false });
+  }
+
+  swipeEnd() {
+    const start = this.swipeStart;
+    this.swipeStart = null;
+    if (!start || !this.swiping) {
+      return;
+    }
+    this.swiping = false;
+    this.suppressClick = true; // the click that ends a swipe doesn't open the chat
+    const offset = this.swipe()?.offset ?? 0;
+    if (offset <= -SWIPE_ARCHIVE) {
+      this.swipe.set(null);
+      void this.onMenuChoice(start.chat, { archive: !start.chat.me.archivedAt });
+    } else if (offset >= SWIPE_REVEAL / 2) {
+      this.swipe.set({ chat: start.chat, offset: SWIPE_REVEAL, revealed: true });
+    } else {
+      this.swipe.set(null);
+    }
+  }
+
+  swipeOffset(chat: Chat): number {
+    const swipe = this.swipe();
+    return swipe?.chat.id === chat.id ? swipe.offset : 0;
+  }
+
+  /** A button behind a row swiped right. */
+  async swipeAction(chat: Chat, action: 'pin' | 'mute') {
+    this.swipe.set(null);
+    const change: ChatStateChange =
+      action === 'pin' ? { pin: !chat.me.pinnedAt } : { mute: isMuted(chat) ? null : 'always' };
+    // A timed mute can't be put back exactly, so unmuting one offers no Undo.
+    const undoable = !('mute' in change) || change.mute !== null || mutedForever(chat);
+    const error = await this.chatService.changeState([chat.id], change);
+    if (error) {
+      this.toast.error(error);
+      return;
+    }
+    const undo: ChatStateChange =
+      'pin' in change ? { pin: !change.pin } : { mute: change.mute ? null : 'always' };
+    const text =
+      'pin' in change
+        ? change.pin ? 'Chat pinned.' : 'Chat unpinned.'
+        : change.mute ? 'Chat muted.' : 'Chat unmuted.';
+    if (undoable) {
+      this.toast.undoable(text, () => void this.undo(chat.id, undo));
+    } else {
+      this.toast.show(text);
+    }
   }
 
   closeMenu() {

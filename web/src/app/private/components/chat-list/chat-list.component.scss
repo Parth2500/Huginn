@@ -127,6 +127,37 @@
 .row.cdk-drag-animating { transition: transform 200ms var(--ease-out); }
 .pinned:not(.cdk-drop-list-disabled) .room { cursor: grab; }
 
+/* Swipe on phones: the row slides over what it uncovers, and snaps back unless held. */
+.room { touch-action: pan-y; }
+.room.swiped { position: relative; z-index: 1; transition: transform 200ms var(--ease-out); }
+.room.swiped:not(.active) { background: var(--side-bg); }
+.room.swiping { transition: none; }
+.swipe-under {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: var(--radius-m);
+  background: var(--side-bg-2);
+  overflow: hidden;
+  &.archiving { justify-content: flex-end; background: var(--accent); }
+}
+.swipe-btn, .swipe-archive {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 72px;
+  border: 0;
+  background: transparent;
+  color: var(--side-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  app-icon { width: 18px; height: 18px; }
+}
+.swipe-btn.mute { border-left: 1px solid var(--side-line); }
+.swipe-archive { width: 96px; color: var(--on-accent); }
+
 /* The row's menu button: shown on hover or focus, in place of the time. */
 .row { position: relative; }
 .row-menu {
