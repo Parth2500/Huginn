@@ -220,6 +220,7 @@ Built in 0.4:
 | `messages.page` | `{ chatId, before?: messageId }` | `{ messages[], hasMore }` |
 | `message.send` | `{ chatId \| toUserId, clientMessageId, text }` | `{ message, chatId }` |
 | `chat.read` | `{ chatId, upTo: messageId }`, capped at the chat's newest; also delivers | `{}`, plus `receipt` updates for the senders (1.5) |
+| `message.edit` | `{ messageId, text }`: your own, within 15 minutes | `{ message }`, plus `message.edited` to every member (1.4) |
 | `chat.delivered` | `{ chatId, upTo: messageId }`, capped likewise | `{}`, plus `receipt` updates (1.5) |
 | `settings.get` / `settings.update` | `{ readReceipts }` for now; the rest with Settings (1.11) | `{ settings }`; your other tabs get a `settings` event |
 | `group.create` | `{ title, description?, memberIds[] }` | `{ chat }` |
@@ -244,6 +245,7 @@ easy to audit. Their effects reach other people as updates.
   `chat.new`, `message.new`, `chat.state` (per-member state with the unread count),
   system messages are `message` rows of kind `system` whose body is a JSON event, sent as
   `system: { type, … }` with no text and worded by each client (built: `group.created`),
+  `message.edited` (to every member: the message with its new text and `editedAt`),
   `message.deleted` (to every member: the message again as a tombstone, with `deletedById`)
   and `message.hidden` (to your own devices: `{ chatId, messageIds }` deleted for you). Coming
   with their features: `message.edited`, `chat.updated`, `chat.member`, `receipt`,

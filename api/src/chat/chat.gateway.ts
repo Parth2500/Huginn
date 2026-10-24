@@ -311,6 +311,7 @@ export class ChatGateway
       text: string;
       chatId?: number;
       toUserId?: number;
+      replyToMessageId?: number;
     },
   ) {
     return this.handle(socket, (user) =>
@@ -324,6 +325,11 @@ export class ChatGateway
           toUserId:
             request?.toUserId !== undefined
               ? Number(request.toUserId)
+              : undefined,
+          replyToMessageId:
+            request?.replyToMessageId !== undefined &&
+            request?.replyToMessageId !== null
+              ? Number(request.replyToMessageId)
               : undefined,
         });
         if (result.createdChat) {
@@ -374,6 +380,23 @@ export class ChatGateway
       );
       this.publish(updates);
       return {};
+    });
+  }
+
+  /** Edit your own message's text, within 15 minutes of sending it. */
+  @SubscribeMessage('message.edit')
+  onMessageEdit(
+    socket: Socket,
+    request: { messageId?: unknown; text?: unknown },
+  ) {
+    return this.handle(socket, async (user) => {
+      const { message, updates } = await this.messages.edit(
+        user.Id,
+        Number(request?.messageId),
+        request?.text,
+      );
+      this.publish(updates);
+      return { message };
     });
   }
 

@@ -118,6 +118,8 @@ export type UpdatePayload =
     }
   /** Someone's watermark moved, and with it the ticks on your messages. */
   | { type: 'receipt'; data: { chatId: number } & Receipts }
+  /** Edited: the message comes again with its new text and `editedAt`. */
+  | { type: 'message.edited'; data: { message: MessageDto } }
   /** Deleted for everyone: the message comes again as a tombstone (no text). */
   | { type: 'message.deleted'; data: { message: MessageDto } }
   /** Deleted for me: only your own devices hear it. */

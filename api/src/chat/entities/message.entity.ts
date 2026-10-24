@@ -51,6 +51,14 @@ export class Message {
   @Column({ type: 'int', nullable: true })
   replyToMessageId: number | null;
 
+  /** The message this one quotes. The column predates the relation, so no constraint is added. */
+  @ManyToOne(() => Message, {
+    nullable: true,
+    createForeignKeyConstraints: false,
+  })
+  @JoinColumn({ name: 'replyToMessageId' })
+  replyTo: Message | null;
+
   @Column({ type: 'timestamptz', nullable: true })
   editedAt: Date | null;
 

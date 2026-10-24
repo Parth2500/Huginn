@@ -28,6 +28,8 @@ export interface SendInput {
    */
   chatId?: number;
   toUserId?: number;
+  /** Quoting a message in the same chat (product-spec.md §3.2). */
+  replyToMessageId?: number;
 }
 
 export interface SendResult {
@@ -67,7 +69,7 @@ export class MessagesService {
         senderId: input.senderId,
         clientMessageId: input.clientMessageId,
       },
-      relations: { sender: true },
+      relations: { sender: true, replyTo: true },
     });
     if (existing) {
       return {
@@ -120,6 +122,12 @@ export class MessagesService {
         throw new ChatRuleError("You're not a member of that chat.");
       }
 
+      const replyTo = await this.replyTarget(
+        manager,
+        chatId,
+        input.senderId,
+        input.replyToMessageId,
+      );
       const saved = await manager.save(
         manager.create(Message, {
           chatId: chatId,
@@ -127,6 +135,7 @@ export class MessagesService {
           clientMessageId: input.clientMessageId,
           kind: 'text',
           body: text,
+          replyToMessageId: replyTo,
         }),
       );
       await manager.update(
@@ -155,7 +164,7 @@ export class MessagesService {
 
       const withSender = await manager.findOneOrFail(Message, {
         where: { id: saved.id },
-        relations: { sender: true },
+        relations: { sender: true, replyTo: true },
       });
       const message = toMessageDto(withSender);
 
@@ -175,6 +184,35 @@ export class MessagesService {
       const updates = await this.updatesService.append(manager, entries);
       return { message, chatId: chatId, createdChat, updates };
     });
+  }
+
+  /** The message a reply quotes: in the same chat, visible to the sender, and not a system line. */
+  private async replyTarget(
+    manager: EntityManager,
+    chatId: number,
+    senderId: number,
+    replyToMessageId: number | undefined,
+  ): Promise<number | null> {
+    if (replyToMessageId === undefined || replyToMessageId === null) {
+      return null;
+    }
+    const [target, member] = await Promise.all([
+      manager.findOne(Message, { where: { id: Number(replyToMessageId) } }),
+      manager.findOne(ChatMember, { where: { chatId, userId: senderId } }),
+    ]);
+    if (
+      !target ||
+      !member ||
+      target.chatId !== chatId ||
+      target.kind === 'system' ||
+      target.id <=
+        Math.max(member.joinedAfterMessageId, member.clearedBeforeMessageId)
+    ) {
+      throw new ChatRuleError(
+        "The message you're replying to couldn't be found.",
+      );
+    }
+    return target.id;
   }
 
   /**
@@ -199,6 +237,7 @@ export class MessagesService {
     const query = this.messages
       .createQueryBuilder('m')
       .leftJoinAndSelect('m.sender', 'sender')
+      .leftJoinAndSelect('m.replyTo', 'replyTo')
       .where('m.chatId = :chatId', { chatId })
       .andWhere('m.id > :floor', { floor })
       .andWhere(
@@ -225,6 +264,75 @@ export class MessagesService {
       where: { userId, messageId: In(messageIds) },
     });
     return new Set(rows.map((r) => r.messageId));
+  }
+
+  /**
+   * Edits your own message within 15 minutes of sending it (product-spec.md §3.3), and records
+   * `message.edited` for every member.
+   */
+  async edit(
+    userId: number,
+    messageId: number,
+    text: unknown,
+  ): Promise<{ message: MessageDto; updates: Addressed[] }> {
+    const body = typeof text === 'string' ? text.trim() : '';
+    if (!body || body.length > MAX_MESSAGE_LENGTH) {
+      throw new ChatRuleError(
+        `Messages must be between 1 and ${MAX_MESSAGE_LENGTH} characters.`,
+      );
+    }
+    return this.dataSource.transaction(async (manager) => {
+      const message = await manager.findOne(Message, {
+        where: { id: messageId },
+      });
+      const member =
+        message &&
+        (await manager.findOne(ChatMember, {
+          where: { chatId: message.chatId, userId, status: 'active' },
+        }));
+      if (!message || !member || message.senderId !== userId) {
+        throw new ChatRuleError('You can only edit your own messages.');
+      }
+      if (message.kind !== 'text' || message.deletedForAllAt) {
+        throw new ChatRuleError("That message can't be edited.");
+      }
+      if (Date.now() - message.createdAt.getTime() > UNSEND_WINDOW_MS) {
+        throw new ChatRuleError(
+          'You can edit a message only within 15 minutes of sending it.',
+        );
+      }
+      if (body !== message.body) {
+        await manager.update(
+          Message,
+          { id: messageId },
+          { body, editedAt: new Date() },
+        );
+      }
+      const edited = toMessageDto(
+        await manager.findOneOrFail(Message, {
+          where: { id: messageId },
+          relations: { sender: true, replyTo: true },
+        }),
+      );
+      const memberIds = await this.chatsService.activeMemberIds(
+        message.chatId,
+        manager,
+      );
+      const updates =
+        body === message.body
+          ? []
+          : await this.updatesService.append(
+              manager,
+              memberIds.map((id) => ({
+                userId: id,
+                payload: {
+                  type: 'message.edited' as const,
+                  data: { message: edited },
+                },
+              })),
+            );
+      return { message: edited, updates };
+    });
   }
 
   /**
@@ -317,7 +425,7 @@ export class MessagesService {
       }
       const deleted = await manager.find(Message, {
         where: { id: In(fresh.map((m) => m.id)) },
-        relations: { sender: true },
+        relations: { sender: true, replyTo: true },
       });
       const entries: { userId: number; payload: UpdatePayload }[] = [];
       for (const chatId of chatIds) {

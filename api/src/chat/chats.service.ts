@@ -476,7 +476,7 @@ export class ChatsService {
     const lastMessages = lastIds.length
       ? await manager.find(Message, {
           where: { id: In(lastIds) },
-          relations: { sender: true },
+          relations: { sender: true, replyTo: true },
         })
       : [];
     const byId = new Map(lastMessages.map((m) => [m.id, m]));
@@ -495,6 +495,7 @@ export class ChatsService {
       const before = await manager
         .createQueryBuilder(Message, 'msg')
         .leftJoinAndSelect('msg.sender', 'sender')
+        .leftJoinAndSelect('msg.replyTo', 'replyTo')
         .where('msg.chatId = :chatId', { chatId: hidden.chatId })
         .andWhere(
           `NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h."messageId" = msg.id AND h."userId" = :userId)`,
