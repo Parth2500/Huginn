@@ -60,6 +60,14 @@ export class LocalDb {
     return this.put('kv', { key: 'seq', value: seq });
   }
 
+  async getDrafts(): Promise<Record<string, string>> {
+    return (await this.get<{ value: Record<string, string> }>('kv', 'drafts'))?.value ?? {};
+  }
+
+  setDrafts(drafts: Record<string, string>) {
+    return this.put('kv', { key: 'drafts', value: drafts });
+  }
+
   async getChats(): Promise<Chat[]> {
     return this.all<Chat>('chats');
   }

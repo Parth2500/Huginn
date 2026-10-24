@@ -439,6 +439,9 @@ Quiet, solid and compact.
 - Delete opens the confirmation dialog with a radio choice, Delete for me / Delete for everyone, when everyone is allowed (all yours and under 15 minutes, or you run the group; everyone is preselected). Otherwise it deletes for you and says so.
 - Tombstones read "You deleted this message", "Deleted by an admin" or "This message was deleted", in italics without a tick; the list preview uses the same words.
 
+### Drafts
+- Unsent text stays per chat on the device. A chat you're not looking at previews it as "**Draft:** …" in light indigo (#a5b4fc; on-accent-2 on the open row) instead of the last message.
+
 ### Unread Divider
 - "3 unread messages": a full-width 1px indigo hairline at 35% with a centred pill (accent-soft fill, Indigo Ink 12px 700 text). Opening a chat with unread messages scrolls so it sits a third of the way down when there's room. It stays until you leave the chat.
 

@@ -22,6 +22,7 @@ import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
 import { chatPartner, chatTitle, isMuted, mutedForever, personName } from '../../helpers/chat-display';
 import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
+import { DraftsStore } from '../../state/drafts.store';
 import { ChatMenuComponent } from '../chat-menu/chat-menu.component';
 import { SelectionBarComponent } from '../selection-bar/selection-bar.component';
 
@@ -70,6 +71,7 @@ const FILTERS: { value: ChatFilter; label: string }[] = [
 export class ChatListComponent {
   private readonly store = inject(ChatsStore);
   private readonly chatService = inject(ChatService);
+  private readonly drafts = inject(DraftsStore);
   private readonly toast = inject(ToastService);
   private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
   private readonly injector = inject(Injector);
@@ -580,6 +582,11 @@ export class ChatListComponent {
     }
     // In a direct chat the sender is obvious; in a group, name them.
     return chat.kind === 'direct' ? text : `${personName(message.sender)}: ${text}`;
+  }
+
+  /** Unsent text in a chat you're not looking at: "Draft: …" (product-spec.md §3.8). */
+  draft(chat: Chat): string {
+    return this.isSelected(chat) ? '' : this.drafts.get(`c${chat.id}`).trim();
   }
 
   /** The tick on your own last message, shown before the preview (ux-design.md §2.1). */

@@ -15,6 +15,7 @@ import { IUser } from 'src/app/models/user.interface';
 import { ChatsStore } from '../state/chats.store';
 import { LocalDb } from '../state/local-db';
 import { MessagesStore } from '../state/messages.store';
+import { DraftsStore } from '../state/drafts.store';
 import { OutboxStore } from '../state/outbox.store';
 import { CustomSocketService } from './custom-socket.service';
 
@@ -42,6 +43,7 @@ export class ChatService {
   private readonly chats = inject(ChatsStore);
   private readonly messages = inject(MessagesStore);
   private readonly outbox = inject(OutboxStore);
+  private readonly drafts = inject(DraftsStore);
 
   readonly connection = signal<ConnectionState>('connecting');
   readonly onlineIds = signal(new Set<number>());
@@ -108,16 +110,18 @@ export class ChatService {
     this.started = true;
     this.me = me;
     this.db.open(me.Id!);
-    const [chats, outbox, seq] = await Promise.all([
+    const [chats, outbox, seq, drafts] = await Promise.all([
       this.db.getChats(),
       this.db.getOutbox(),
       this.db.getSeq(),
+      this.db.getDrafts(),
     ]);
     if (this.me?.Id !== me.Id) {
       return; // signed out while the cache loaded
     }
     this.chats.restore(chats);
     this.outbox.restore(outbox);
+    this.drafts.restore(drafts);
     this.seq = seq ?? 0;
     this.connection.set('connecting');
     this.socket.connectAs(me.Id!);
@@ -134,6 +138,7 @@ export class ChatService {
     this.chats.reset();
     this.messages.clear();
     this.outbox.reset();
+    this.drafts.reset();
     this.onlineIds.set(new Set());
     this.db.close();
   }

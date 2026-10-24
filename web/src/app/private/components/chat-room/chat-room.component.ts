@@ -26,6 +26,7 @@ import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 import { chatPartner, chatTitle, draftTarget, personName } from '../../helpers/chat-display';
 import { ChatService, ConnectionState } from '../../services/chat.service';
 import { MessagesStore } from '../../state/messages.store';
+import { DraftsStore } from '../../state/drafts.store';
 import { OutboxStore } from '../../state/outbox.store';
 import { ConfirmDialogComponent } from 'src/app/shared/confirm-dialog/confirm-dialog.component';
 import { ToastService } from 'src/app/shared/toast/toast.service';
@@ -99,6 +100,9 @@ export class ChatRoomComponent implements AfterViewInit {
   private chatService = inject(ChatService);
   private messagesStore = inject(MessagesStore);
   private outbox = inject(OutboxStore);
+  private drafts = inject(DraftsStore);
+  /** Where the composer's text is kept between visits: `c<chatId>` or `u<userId>`. */
+  private draftKey: string | undefined;
   private locale = inject(LOCALE_ID);
   private toast = inject(ToastService);
 
@@ -245,9 +249,19 @@ export class ChatRoomComponent implements AfterViewInit {
       const { id, partnerId } = this.conversation();
       const sameConversation = partnerId !== undefined && partnerId === previousPartner;
       previousPartner = partnerId;
-      if (!sameConversation) {
-        untracked(() => this.resetView());
+      const key = id !== undefined ? `c${id}` : `u${partnerId}`;
+      if (sameConversation) {
+        if (this.draftKey && this.draftKey !== key) {
+          this.drafts.move(this.draftKey, key);
+        }
+      } else {
+        untracked(() => {
+          this.resetView();
+          this.chatMessage.setValue(this.drafts.get(key));
+          setTimeout(() => this.resizeComposer());
+        });
       }
+      this.draftKey = key;
       if (id === undefined) {
         return;
       }
@@ -326,12 +340,18 @@ export class ChatRoomComponent implements AfterViewInit {
       this.chatService.send({ toUserId: partnerId }, text);
     }
     this.chatMessage.reset('');
+    if (this.draftKey) {
+      this.drafts.set(this.draftKey, '');
+    }
     this.resizeComposer();
     this.scrollToBottom(true);
   }
 
   onComposerInput() {
     this.resizeComposer();
+    if (this.draftKey) {
+      this.drafts.set(this.draftKey, this.chatMessage.value ?? '');
+    }
     const now = Date.now();
     const id = this.chatId();
     const alone = this.chat().kind === 'self';

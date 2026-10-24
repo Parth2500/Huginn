@@ -79,6 +79,8 @@
 .when { font-size: 12px; color: var(--side-text-2); flex: none; }
 .preview { font-size: 13px; color: var(--side-text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; }
 .preview.empty { font-style: normal; }
+.preview.draft { color: #a5b4fc; b { font-weight: 600; } }
+.room.active .preview.draft { color: var(--on-accent-2); }
 
 .badge {
   flex: none;
