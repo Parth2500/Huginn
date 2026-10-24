@@ -1,0 +1,62 @@
+<div class="bar" role="toolbar" aria-label="Actions for selected chats">
+  <button type="button" class="action" (click)="archive()">
+    <app-icon [name]="archivedView() ? 'archive-restore' : 'archive'" />
+    <span>{{ archivedView() ? 'Unarchive' : 'Archive' }}</span>
+  </button>
+
+  @if (allMuted()) {
+    <button type="button" class="action" (click)="mute(null)">
+      <app-icon name="bell" /><span>Unmute</span>
+    </button>
+  } @else {
+    <div class="mute">
+      <button type="button" class="action" aria-haspopup="menu" [attr.aria-expanded]="muteOpen()"
+        (click)="muteOpen.set(!muteOpen())">
+        <app-icon name="bell-off" /><span>Mute</span>
+      </button>
+      @if (muteOpen()) {
+        <div class="mute-menu" role="menu" aria-label="Mute for">
+          @for (choice of muteChoices; track choice.value) {
+            <button type="button" role="menuitem" (click)="mute(choice.value)">{{ choice.label }}</button>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <button type="button" class="action" (click)="toggleRead()"
+    [attr.aria-label]="anyUnread() ? 'Mark as read' : 'Mark as unread'">
+    <app-icon [name]="anyUnread() ? 'check-check' : 'message-dot'" />
+    <span>{{ anyUnread() ? 'Read' : 'Unread' }}</span>
+  </button>
+
+  <button type="button" class="action" (click)="togglePin()" [disabled]="!!pinBlocked()"
+    [attr.title]="pinBlocked()" [attr.aria-describedby]="pinBlocked() ? 'pin-why' : null">
+    <app-icon [name]="allPinned() ? 'pin-off' : 'pin'" />
+    <span>{{ allPinned() ? 'Unpin' : 'Pin' }}</span>
+  </button>
+  @if (pinBlocked(); as why) {
+    <span id="pin-why" class="visually-hidden">{{ why }}</span>
+  }
+
+  <button type="button" class="action danger" (click)="confirmingDelete.set(true)" [disabled]="!!deleteBlocked()"
+    [attr.title]="deleteBlocked()" [attr.aria-describedby]="deleteBlocked() ? 'delete-why' : null">
+    <app-icon name="trash" /><span>Delete</span>
+  </button>
+  @if (deleteBlocked(); as why) {
+    <span id="delete-why" class="visually-hidden">{{ why }}</span>
+  }
+
+  @if (chats().length === 1) {
+    <button #moreButton type="button" class="action" aria-haspopup="menu" (click)="more.emit(moreButton)"
+      aria-label="More actions">
+      <app-icon name="more-horizontal" /><span>More</span>
+    </button>
+  }
+</div>
+
+@if (confirmingDelete()) {
+  @let text = deleteText();
+  <app-confirm-dialog [title]="text.title" [body]="text.body" [action]="text.action"
+    (confirm)="confirmDelete()" (cancel)="confirmingDelete.set(false)" />
+}

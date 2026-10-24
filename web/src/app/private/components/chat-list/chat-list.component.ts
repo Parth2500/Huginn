@@ -23,6 +23,7 @@ import { chatPartner, chatTitle, isMuted, mutedForever, personName } from '../..
 import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
 import { ChatMenuComponent } from '../chat-menu/chat-menu.component';
+import { SelectionBarComponent } from '../selection-bar/selection-bar.component';
 
 /** Past this many pixels sideways, a touch is a swipe rather than a tap or a scroll. */
 const SWIPE_SLOP = 10;
@@ -47,7 +48,8 @@ const FILTERS: { value: ChatFilter; label: string }[] = [
   selector: 'app-chat-list',
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-list.component.html',
-  styleUrls: ['./chat-list.component.scss'],
+  styleUrls: ['./chat-list.component.scss', './chat-list-gestures.scss'],
+  host: { '(keydown.escape)': 'endSelection()' },
   imports: [
     NgClass,
     NgTemplateOutlet,
@@ -57,6 +59,7 @@ const FILTERS: { value: ChatFilter; label: string }[] = [
     IconComponent,
     ChatMenuComponent,
     ConfirmDialogComponent,
+    SelectionBarComponent,
     InitialsPipe,
     TonePipe,
   ],
@@ -111,10 +114,18 @@ export class ChatListComponent {
     const pinned = new Set(this.pinnedRows());
     return this.listChats().filter((chat) => !pinned.has(chat));
   });
-  /** Dragging needs a mouse or pen; on touch, a long-press opens the menu (Move up / down). */
+  /** Dragging needs a mouse or pen, and not while choosing chats. */
   readonly canDrag = computed(
-    () => this.pinnedRows().length > 1 && matchMedia('(pointer: fine)').matches,
+    () => this.pinnedRows().length > 1 && !this.selecting() && matchMedia('(pointer: fine)').matches,
   );
+
+  /** Selection mode (product-spec.md §1.8): rows toggle instead of opening. */
+  readonly selecting = signal(false);
+  readonly picked = signal(new Set<number>());
+  /** The chosen chats still in view, in list order. */
+  readonly pickedChats = computed(() => this.listChats().filter((chat) => this.picked().has(chat.id)));
+  /** Where a Shift+click range starts. */
+  private anchor: number | undefined;
   readonly archivedFolder = computed(() => this.store.folders().archived);
   readonly hasMoreChats = computed(() =>
     this.folder() === 'archived' ? !!this.store.nextArchived() : !!this.store.next(),
@@ -139,6 +150,7 @@ export class ChatListComponent {
   // ---- Folders and paging --------------------------------------------------------------------
 
   showArchived() {
+    this.endSelection();
     this.folder.set('archived');
     if (this.store.nextArchived() === undefined) {
       void this.chatService.loadArchived();
@@ -146,6 +158,7 @@ export class ChatListComponent {
   }
 
   showMain() {
+    this.endSelection();
     this.folder.set('main');
   }
 
@@ -161,9 +174,13 @@ export class ChatListComponent {
 
   // ---- Rows and the row menu -----------------------------------------------------------------
 
-  onRowClick(chat: Chat) {
+  onRowClick(chat: Chat, event?: MouseEvent) {
     if (this.suppressClick) {
       this.suppressClick = false;
+      return;
+    }
+    if (this.selecting() || event?.ctrlKey || event?.metaKey) {
+      this.pick(chat, !!event?.shiftKey);
       return;
     }
     if (this.swipe()) {
@@ -208,10 +225,11 @@ export class ChatListComponent {
     if (this.swipe()?.revealed && this.swipe()?.chat.id !== chat.id) {
       this.swipe.set(null);
     }
-    this.swipeStart = { chat, x: at.x, y: at.y, base: this.swipeOffset(chat) };
+    this.swipeStart = this.selecting() ? null : { chat, x: at.x, y: at.y, base: this.swipeOffset(chat) };
     this.longPress = setTimeout(() => {
       this.suppressClick = true;
-      this.menu.set({ chat, at, returnFocus: row });
+      // A long-press starts choosing chats; the bar's More holds this row's full menu.
+      this.pick(chat, false);
     }, 500);
   }
 
@@ -290,6 +308,65 @@ export class ChatListComponent {
     }
   }
 
+  // ---- Selection --------------------------------------------------------------------------
+
+  startSelection() {
+    this.menu.set(null);
+    this.swipe.set(null);
+    this.selecting.set(true);
+  }
+
+  /** Toggles a chat; with Shift, everything from the last one picked to this one. */
+  pick(chat: Chat, range: boolean) {
+    this.startSelection();
+    const rows = this.listChats();
+    const next = new Set(this.picked());
+    const from = rows.findIndex((c) => c.id === this.anchor);
+    if (range && from >= 0) {
+      const to = rows.indexOf(chat);
+      rows.slice(Math.min(from, to), Math.max(from, to) + 1).forEach((c) => next.add(c.id));
+    } else if (next.has(chat.id)) {
+      next.delete(chat.id);
+    } else {
+      next.add(chat.id);
+    }
+    this.anchor = chat.id;
+    this.picked.set(next);
+    if (next.size === 0) {
+      this.endSelection();
+    }
+  }
+
+  pickAll() {
+    this.picked.set(new Set(this.listChats().map((chat) => chat.id)));
+  }
+
+  endSelection() {
+    if (!this.selecting()) {
+      return;
+    }
+    this.selecting.set(false);
+    this.picked.set(new Set());
+    this.anchor = undefined;
+  }
+
+  /** The bar's More, for exactly one chat: its full row menu. */
+  openMenuFor(button: HTMLElement) {
+    const chat = this.pickedChats()[0];
+    if (chat) {
+      const rect = button.getBoundingClientRect();
+      this.menu.set({ chat, at: { x: rect.left, y: rect.top - 8 }, returnFocus: button });
+    }
+  }
+
+  /** Bulk mark-unread or delete includes the open chat: close it. */
+  onBulkTouches(ids: number[]) {
+    const open = this.selectedChatId();
+    if (open !== undefined && ids.includes(open)) {
+      this.closeSelected.emit();
+    }
+  }
+
   closeMenu() {
     const open = this.menu();
     this.menu.set(null);
@@ -299,6 +376,7 @@ export class ChatListComponent {
   async onMenuChoice(chat: Chat, change: ChatStateChange) {
     const focus = this.menu()?.returnFocus;
     this.closeMenu();
+    this.endSelection();
     if ('clear' in change || 'delete' in change) {
       if (focus) {
         this.confirming.set({ chat, action: 'clear' in change ? 'clear' : 'delete', focus });

@@ -1,0 +1,77 @@
+/* The list's gestures and modes: pin dragging, phone swipes and selection. */
+
+/* Dragging a pin: the row lifts (it floats, so it takes the Float shadow), the others make room. */
+.pinned { margin-bottom: 2px; }
+.row.cdk-drag-preview {
+  list-style: none;
+  border-radius: var(--radius-m);
+  background: var(--side-bg-2);
+  color: var(--side-text);
+  box-shadow: var(--shadow-2);
+  .row-menu { display: none; }
+}
+.row.cdk-drag-placeholder { opacity: 0.35; }
+.pinned.cdk-drop-list-dragging .row:not(.cdk-drag-placeholder),
+.row.cdk-drag-animating { transition: transform 200ms var(--ease-out); }
+.pinned:not(.cdk-drop-list-disabled) .room { cursor: grab; }
+
+/* Swipe on phones: the row slides over what it uncovers, and snaps back unless held. */
+.room { touch-action: pan-y; }
+.room.swiped { position: relative; z-index: 1; transition: transform 200ms var(--ease-out); }
+.room.swiped:not(.active) { background: var(--side-bg); }
+.room.swiping { transition: none; }
+.swipe-under {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  border-radius: var(--radius-m);
+  background: var(--side-bg-2);
+  overflow: hidden;
+  &.archiving { justify-content: flex-end; background: var(--accent); }
+}
+.swipe-btn, .swipe-archive {
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  width: 72px;
+  border: 0;
+  background: transparent;
+  color: var(--side-text);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  app-icon { width: 18px; height: 18px; }
+}
+.swipe-btn.mute { border-left: 1px solid var(--side-line); }
+.swipe-archive { width: 96px; color: var(--on-accent); }
+
+/* Selection mode: a checkbox leads each row, and the chevron steps aside. */
+.side-title .select-btn { margin: -8px -8px -8px auto; width: 32px; height: 32px; color: var(--side-text-2); app-icon { width: 18px; height: 18px; } }
+.side-title.selecting { padding-top: 12px; padding-bottom: 6px; h2 { color: var(--side-text); font-size: 15px; } }
+.title-action {
+  margin-left: auto;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: none;
+  color: #a5b4fc;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  &:hover { background: var(--side-bg-2); }
+}
+.check {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--side-text-2);
+  border-radius: 4px;
+  &.on { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+  app-icon { width: 14px; height: 14px; }
+}
+.room-list.selecting .row-menu { display: none; }
+.room.picked:not(.active) { background: color-mix(in srgb, var(--accent) 22%, transparent); }

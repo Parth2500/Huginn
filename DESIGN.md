@@ -429,6 +429,10 @@ Quiet, solid and compact.
 - A pinned chat in the full main list also gets *Move up* / *Move down* (arrow icons) under Pin: the keyboard's way to reorder pins.
 - Destructive items (Clear chat…, Delete chat…) sit below a 1px divider in danger ink, icon included, and fill with danger-wash on hover. A trailing "…" means a confirmation follows.
 
+### Selection Bar
+- Docked under the list on the slate rail, above the account bar, with a hairline above: equal-width icon-over-label buttons (18px icon, 11px 600 label) for Archive, Mute (an inline menu of durations, or Unmute), Read / Unread, Pin / Unpin, Delete (rose ink) and, for one chat, More. Disabled actions drop to 40% and say why in a tooltip and to screen readers.
+- The list title becomes "✕ N selected" with a light-indigo "Select all"; rows lead with an 18px checkbox (4px radius, indigo fill and check when on) and picked rows take a 22% indigo wash. The row chevron hides.
+
 ### Pin Reordering
 - In the full main list (no filter), pinned rows drag with a mouse or pen (Angular CDK, vertical only, `grab` cursor). The lifted row takes Slate Rail Raised, the Float shadow and no chevron; its slot stays at 35% opacity, and the other rows slide 200ms on the ease-out curve. On touch screens the long-press menu does it instead.
 

@@ -99,8 +99,10 @@ shortcuts* shows this list.
 
 ### 2.2 Row menu
 
-Opens by right-click, the chevron that appears on hover, or a long-press on a phone. It's a
-menu, not a dialog.
+Opens by right-click, the chevron that appears on hover, or the keyboard's menu key. It's a menu,
+not a dialog. On a phone a long-press starts selection mode (§1.2, §2.3) instead, and the bar's
+**More** opens this menu when one chat is selected (decided 2026-10-24: the two sections
+disagreed).
 
 ```
 Pin chat              (Unpin chat)
@@ -131,6 +133,9 @@ divider.
 - The bar is docked at the bottom of the rail, or the screen on a phone. Actions that don't
   apply to the selection are disabled, with a tooltip that explains why ("Pin: limit of 5
   reached").
+- Built 2026-10-24: entered by the list's Select button, Ctrl/⌘+click or a long-press; Shift+click
+  picks a range. Until groups can be left (1.7), Delete is disabled when a group is selected
+  ("Delete: leave a group before deleting it").
 
 ### 2.4 Archived view
 

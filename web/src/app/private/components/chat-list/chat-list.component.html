@@ -1,16 +1,32 @@
-<div class="side-title">
-  @if (folder() === 'archived') {
-    <button type="button" class="folder-back icon-btn" (click)="showMain()" aria-label="Back to chats">
-      <app-icon name="arrow-left" />
+@if (selecting()) {
+  <div class="side-title selecting">
+    <button type="button" class="folder-back icon-btn" (click)="endSelection()" aria-label="Stop selecting">
+      <app-icon name="x" />
     </button>
-    <h2>Archived</h2>
-  } @else {
-    <h2>Chats</h2>
-  }
-  @if (loaded()) {
-    <span class="count tabular">{{ listChats().length }}{{ hasMoreChats() ? '+' : '' }}</span>
-  }
-</div>
+    <h2 aria-live="polite">{{ picked().size }} selected</h2>
+    <button type="button" class="title-action" (click)="pickAll()">Select all</button>
+  </div>
+} @else {
+  <div class="side-title">
+    @if (folder() === 'archived') {
+      <button type="button" class="folder-back icon-btn" (click)="showMain()" aria-label="Back to chats">
+        <app-icon name="arrow-left" />
+      </button>
+      <h2>Archived</h2>
+    } @else {
+      <h2>Chats</h2>
+    }
+    @if (loaded()) {
+      <span class="count tabular">{{ listChats().length }}{{ hasMoreChats() ? '+' : '' }}</span>
+    }
+    @if (loaded() && listChats().length > 0) {
+      <button type="button" class="select-btn icon-btn" (click)="startSelection()" aria-label="Select chats"
+        title="Select chats">
+        <app-icon name="list-checks" />
+      </button>
+    }
+  </div>
+}
 @if (folder() === 'main' && loaded() && allChats().length > 0) {
   <div class="filters" role="group" aria-label="Filter chats">
     @for (option of filters; track option.value) {
@@ -19,7 +35,7 @@
     }
   </div>
 }
-<nav class="room-list" [attr.aria-label]="folder() === 'archived' ? 'Archived chats' : 'Chats'">
+<nav class="room-list" [class.selecting]="selecting()" [attr.aria-label]="folder() === 'archived' ? 'Archived chats' : 'Chats'">
   <!-- Loading -->
   @if (!loaded()) {
     <ul aria-busy="true" aria-label="Loading chats">
@@ -102,6 +118,10 @@
     </div>
   }
 </nav>
+@if (selecting() && pickedChats().length > 0) {
+  <app-selection-bar [chats]="pickedChats()" [archivedView]="folder() === 'archived'"
+    (done)="endSelection()" (more)="openMenuFor($event)" (closesOpen)="onBulkTouches($event)" />
+}
 @if (menu(); as open) {
   <app-chat-menu [chat]="open.chat" [at]="open.at" [moves]="pinMoves(open.chat)"
     (choose)="onMenuChoice(open.chat, $event)" (move)="movePin(open.chat, $event)" (close)="closeMenu()" />
@@ -131,7 +151,8 @@
       }
     </div>
   }
-  <button type="button" class="room" (click)="onRowClick(chat)"
+  <button type="button" class="room" (click)="onRowClick(chat, $event)"
+    [attr.aria-pressed]="selecting() ? picked().has(chat.id) : null"
     (contextmenu)="openMenuAt($event, chat)"
     [style.transform]="swipeOffset(chat) ? 'translateX(' + swipeOffset(chat) + 'px)' : null"
     [class.swiped]="swipeOffset(chat) !== 0"
@@ -143,8 +164,14 @@
     [class.fresh]="fresh().has(chat.id)"
     [class.has-unread]="chat.unreadCount > 0 || chat.me.markedUnread"
     [class.muted]="muted(chat)"
+    [class.picked]="picked().has(chat.id)"
     [attr.aria-current]="isSelected(chat) ? 'true' : null"
     [attr.aria-label]="rowLabel(chat)">
+    @if (selecting()) {
+      <span class="check" [class.on]="picked().has(chat.id)" aria-hidden="true">
+        @if (picked().has(chat.id)) { <app-icon name="check" /> }
+      </span>
+    }
     @if (directPartner(chat); as person) {
       <app-avatar [user]="person"
       [online]="onlineIds().has(person.Id!)" />
