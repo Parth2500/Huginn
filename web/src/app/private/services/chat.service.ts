@@ -235,6 +235,19 @@ export class ChatService {
     return null;
   }
 
+  /** Edits your own message (`message.edit`). Returns null, or why it couldn't be edited. */
+  async editMessage(messageId: number, text: string): Promise<string | null> {
+    const result = await this.socket.request<{ message: ChatMessage }>('message.edit', { messageId, text });
+    if (!result.ok) {
+      return result.error === 'offline'
+        ? "You're offline. Try again when the connection is back."
+        : result.error;
+    }
+    this.messages.replace(result.message);
+    this.chats.applyChanged(result.message);
+    return null;
+  }
+
   /** A send the server refused: try it again. */
   retrySend(clientMessageId: string) {
     this.outbox.retry(clientMessageId);
@@ -343,13 +356,21 @@ export class ChatService {
     return page.ok;
   }
 
-  /** Queues a message. `toUserId` sends the first message to a person, creating the chat. */
-  send(target: { chatId: number } | { toUserId: number }, text: string) {
+  /**
+   * Queues a message. `toUserId` sends the first message to a person, creating the chat; `replyTo`
+   * quotes a message in the same chat.
+   */
+  send(
+    target: { chatId: number } | { toUserId: number },
+    text: string,
+    replyTo?: { id: number; senderId: number | null; excerpt: string | null },
+  ) {
     this.outbox.add({
       clientMessageId: crypto.randomUUID(),
       ...target,
       text,
       createdAt: new Date().toISOString(),
+      ...(replyTo ? { replyToMessageId: replyTo.id, replyTo } : {}),
     });
     void this.flushOutbox();
   }
@@ -514,9 +535,14 @@ export class ChatService {
         this.chats.applyReceipts(chatId, receipts);
         return;
       }
+      case 'message.edited': {
+        this.messages.replace(update.data.message);
+        this.chats.applyChanged(update.data.message);
+        return;
+      }
       case 'message.deleted': {
         this.messages.replace(update.data.message);
-        this.chats.applyDeleted(update.data.message);
+        this.chats.applyChanged(update.data.message);
         return;
       }
       case 'message.hidden': {

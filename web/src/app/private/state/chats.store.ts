@@ -139,8 +139,8 @@ export class ChatsStore {
     }
   }
 
-  /** A message deleted for everyone: if it's the preview, the preview becomes its tombstone. */
-  applyDeleted(message: ChatMessage) {
+  /** A message edited or deleted for everyone: if it's the preview, the preview follows. */
+  applyChanged(message: ChatMessage) {
     const chat = this.get(message.chatId);
     if (chat?.lastMessage?.id === message.id) {
       this.upsert([{ ...chat, lastMessage: message }]);

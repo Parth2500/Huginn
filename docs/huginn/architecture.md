@@ -218,7 +218,7 @@ Built in 0.4:
 | `direct.open` | `{ userId }` | `{ partner, chat }`, where `chat` is null until the first message creates it |
 | `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], hasMore }` / `{}` |
 | `messages.page` | `{ chatId, before?: messageId }` | `{ messages[], hasMore }` |
-| `message.send` | `{ chatId \| toUserId, clientMessageId, text }` | `{ message, chatId }` |
+| `message.send` | `{ chatId \| toUserId, clientMessageId, text, replyToMessageId? }` | `{ message, chatId }` |
 | `chat.read` | `{ chatId, upTo: messageId }`, capped at the chat's newest; also delivers | `{}`, plus `receipt` updates for the senders (1.5) |
 | `message.edit` | `{ messageId, text }`: your own, within 15 minutes | `{ message }`, plus `message.edited` to every member (1.4) |
 | `chat.delivered` | `{ chatId, upTo: messageId }`, capped likewise | `{}`, plus `receipt` updates (1.5) |

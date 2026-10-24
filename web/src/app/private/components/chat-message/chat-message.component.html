@@ -1,4 +1,5 @@
 <div class="msg" [class.own]="own()" [class.first]="first()" [class.last]="last()" [class.fresh]="fresh()"
+  [class.flash]="flash()" [class.menu-open]="menuOpen()"
   [class.pending]="status() === 'pending' || status() === 'stalled'" [class.selecting]="selecting()" [class.picked]="picked()"
   (click)="onClick($event)" (pointerdown)="pressStart($event)" (pointerup)="pressEnd()" (pointercancel)="pressEnd()"
   (pointermove)="pressEnd()">
@@ -22,7 +23,17 @@
       <button type="button" class="sender" [ngClass]="message().sender?.Id | tone"
       (click)="emitSender()">{{ message().sender | displayName }}</button>
     }
+    @if (message().replyTo; as quote) {
+      <button type="button" class="quote" [ngClass]="quote.senderId | tone" (click)="jump.emit(quote.id); $event.stopPropagation()"
+        [attr.aria-label]="'Replying to ' + quoteName() + ': ' + quoteText() + '. Show it.'">
+        <span class="quote-name">{{ quoteName() }}</span>
+        <span class="quote-text">{{ quoteText() }}</span>
+      </button>
+    }
     <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().sender | displayName) }}: </span>@if (message().deleted) {<em class="deleted">{{ tombstone() }}</em>} @else {@for (part of message().text | richText; track $index) {@switch (part.style) {@case ('bold') {<b>{{ part.text }}</b>} @case ('italic') {<i>{{ part.text }}</i>} @case ('strike') {<s>{{ part.text }}</s>} @case ('code') {<code>{{ part.text }}</code>} @default {@if (part.href) {<a [href]="part.href" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>} @else {{{ part.text }}}}}}}<span class="meta">
+    @if (message().editedAt && !message().deleted) {
+      <span class="edited">edited</span>
+    }
     <time [attr.datetime]="message().createdAt" [title]="message().createdAt | date: 'EEEE d MMMM y, HH:mm'">{{ message().createdAt | date: 'HH:mm' }}</time>
     @switch (status()) {
       @case ('pending') {
@@ -58,6 +69,31 @@
     }
   </span></p>
 </div>
+@if (actions()) {
+  <div class="actions">
+    <button type="button" class="act" (click)="reply.emit()" aria-label="Reply" title="Reply">
+      <app-icon name="reply" />
+    </button>
+    <button type="button" class="act more" (click)="menuOpen.set(!menuOpen())" aria-haspopup="menu"
+      [attr.aria-expanded]="menuOpen()" aria-label="More actions" title="More">
+      <app-icon name="more-horizontal" />
+    </button>
+    @if (menuOpen()) {
+      <div class="msg-menu" role="menu" aria-label="Message actions" (keydown.escape)="menuOpen.set(false)">
+        <button type="button" role="menuitem" (click)="choose('reply')"><app-icon name="reply" />Reply</button>
+        @if (message().text) {
+          <button type="button" role="menuitem" (click)="choose('copy')"><app-icon name="copy" />Copy text</button>
+        }
+        @if (canEdit()) {
+          <button type="button" role="menuitem" (click)="choose('edit')"><app-icon name="pencil" />Edit</button>
+        }
+        <button type="button" role="menuitem" (click)="choose('select')"><app-icon name="list-checks" />Select</button>
+        <div class="divider" role="separator"></div>
+        <button type="button" role="menuitem" class="danger" (click)="choose('remove')"><app-icon name="trash" />Delete…</button>
+      </div>
+    }
+  </div>
+}
 </div>
 @if (status() === 'failed') {
   <div class="failed-note" [class.own]="own()">

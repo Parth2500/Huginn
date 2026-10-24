@@ -1,4 +1,13 @@
-import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
+import {
+  ChangeDetectionStrategy,
+  Component,
+  HostListener,
+  computed,
+  input,
+  output,
+  signal,
+} from '@angular/core';
+import { plainText } from '../../helpers/chat-display';
 import { IUser } from 'src/app/models/user.interface';
 import { MessageStatus, ShownMessage } from '../chat-room/chat-room.component';
 import { NgClass, DatePipe } from '@angular/common';
@@ -10,6 +19,7 @@ import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 
 @Component({
     selector: 'app-chat-message',
+    host: { '[attr.data-message-id]': 'message().id ?? null' },
     templateUrl: './chat-message.component.html',
     styleUrls: ['./chat-message.component.scss'],
     changeDetection: ChangeDetectionStrategy.OnPush,
@@ -50,6 +60,39 @@ export class ChatMessageComponent {
   /** "Not sent. Tap to see why." opens the reason and the choices. */
   readonly showWhy = signal(false);
   private pressTimer: ReturnType<typeof setTimeout> | undefined;
+
+  /** The hover pill and ⋯ menu (ux-design.md §3.3): off while selecting or sending. */
+  readonly actions = input(false);
+  readonly canEdit = input(false);
+  /** Who wrote the message this one quotes: "You" or their name. */
+  readonly quoteName = input('');
+  /** Jumped to: the bubble flashes once. */
+  readonly flash = input(false);
+  readonly reply = output<void>();
+  readonly edit = output<void>();
+  readonly copy = output<void>();
+  readonly select = output<void>();
+  readonly remove = output<void>();
+  readonly jump = output<number>();
+  readonly menuOpen = signal(false);
+
+  /** A quoted message's words, without formatting markers. */
+  readonly quoteText = computed(() => {
+    const quote = this.message().replyTo;
+    return quote?.excerpt != null ? plainText(quote.excerpt) : 'Deleted message';
+  });
+
+  choose(action: 'reply' | 'edit' | 'copy' | 'select' | 'remove') {
+    this.menuOpen.set(false);
+    this[action].emit();
+  }
+
+  @HostListener('document:pointerdown', ['$event'])
+  closeMenuOutside(event: PointerEvent) {
+    if (this.menuOpen() && !(event.target as Element).closest('.msg-menu, .more')) {
+      this.menuOpen.set(false);
+    }
+  }
 
   readonly tombstone = computed(() => {
     const message = this.message();

@@ -43,7 +43,7 @@ export class OutboxStore {
     this.entries.update((list) =>
       list.map((e) =>
         e.toUserId === toUserId
-          ? { clientMessageId: e.clientMessageId, chatId, text: e.text, createdAt: e.createdAt, failed: e.failed }
+          ? { ...e, toUserId: undefined, chatId }
           : e,
       ),
     );

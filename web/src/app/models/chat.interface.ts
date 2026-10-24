@@ -112,6 +112,7 @@ export type Update =
   | { seq: number; type: 'message.new'; data: { message: ChatMessage } }
   | { seq: number; type: 'chat.state'; data: { chatId: number; me: MyChatState; unreadCount: number } }
   | { seq: number; type: 'receipt'; data: { chatId: number } & Receipts }
+  | { seq: number; type: 'message.edited'; data: { message: ChatMessage } }
   | { seq: number; type: 'message.deleted'; data: { message: ChatMessage } }
   | { seq: number; type: 'message.hidden'; data: { chatId: number; messageIds: number[] } };
 

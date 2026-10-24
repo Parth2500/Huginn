@@ -171,3 +171,90 @@
 .msg.picked .pick { border-color: var(--accent); background: var(--accent); }
 .msg.own .pick { order: 2; margin-right: auto; }
 .msg.own.selecting { padding-left: 0; }
+
+/* A quote (product-spec.md §3.2): the quoted person's colour on a bar, then their words. */
+.quote {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  margin: 2px 0 4px;
+  padding: 4px 8px;
+  border: 0;
+  border-left: 3px solid var(--tone-text, var(--accent));
+  border-radius: 6px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  .msg.own & { border-left-color: var(--on-accent-2); }
+}
+.quote-name { font-size: 12px; font-weight: 700; color: var(--tone-text, inherit); .msg.own & { color: var(--on-accent); } }
+.quote-text { font-size: 13px; opacity: 0.85; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.edited { font-style: italic; }
+
+/* Jumped to: a ring that fades (static, then gone, under reduced motion). */
+.bubble { transition: box-shadow 600ms ease-out; }
+.msg.flash .bubble { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); transition: none; }
+
+/* The hover pill: Reply and ⋯ beside the bubble. */
+.msg { position: relative; }
+.actions {
+  position: relative;
+  display: flex;
+  align-self: center;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+.msg:hover .actions, .msg:focus-within .actions, .msg.menu-open .actions { opacity: 1; }
+.act {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--text-2);
+  box-shadow: var(--shadow-1);
+  cursor: pointer;
+  app-icon { width: 16px; height: 16px; }
+  &:hover { color: var(--text); }
+}
+.msg-menu {
+  position: absolute;
+  z-index: 20;
+  bottom: calc(100% + 4px);
+  display: grid;
+  min-width: 180px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-2);
+  .msg:not(.own) & { left: 0; }
+  .msg.own & { right: 0; }
+  [role='menuitem'] {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 36px;
+    padding: 6px 10px;
+    border: 0;
+    border-radius: var(--radius-s);
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-size: 14px;
+    text-align: left;
+    cursor: pointer;
+    app-icon { width: 16px; height: 16px; color: var(--text-2); }
+    &:hover, &:focus-visible { background: var(--surface-2); outline: none; }
+    &.danger, &.danger app-icon { color: var(--danger); }
+  }
+  .divider { height: 1px; margin: 4px; background: var(--line); }
+}
+@media (hover: none) { .actions { display: none; } }

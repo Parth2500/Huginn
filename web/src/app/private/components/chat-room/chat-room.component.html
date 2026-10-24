@@ -138,6 +138,11 @@
             [picked]="row.message.id !== undefined && picked().has(row.message.id)"
             (toggle)="togglePick(row.message.id)" (press)="startSelecting(row.message.id)"
             (retry)="retrySend(row.message)" (discard)="discardSend(row.message)"
+            [actions]="!selecting() && row.message.id !== undefined && !row.message.deleted"
+            [canEdit]="canEdit(row.message)" [quoteName]="quoteName(row.message.replyTo?.senderId)"
+            [flash]="row.message.id !== undefined && flashId() === row.message.id"
+            (reply)="replyTo(row.message)" (edit)="startEdit(row.message)" (copy)="copyText(row.message)"
+            (select)="startSelecting(row.message.id)" (remove)="removeOne(row.message)" (jump)="jumpTo($event)"
             (openSender)="openProfile.emit($event)">
           </app-chat-message>
         }
@@ -156,6 +161,16 @@
 
   @if (selecting()) {
     <div class="select-bar" role="toolbar" aria-label="Actions for selected messages">
+      @if (pickedMessages().length === 1) {
+        <button type="button" class="btn btn-secondary" (click)="replyTo(pickedMessages()[0])">
+          <app-icon name="reply"></app-icon>Reply
+        </button>
+        @if (canEdit(pickedMessages()[0])) {
+          <button type="button" class="btn btn-secondary" (click)="startEdit(pickedMessages()[0])">
+            <app-icon name="pencil"></app-icon>Edit
+          </button>
+        }
+      }
       <button type="button" class="btn btn-secondary" (click)="copyPicked()" [disabled]="picked().size === 0">
         <app-icon name="copy"></app-icon>Copy
       </button>
@@ -171,13 +186,26 @@
           {{ connection() === 'connecting' ? 'Connecting to the chat server…' : "You're offline. Messages you send will go out when the connection is back." }}
         </p>
       }
+      @if (replying(); as quoted) {
+        <div class="compose-strip">
+          <app-icon name="reply"></app-icon>
+          <span class="strip-text"><b>Replying to {{ quoteName(quoted.sender?.Id) }}</b> · {{ quoted.text }}</span>
+          <button type="button" class="icon-btn" (click)="cancelCompose()" aria-label="Cancel reply"><app-icon name="x"></app-icon></button>
+        </div>
+      } @else if (editing()) {
+        <div class="compose-strip">
+          <app-icon name="pencil"></app-icon>
+          <span class="strip-text"><b>Editing message</b> · Esc to cancel</span>
+          <button type="button" class="icon-btn" (click)="cancelCompose()" aria-label="Cancel editing"><app-icon name="x"></app-icon></button>
+        </div>
+      }
       <div class="composer-row">
         <label class="visually-hidden" for="composer-input">Message {{ title() }}</label>
         <textarea id="composer-input" #composer rows="1" [formControl]="chatMessage"
           [placeholder]="'Message ' + title()" (keydown)="onComposerKeydown($event)"
         (input)="onComposerInput()" enterkeyhint="send" aria-describedby="composer-hint" maxlength="2000"></textarea>
-        <button type="submit" class="send" [disabled]="!canSend" aria-label="Send message">
-          <app-icon name="send"></app-icon>
+        <button type="submit" class="send" [disabled]="!canSend" [attr.aria-label]="editing() ? 'Save edit' : 'Send message'">
+          <app-icon [name]="editing() ? 'check' : 'send'"></app-icon>
         </button>
       </div>
       <p class="hint" id="composer-hint">
@@ -196,7 +224,7 @@
 @if (confirmingDelete()) {
   @let text = deleteText();
   <app-confirm-dialog [title]="text.title" [body]="canDeleteForAll() ? 'Choose who it\'s deleted for.' : 'They\'ll be removed from your devices. Everyone else keeps their copy.'"
-    [action]="text.action" (confirm)="confirmDelete()" (cancel)="confirmingDelete.set(false)">
+    [action]="text.action" (confirm)="confirmDelete()" (cancel)="cancelDelete()">
     @if (canDeleteForAll()) {
       <div class="delete-scope" role="radiogroup" aria-label="Delete for">
         <label><input type="radio" name="delete-for" [checked]="deleteFor() === 'me'" (change)="deleteFor.set('me')" /> Delete for me</label>

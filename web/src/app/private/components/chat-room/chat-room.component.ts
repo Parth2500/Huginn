@@ -59,6 +59,8 @@ export interface ShownMessage {
   deletedById?: number | null;
   kind?: 'text' | 'system';
   system?: SystemEvent | null;
+  editedAt?: string | null;
+  replyTo?: { id: number; senderId: number | null; excerpt: string | null } | null;
   /** Still in the outbox: its key there, and why the server refused it, if it did. */
   clientMessageId?: string | null;
   failed?: string;
@@ -183,6 +185,12 @@ export class ChatRoomComponent implements AfterViewInit {
     );
   });
   readonly confirmingDelete = signal(false);
+
+  /** The composer is replying to a message, or editing one of yours (ux-design.md §3.4). */
+  readonly replying = signal<ShownMessage | null>(null);
+  readonly editing = signal<ChatMessage | null>(null);
+  /** A quoted message that was jumped to, flashing once. */
+  readonly flashId = signal<number | undefined>(undefined);
   readonly deleteFor = signal<'me' | 'all'>('me');
 
   /** Messages from others that arrived while the reader was scrolled up. */
@@ -326,6 +334,105 @@ export class ChatRoomComponent implements AfterViewInit {
     }
   }
 
+  // ---- Reply, edit and the message menu -------------------------------------------------------
+
+  /** Your own text message, stored, and under 15 minutes old. */
+  canEdit(message: ShownMessage): boolean {
+    return (
+      message.id !== undefined &&
+      message.kind !== 'system' &&
+      !message.deleted &&
+      message.sender?.Id === this.me().Id &&
+      Date.now() - Date.parse(message.createdAt) <= UNSEND_WINDOW_MS
+    );
+  }
+
+  /** "You", or the name of whoever wrote the quoted message. */
+  quoteName(senderId: number | null | undefined): string {
+    if (senderId === this.me().Id) {
+      return 'You';
+    }
+    return personName(this.chat().members.find((m) => m.Id === senderId));
+  }
+
+  replyTo(message: ShownMessage) {
+    this.endSelecting();
+    this.editing.set(null);
+    this.replying.set(message);
+    this.focusComposer();
+  }
+
+  startEdit(message: ShownMessage) {
+    const stored = this.history()?.messages.find((m) => m.id === message.id);
+    if (!stored || !this.canEdit(stored)) {
+      return;
+    }
+    this.endSelecting();
+    this.replying.set(null);
+    this.editing.set(stored);
+    this.chatMessage.setValue(stored.text ?? '');
+    this.focusComposer();
+  }
+
+  cancelCompose() {
+    if (this.editing()) {
+      this.chatMessage.setValue(this.draftKey ? this.drafts.get(this.draftKey) : '');
+      setTimeout(() => this.resizeComposer());
+    }
+    this.replying.set(null);
+    this.editing.set(null);
+  }
+
+  async copyText(message: ShownMessage) {
+    try {
+      await navigator.clipboard.writeText(message.text ?? '');
+      this.toast.show('Copied.');
+    } catch {
+      this.toast.error("Couldn't copy. Your browser didn't allow it.");
+    }
+  }
+
+  /** Delete… from the menu: the same dialog as selection, for one message. */
+  removeOne(message: ShownMessage) {
+    if (message.id !== undefined) {
+      this.picked.set(new Set([message.id]));
+      this.askDelete();
+    }
+  }
+
+  cancelDelete() {
+    this.confirmingDelete.set(false);
+    if (!this.selecting()) {
+      this.picked.set(new Set());
+    }
+  }
+
+  /** Shows a quoted message: scrolls to it (loading older pages if needed) and flashes it. */
+  async jumpTo(messageId: number) {
+    const scroller = this.messagesScroller()?.nativeElement;
+    const find = () => scroller?.querySelector<HTMLElement>(`[data-message-id="${messageId}"]`);
+    for (let page = 0; !find() && page < 5 && this.truncated(); page++) {
+      await this.loadOlder();
+      await new Promise((resolve) => setTimeout(resolve));
+    }
+    const target = find();
+    if (!target) {
+      this.toast.show("That message is too far back, or it's been deleted.");
+      return;
+    }
+    this.pinned = false;
+    target.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    this.flashId.set(messageId);
+    setTimeout(() => this.flashId.set(undefined), 700);
+  }
+
+  private focusComposer() {
+    setTimeout(() => {
+      this.resizeComposer();
+      this.composer()?.nativeElement.focus();
+    });
+  }
+
   get canSend(): boolean {
     return !!this.chatMessage.value?.trim();
   }
@@ -335,10 +442,26 @@ export class ChatRoomComponent implements AfterViewInit {
     if (!text) {
       return;
     }
+    const editing = this.editing();
+    if (editing) {
+      this.editing.set(null);
+      this.chatMessage.setValue(this.draftKey ? this.drafts.get(this.draftKey) : '');
+      setTimeout(() => this.resizeComposer());
+      if (text !== editing.text) {
+        void this.chatService.editMessage(editing.id, text).then((error) => error && this.toast.error(error));
+      }
+      return;
+    }
     const id = this.chatId();
     const partnerId = draftTarget(this.chat(), this.me());
+    const quoted = this.replying();
+    const replyTo =
+      quoted?.id !== undefined
+        ? { id: quoted.id, senderId: quoted.sender?.Id ?? null, excerpt: (quoted.text ?? '').slice(0, 140) }
+        : undefined;
+    this.replying.set(null);
     if (id !== undefined) {
-      this.chatService.send({ chatId: id }, text);
+      this.chatService.send({ chatId: id }, text, replyTo);
     } else if (partnerId !== undefined) {
       this.chatService.send({ toUserId: partnerId }, text);
     }
@@ -352,7 +475,7 @@ export class ChatRoomComponent implements AfterViewInit {
 
   onComposerInput() {
     this.resizeComposer();
-    if (this.draftKey) {
+    if (this.draftKey && !this.editing()) {
       this.drafts.set(this.draftKey, this.chatMessage.value ?? '');
     }
     const now = Date.now();
@@ -383,6 +506,21 @@ export class ChatRoomComponent implements AfterViewInit {
   }
 
   onComposerKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && (this.replying() || this.editing())) {
+      event.preventDefault();
+      event.stopPropagation();
+      this.cancelCompose();
+      return;
+    }
+    // ↑ in an empty composer edits your last message (ux-design.md §1.3).
+    if (event.key === 'ArrowUp' && !this.chatMessage.value && !this.editing()) {
+      const last = [...(this.history()?.messages ?? [])].reverse().find((m) => m.sender?.Id === this.me().Id);
+      if (last && this.canEdit(last)) {
+        event.preventDefault();
+        this.startEdit(last);
+      }
+      return;
+    }
     if (event.key === 'Enter' && !event.shiftKey && !event.isComposing) {
       event.preventDefault();
       this.sendMessage();
@@ -514,6 +652,8 @@ export class ChatRoomComponent implements AfterViewInit {
 
   private resetView() {
     this.endSelecting();
+    this.replying.set(null);
+    this.editing.set(null);
     const chat = this.chat();
     this.unreadMark.set(
       chat.id !== undefined && chat.unreadCount > 0
@@ -594,6 +734,7 @@ export class ChatRoomComponent implements AfterViewInit {
           deleted: false,
           clientMessageId: p.clientMessageId,
           failed: p.failed,
+          replyTo: p.replyTo ?? null,
         },
         status: (p.failed ? 'failed' : stalled.has(p.clientMessageId) ? 'stalled' : 'pending') as MessageStatus,
         key: `p${p.clientMessageId}`,

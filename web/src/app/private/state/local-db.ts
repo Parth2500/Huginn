@@ -9,6 +9,9 @@ export interface OutboxEntry {
   toUserId?: number;
   text: string;
   createdAt: string;
+  /** A reply: the message it quotes, and the quote to show while it's sending. */
+  replyToMessageId?: number;
+  replyTo?: { id: number; senderId: number | null; excerpt: string | null };
   /** The server refused it, and why: shown with Retry and Delete instead of sending again. */
   failed?: string;
 }
