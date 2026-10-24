@@ -19,7 +19,15 @@ import { ToastService } from 'src/app/shared/toast/toast.service';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
-import { chatPartner, chatTitle, isMuted, mutedForever, personName } from '../../helpers/chat-display';
+import {
+  chatPartner,
+  chatTitle,
+  isMuted,
+  mutedForever,
+  personName,
+  plainText,
+  systemText,
+} from '../../helpers/chat-display';
 import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
 import { DraftsStore } from '../../state/drafts.store';
@@ -570,10 +578,13 @@ export class ChatListComponent {
     if (!message) {
       return chat.kind === 'self' ? 'Only you can see this' : `No messages yet · ${this.members(chat)}`;
     }
+    if (message.kind === 'system') {
+      return systemText(message.system, this.me(), chat.members);
+    }
     if (message.deleted) {
       return message.deletedById === this.me().Id ? 'You deleted this message' : 'This message was deleted';
     }
-    const text = message.text ?? '';
+    const text = plainText(message.text ?? '');
     if (chat.kind === 'self') {
       return text; // every note is yours
     }

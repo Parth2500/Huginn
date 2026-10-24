@@ -10,14 +10,19 @@ export type ChatKind = 'self' | 'direct' | 'group';
 export type MemberRole = 'owner' | 'admin' | 'member';
 export type GroupPolicy = 'all' | 'admins';
 
+/** What a system message records; each client words it for its reader (product-spec.md §3.10). */
+export type SystemEvent = { type: 'group.created'; actorId: number; title: string };
+
 export interface ChatMessage {
   id: number;
   chatId: number;
   clientMessageId: string | null;
   sender: IUser | null;
   kind: 'text' | 'system';
-  /** Null once deleted for everyone. */
+  /** Null once deleted for everyone, and for system messages. */
   text: string | null;
+  /** Set on system messages only. */
+  system: SystemEvent | null;
   replyTo: { id: number; senderId: number | null; excerpt: string | null } | null;
   createdAt: string;
   editedAt: string | null;

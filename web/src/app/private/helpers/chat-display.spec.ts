@@ -10,6 +10,8 @@ import {
   isMuted,
   mutedForever,
   personName,
+  plainText,
+  systemText,
   withUpdatedUser,
 } from './chat-display';
 
@@ -74,6 +76,16 @@ describe('chat display helpers', () => {
     expect(draftTarget(direct, me)).toBe(2);
   });
 
+  it('drops formatting markers from previews', () => {
+    expect(plainText('Ship *today*, `npm run build`')).toBe('Ship today, npm run build');
+  });
+
+  it('words system messages for the reader', () => {
+    const event = { type: 'group.created' as const, actorId: 2, title: 'Launch crew' };
+    expect(systemText(event, me, [me, sam])).toBe('Sam Rivera created the group “Launch crew”');
+    expect(systemText({ ...event, actorId: 1 }, me, [me, sam])).toBe('You created the group “Launch crew”');
+  });
+
   it('falls back from display name to username', () => {
     expect(personName({ username: 'tess' })).toBe('tess');
     expect(personName(undefined)).toBe('Someone');
@@ -88,6 +100,7 @@ describe('chat display helpers', () => {
         sender: sam,
         kind: 'text',
         text: 'hi',
+        system: null,
         replyTo: null,
         createdAt: '2026-10-20T10:00:00Z',
         editedAt: null,

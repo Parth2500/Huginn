@@ -18,6 +18,19 @@
   }
 }
 
+/* System messages (product-spec.md §3.10): centred, quiet, never a bubble. */
+.system-line {
+  margin: 10px auto;
+  max-width: 80%;
+  padding: 4px 12px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+  color: var(--text-2);
+  font-size: 12.5px;
+  text-align: center;
+  width: fit-content;
+}
+
 /* Selecting messages: the header counts them, and the composer gives way to Copy and Delete. */
 .select-title { flex: 1; font-size: 16px; font-weight: 650; }
 .select-messages { margin-left: auto; color: var(--text-2); }

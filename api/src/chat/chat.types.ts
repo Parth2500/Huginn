@@ -6,14 +6,26 @@ import { MessageKind } from './entities/message.entity';
 /** What clients receive. Mirrored in web/src/app/models. Version 1 of the realtime protocol. */
 export const PROTOCOL_VERSION = 1;
 
+/**
+ * What a system message records (product-spec.md §3.10). Clients word it, so "You" and names
+ * fit the reader. More events arrive with full groups (1.7).
+ */
+export type SystemEvent = {
+  type: 'group.created';
+  actorId: number;
+  title: string;
+};
+
 export interface MessageDto {
   id: number;
   chatId: number;
   clientMessageId: string | null;
   sender: IPublicUser | null;
   kind: MessageKind;
-  /** Null once deleted for everyone. */
+  /** Null once deleted for everyone, and for system messages. */
   text: string | null;
+  /** Set on system messages only. */
+  system: SystemEvent | null;
   replyTo: {
     id: number;
     senderId: number | null;

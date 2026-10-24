@@ -24,6 +24,7 @@ const message = (id: number, createdAt: string): ChatMessage => ({
   sender: { Id: 2, username: 'sam' },
   kind: 'text',
   text: `message ${id}`,
+  system: null,
   replyTo: null,
   createdAt,
   editedAt: null,

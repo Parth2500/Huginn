@@ -17,13 +17,13 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { ChatMessage, OpenChat } from 'src/app/models/chat.interface';
+import { ChatMessage, OpenChat, SystemEvent } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
-import { chatPartner, chatTitle, draftTarget, personName } from '../../helpers/chat-display';
+import { chatPartner, chatTitle, draftTarget, personName, systemText } from '../../helpers/chat-display';
 import { ChatService, ConnectionState } from '../../services/chat.service';
 import { MessagesStore } from '../../state/messages.store';
 import { DraftsStore } from '../../state/drafts.store';
@@ -57,6 +57,8 @@ export interface ShownMessage {
   createdAt: string;
   deleted: boolean;
   deletedById?: number | null;
+  kind?: 'text' | 'system';
+  system?: SystemEvent | null;
   /** Still in the outbox: its key there, and why the server refused it, if it did. */
   clientMessageId?: string | null;
   failed?: string;
@@ -64,6 +66,7 @@ export interface ShownMessage {
 
 export type StreamRow =
   | { kind: 'day'; key: string; label: string }
+  | { kind: 'system'; key: string; label: string }
   | { kind: 'unread'; key: string; label: string }
   | {
       kind: 'message';
@@ -542,7 +545,7 @@ export class ChatRoomComponent implements AfterViewInit {
     const mark = this.unreadMark();
     // The device's copy may not hold the unread messages yet; scroll once they're here.
     const unreadHere =
-      !!mark && !this.unreadScrolled && messages.some((m) => m.id > mark.after && m.sender?.Id !== this.me().Id);
+      !!mark && !this.unreadScrolled && messages.some((m) => m.id > mark.after && m.kind !== 'system' && m.sender?.Id !== this.me().Id);
     if (unreadHere) {
       this.unreadScrolled = true;
       this.scrollToUnread();
@@ -602,7 +605,11 @@ export class ChatRoomComponent implements AfterViewInit {
     const mark = this.unreadMark();
     const firstUnread = mark
       ? entries.findIndex(
-          (e) => e.message.id !== undefined && e.message.id > mark.after && e.message.sender?.Id !== meId,
+          (e) =>
+            e.message.id !== undefined &&
+            e.message.id > mark.after &&
+            e.message.kind !== 'system' &&
+            e.message.sender?.Id !== meId,
         )
       : -1;
     entries.forEach((entry, i) => {
@@ -615,14 +622,27 @@ export class ChatRoomComponent implements AfterViewInit {
       if (i === firstUnread && mark) {
         const count = Math.max(
           mark.count,
-          entries.filter((e) => e.message.id !== undefined && e.message.id > mark.after && e.message.sender?.Id !== meId)
-            .length,
+          entries.filter(
+            (e) =>
+              e.message.id !== undefined &&
+              e.message.id > mark.after &&
+              e.message.kind !== 'system' &&
+              e.message.sender?.Id !== meId,
+          ).length,
         );
         rows.push({
           kind: 'unread',
           key: 'unread',
           label: count === 1 ? '1 unread message' : `${count} unread messages`,
         });
+      }
+      if (entry.message.kind === 'system') {
+        rows.push({
+          kind: 'system',
+          key: entry.key,
+          label: systemText(entry.message.system ?? null, this.me(), this.chat().members),
+        });
+        return;
       }
       const prev = entries[i - 1]?.message;
       const next = entries[i + 1]?.message;
@@ -719,6 +739,9 @@ export class ChatRoomComponent implements AfterViewInit {
 }
 
 function sameGroup(a: ShownMessage, b: ShownMessage): boolean {
+  if (a.kind === 'system' || b.kind === 'system') {
+    return false;
+  }
   const gap = Date.parse(b.createdAt) - Date.parse(a.createdAt);
   return (
     a.sender?.Id === b.sender?.Id &&

@@ -242,6 +242,8 @@ easy to audit. Their effects reach other people as updates.
 
 - `update { seq, type, data }`: the only push channel for state changes. Built so far:
   `chat.new`, `message.new`, `chat.state` (per-member state with the unread count),
+  system messages are `message` rows of kind `system` whose body is a JSON event, sent as
+  `system: { type, … }` with no text and worded by each client (built: `group.created`),
   `message.deleted` (to every member: the message again as a tombstone, with `deletedById`)
   and `message.hidden` (to your own devices: `{ chatId, messageIds }` deleted for you). Coming
   with their features: `message.edited`, `chat.updated`, `chat.member`, `receipt`,

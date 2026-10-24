@@ -1,5 +1,13 @@
-import { Chat, ChatMessage, OpenChat } from 'src/app/models/chat.interface';
+import { Chat, ChatMessage, OpenChat, SystemEvent } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
+import { RichTextPipe } from 'src/app/shared/pipes/rich-text.pipe';
+
+const richText = new RichTextPipe();
+
+/** Message text without its formatting markers, for one-line previews. */
+export function plainText(text: string): string {
+  return richText.transform(text).map((part) => part.text).join('');
+}
 
 /** The other person in a direct chat, or undefined for a group. */
 export function chatPartner(chat: OpenChat | undefined | null, me: IUser): IUser | undefined {
@@ -40,6 +48,19 @@ export function withUpdatedSender(message: ChatMessage, user: IUser): ChatMessag
   return message.sender?.Id === user.Id
     ? { ...message, sender: { ...message.sender, ...user } }
     : message;
+}
+
+/** A system message in words, for this reader: "You created the group “Launch crew”". */
+export function systemText(event: SystemEvent | null, me: IUser, members: IUser[]): string {
+  if (!event) {
+    return 'Something changed in this chat';
+  }
+  const who = (id: number) =>
+    id === me.Id ? 'You' : personName(members.find((m) => m.Id === id));
+  switch (event.type) {
+    case 'group.created':
+      return `${who(event.actorId)} created the group “${event.title}”`;
+  }
 }
 
 /** Newest activity first; ties broken by id so the order is stable. */

@@ -439,6 +439,12 @@ Quiet, solid and compact.
 - Delete opens the confirmation dialog with a radio choice, Delete for me / Delete for everyone, when everyone is allowed (all yours and under 15 minutes, or you run the group; everyone is preselected). Otherwise it deletes for you and says so.
 - Tombstones read "You deleted this message", "Deleted by an admin" or "This message was deleted", in italics without a tick; the list preview uses the same words.
 
+### System Lines
+- "You created the group “Launch crew”": centred, 12.5px muted text on a pill of 70% surface, never a bubble, no avatar or tick. They break bubble runs, never count as unread and can't be selected, replied to or deleted.
+
+### Formatting
+- `*bold*` (700), `_italic_`, `~strike~` and `` `code` `` (monospace at 0.9em on a 12% current-colour wash, 4px radius) render in bubbles; the list preview shows the text without markers.
+
 ### Drafts
 - Unsent text stays per chat on the device. A chat you're not looking at previews it as "**Draft:** …" in light indigo (#a5b4fc; on-accent-2 on the open row) instead of the last message.
 

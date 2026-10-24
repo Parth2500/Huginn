@@ -20,6 +20,7 @@ import {
   MemberDto,
   MyChatState,
   Receipts,
+  SystemEvent,
   UpdatePayload,
 } from './chat.types';
 import { toMessageDto } from './chat.mappers';
@@ -147,7 +148,7 @@ export class ChatsService {
                   SELECT 1 FROM message msg
                    WHERE msg."chatId" = m."chatId"
                      AND msg.id > GREATEST(m."lastReadMessageId", m."clearedBeforeMessageId")
-                     AND (msg."senderId" IS NULL OR msg."senderId" <> $1)
+                     AND msg."senderId" IS NOT NULL AND msg."senderId" <> $1
                      AND msg."deletedForAllAt" IS NULL)) AS unread
            FROM chat_member m
            JOIN chat c ON c.id = m."chatId"
@@ -520,7 +521,10 @@ export class ChatsService {
       .where('msg.chatId IN (:...chatIds)', { chatIds })
       .andWhere('msg.id > cm.lastReadMessageId')
       .andWhere('msg.id > cm.clearedBeforeMessageId')
-      .andWhere('(msg.senderId IS NULL OR msg.senderId <> :userId)', { userId })
+      // System messages ("Maya created the group") never count as unread.
+      .andWhere('msg.senderId IS NOT NULL AND msg.senderId <> :userId', {
+        userId,
+      })
       .andWhere('msg.deletedForAllAt IS NULL')
       .groupBy('msg.chatId')
       .getRawMany();
@@ -697,6 +701,24 @@ export class ChatsService {
           role: 'member' as const,
         })),
       ]);
+      // "Maya created the group" opens the history (§3.10).
+      const created = await manager.save(
+        manager.create(Message, {
+          chatId: chat.id,
+          senderId: null,
+          kind: 'system',
+          body: JSON.stringify({
+            type: 'group.created',
+            actorId: creatorId,
+            title,
+          } satisfies SystemEvent),
+        }),
+      );
+      await manager.update(
+        Chat,
+        { id: chat.id },
+        { lastMessageId: created.id, lastActivityAt: created.createdAt },
+      );
       const memberIds = [creatorId, ...others];
       const entries = await this.announceNew(manager, chat.id, memberIds);
       const own = await this.summary(creatorId, chat.id, manager);

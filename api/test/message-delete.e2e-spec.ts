@@ -142,7 +142,8 @@ describe('deleting messages', () => {
     });
     expect(done.ok).toBe(true);
     const c = await open(cy);
-    expect(await texts(c, group.chat.id)).toEqual(['(deleted)']);
+    // Newest first: the tombstone, then "Ana created the group".
+    expect(await texts(c, group.chat.id)).toEqual(['(deleted)', null]);
   });
 
   it("can't touch messages outside your chats, and checks its input", async () => {

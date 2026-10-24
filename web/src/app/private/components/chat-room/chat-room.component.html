@@ -125,6 +125,9 @@
         @if (row.kind === 'day') {
           <div class="day"><span>{{ row.label }}</span></div>
         }
+        @if (row.kind === 'system') {
+          <p class="system-line">{{ row.label }}</p>
+        }
         @if (row.kind === 'unread') {
           <div class="unread-divider" role="separator" [attr.aria-label]="row.label"><span>{{ row.label }}</span></div>
         }
