@@ -60,6 +60,16 @@ export interface Receipts {
   readUpTo: number;
 }
 
+/** One member's line in message info (dates are ISO strings). */
+export interface MessageInfoEntry {
+  user: IUser;
+  delivered: boolean;
+  deliveredAt: string | null;
+  /** False when they read it but don't share read receipts. */
+  read: boolean;
+  readAt: string | null;
+}
+
 /** How long a mute lasts; `null` unmutes. */
 export type MuteFor = '8h' | '1w' | 'always' | null;
 

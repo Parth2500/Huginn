@@ -383,6 +383,14 @@ export class ChatGateway
     });
   }
 
+  /** Who your message reached and who read it, with times (ux-design.md §3.6). */
+  @SubscribeMessage('message.info')
+  onMessageInfo(socket: Socket, request: { messageId?: unknown }) {
+    return this.handle(socket, (user) =>
+      this.chats.messageInfo(user.Id, Number(request?.messageId)),
+    );
+  }
+
   /** Edit your own message's text, within 15 minutes of sending it. */
   @SubscribeMessage('message.edit')
   onMessageEdit(

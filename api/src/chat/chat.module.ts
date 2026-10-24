@@ -10,6 +10,7 @@ import { ChatMember } from './entities/chat-member.entity';
 import { Chat } from './entities/chat.entity';
 import { MessageHidden } from './entities/message-hidden.entity';
 import { Message } from './entities/message.entity';
+import { WatermarkLog } from './entities/watermark-log.entity';
 import { UserUpdate } from './entities/user-update.entity';
 import { MessagesService } from './messages.service';
 import { UpdatesService } from './updates.service';
@@ -23,6 +24,7 @@ import { UpdatesService } from './updates.service';
       MessageHidden,
       Block,
       UserUpdate,
+      WatermarkLog,
       User,
     ]),
     AuthModule,

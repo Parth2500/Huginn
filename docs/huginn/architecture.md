@@ -220,6 +220,7 @@ Built in 0.4:
 | `messages.page` | `{ chatId, before?: messageId }` | `{ messages[], hasMore }` |
 | `message.send` | `{ chatId \| toUserId, clientMessageId, text, replyToMessageId? }` | `{ message, chatId }` |
 | `chat.read` | `{ chatId, upTo: messageId }`, capped at the chat's newest; also delivers | `{}`, plus `receipt` updates for the senders (1.5) |
+| `message.info` | `{ messageId }`: your own | `{ entries[]: { user, delivered, deliveredAt, read, readAt }, readCount }` (1.4) |
 | `message.edit` | `{ messageId, text }`: your own, within 15 minutes | `{ message }`, plus `message.edited` to every member (1.4) |
 | `chat.delivered` | `{ chatId, upTo: messageId }`, capped likewise | `{}`, plus `receipt` updates (1.5) |
 | `settings.get` / `settings.update` | `{ readReceipts }` for now; the rest with Settings (1.11) | `{ settings }`; your other tabs get a `settings` event |
@@ -304,6 +305,9 @@ Receipts are **watermarks**, not one row per message per reader.
   messages changed tick, which does the job of the 500 ms batching on the server side; devices
   batch their `chat.delivered` reports per chat every 300 ms. In groups, reads always count
   (WhatsApp's rule); receipts off hides reads only in direct chats, both ways.
+- **Times for message info (1.4):** each watermark move is logged in `watermark_log`
+  (`chatId, userId, kind d|r, upTo, at`): one row per move, not per message. A message's
+  delivered or read time for a member is the earliest move that reached it.
 
 ---
 

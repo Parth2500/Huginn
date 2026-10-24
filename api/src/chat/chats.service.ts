@@ -13,11 +13,13 @@ import { toPublicUser } from 'src/user/entities/user.interface';
 import { ChatMember } from './entities/chat-member.entity';
 import { Chat } from './entities/chat.entity';
 import { Message } from './entities/message.entity';
+import { WatermarkLog } from './entities/watermark-log.entity';
 import {
   ChatFolder,
   ChatStateChange,
   ChatSummary,
   MemberDto,
+  MessageInfoEntry,
   MyChatState,
   Receipts,
   SystemEvent,
@@ -48,6 +50,13 @@ interface WatermarkRow {
 }
 
 /** What `viewerId` sees: the lowest watermarks among the chat's other members. */
+function earliest(a: Date | null, b: Date | null): Date | null {
+  if (!a || !b) {
+    return a ?? b;
+  }
+  return a < b ? a : b;
+}
+
 function receiptsOf(rows: WatermarkRow[], viewerId: number): Receipts {
   const others = rows.filter((r) => r.userId !== viewerId);
   if (others.length === 0) {
@@ -395,6 +404,7 @@ export class ChatsService {
     const before = await this.watermarkRows(manager, chatIds);
     await run();
     const after = await this.watermarkRows(manager, chatIds);
+    await this.logMoves(manager, before, after);
     const entries: { userId: number; payload: UpdatePayload }[] = [];
     for (const chatId of chatIds) {
       const was = before.filter((r) => r.chatId === chatId);
@@ -425,6 +435,101 @@ export class ChatsService {
       }
     }
     return entries;
+  }
+
+  /** Records each watermark that moved, and when, for message info. */
+  private async logMoves(
+    manager: EntityManager,
+    before: WatermarkRow[],
+    after: WatermarkRow[],
+  ) {
+    const moves: {
+      chatId: number;
+      userId: number;
+      kind: 'd' | 'r';
+      upTo: number;
+    }[] = [];
+    for (const row of after) {
+      const was = before.find(
+        (b) => b.chatId === row.chatId && b.userId === row.userId,
+      );
+      if (row.delivered > (was?.delivered ?? 0)) {
+        moves.push({
+          chatId: row.chatId,
+          userId: row.userId,
+          kind: 'd',
+          upTo: row.delivered,
+        });
+      }
+      if (row.read > (was?.read ?? 0)) {
+        moves.push({
+          chatId: row.chatId,
+          userId: row.userId,
+          kind: 'r',
+          upTo: row.read,
+        });
+      }
+    }
+    if (moves.length > 0) {
+      await manager.insert(WatermarkLog, moves);
+    }
+  }
+
+  /**
+   * Message info for your own message (ux-design.md §3.6): for each other member, whether and
+   * when it reached them and when they read it. Reads follow the receipts rules: hidden both ways
+   * in a direct chat when either side turned them off, and in groups counted but not shown for
+   * people who turned them off.
+   */
+  async messageInfo(
+    userId: number,
+    messageId: number,
+  ): Promise<{ entries: MessageInfoEntry[]; readCount: number }> {
+    const message = await this.dataSource.manager.findOne(Message, {
+      where: { id: messageId },
+    });
+    if (!message || message.senderId !== userId || message.kind === 'system') {
+      throw new ChatRuleError('Info is only shown for your own messages.');
+    }
+    const rows = await this.watermarkRows(this.dataSource.manager, [
+      message.chatId,
+    ]);
+    if (!rows.some((r) => r.userId === userId)) {
+      throw new ChatRuleError('Info is only shown for your own messages.');
+    }
+    const me = rows.find((r) => r.userId === userId);
+    const others = rows.filter((r) => r.userId !== userId);
+    const direct = others[0]?.kind === 'direct';
+    const times: { userId: number; kind: 'd' | 'r'; at: Date }[] =
+      await this.dataSource.query(
+        `SELECT "userId", kind, MIN("at") AS at FROM watermark_log
+          WHERE "chatId" = $1 AND "upTo" >= $2 AND "userId" = ANY($3)
+          GROUP BY "userId", kind`,
+        [message.chatId, messageId, others.map((o) => o.userId)],
+      );
+    const users = await this.dataSource.manager.find(User, {
+      where: { Id: In(others.map((o) => o.userId)) },
+    });
+    let readCount = 0;
+    const entries = others.map((o): MessageInfoEntry => {
+      const at = (kind: 'd' | 'r') =>
+        times.find((t) => t.userId === o.userId && t.kind === kind)?.at ?? null;
+      const read = o.read >= messageId;
+      const shared = direct ? me?.receipts !== false && o.receipts : o.receipts;
+      if (read && (shared || !direct)) {
+        readCount++;
+      }
+      const delivered = read || o.delivered >= messageId;
+      return {
+        user: toPublicUser(users.find((u) => u.Id === o.userId)),
+        delivered,
+        // Reading delivers too, so the earlier of the two moves.
+        deliveredAt: delivered ? earliest(at('d'), at('r')) : null,
+        read: read && shared,
+        readAt: read && shared ? at('r') : null,
+      };
+    });
+    return { entries, readCount };
   }
 
   /**

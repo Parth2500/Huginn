@@ -6,6 +6,7 @@ import {
   ChatMessage,
   ChatStateChange,
   ChatStateResult,
+  MessageInfoEntry,
   MyChatState,
   PROTOCOL_VERSION,
   TypingEvent,
@@ -246,6 +247,20 @@ export class ChatService {
     this.messages.replace(result.message);
     this.chats.applyChanged(result.message);
     return null;
+  }
+
+  /** Who your message reached and read it (`message.info`); a string is why it couldn't load. */
+  async messageInfo(
+    messageId: number,
+  ): Promise<{ entries: MessageInfoEntry[]; readCount: number } | string> {
+    const result = await this.socket.request<{ entries: MessageInfoEntry[]; readCount: number }>(
+      'message.info',
+      { messageId },
+    );
+    if (!result.ok) {
+      return result.error === 'offline' ? "You're offline. Info shows when the connection is back." : result.error;
+    }
+    return { entries: result.entries, readCount: result.readCount };
   }
 
   /** A send the server refused: try it again. */

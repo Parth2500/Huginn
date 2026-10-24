@@ -1,0 +1,68 @@
+:host {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: none;
+}
+
+.scrim { position: absolute; inset: 0; background: var(--scrim); pointer-events: auto; animation: fade 200ms ease; }
+
+.panel {
+  position: relative;
+  width: min(360px, 100%);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-2);
+  pointer-events: auto;
+  animation: slide 280ms var(--ease-out);
+}
+
+@keyframes slide { from { transform: translateX(24px); opacity: 0; } }
+@keyframes fade { from { opacity: 0; } }
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  padding: 0 12px 0 20px;
+  flex: none;
+  border-bottom: 1px solid var(--line);
+  h2 { font-size: 16px; font-weight: 700; }
+}
+
+.body { flex: 1; overflow-y: auto; padding: 20px; display: grid; align-content: start; gap: 20px; }
+
+.shown {
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 18px 18px 4px 18px;
+  background: var(--bubble-out);
+  color: var(--on-accent);
+  justify-self: end;
+  max-width: 100%;
+  p { white-space: pre-wrap; overflow-wrap: anywhere; }
+  time { display: block; margin-top: 4px; font-size: 11px; color: var(--on-accent-2); text-align: right; }
+}
+
+.label { margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--text-2); }
+ul { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+li { display: flex; align-items: center; gap: 10px; app-avatar { --ring: var(--surface); } }
+.name { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.when { font-size: 13px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.quiet { color: var(--text-2); font-size: 14px; }
+.note { color: var(--text-2); }
+
+.times {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  div { display: flex; justify-content: space-between; gap: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
+  dt { display: flex; align-items: center; gap: 8px; font-weight: 600; app-icon { width: 16px; height: 16px; color: var(--text-2); } .read { color: #0ea5e9; } }
+  dd { margin: 0; color: var(--text-2); font-variant-numeric: tabular-nums; }
+}

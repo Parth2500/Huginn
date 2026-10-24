@@ -143,6 +143,7 @@
             [flash]="row.message.id !== undefined && flashId() === row.message.id"
             (reply)="replyTo(row.message)" (edit)="startEdit(row.message)" (copy)="copyText(row.message)"
             (select)="startSelecting(row.message.id)" (remove)="removeOne(row.message)" (jump)="jumpTo($event)"
+            [canInfo]="row.own && row.message.id !== undefined && chat().kind !== 'self'" (info)="showInfo(row.message)"
             (openSender)="openProfile.emit($event)">
           </app-chat-message>
         }
@@ -165,6 +166,11 @@
         <button type="button" class="btn btn-secondary" (click)="replyTo(pickedMessages()[0])">
           <app-icon name="reply"></app-icon>Reply
         </button>
+        @if (pickedMessages()[0].sender?.Id === me().Id && chat().kind !== 'self') {
+          <button type="button" class="btn btn-secondary" (click)="showInfo(pickedMessages()[0])">
+            <app-icon name="info"></app-icon>Info
+          </button>
+        }
         @if (canEdit(pickedMessages()[0])) {
           <button type="button" class="btn btn-secondary" (click)="startEdit(pickedMessages()[0])">
             <app-icon name="pencil"></app-icon>Edit
@@ -232,4 +238,8 @@
       </div>
     }
   </app-confirm-dialog>
+}
+
+@if (infoFor(); as message) {
+  <app-message-info [message]="message" [direct]="chat().kind === 'direct'" (close)="closeInfo()" />
 }

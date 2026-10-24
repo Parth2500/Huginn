@@ -64,6 +64,9 @@ export class ChatMessageComponent {
   /** The hover pill and ⋯ menu (ux-design.md §3.3): off while selecting or sending. */
   readonly actions = input(false);
   readonly canEdit = input(false);
+  /** Your own stored message: Info is in its menu. */
+  readonly canInfo = input(false);
+  readonly info = output<void>();
   /** Who wrote the message this one quotes: "You" or their name. */
   readonly quoteName = input('');
   /** Jumped to: the bubble flashes once. */
@@ -82,7 +85,7 @@ export class ChatMessageComponent {
     return quote?.excerpt != null ? plainText(quote.excerpt) : 'Deleted message';
   });
 
-  choose(action: 'reply' | 'edit' | 'copy' | 'select' | 'remove') {
+  choose(action: 'reply' | 'edit' | 'copy' | 'select' | 'remove' | 'info') {
     this.menuOpen.set(false);
     this[action].emit();
   }

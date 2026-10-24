@@ -29,6 +29,7 @@ import { MessagesStore } from '../../state/messages.store';
 import { DraftsStore } from '../../state/drafts.store';
 import { OutboxStore } from '../../state/outbox.store';
 import { ConfirmDialogComponent } from 'src/app/shared/confirm-dialog/confirm-dialog.component';
+import { MessageInfoComponent } from '../message-info/message-info.component';
 import { ToastService } from 'src/app/shared/toast/toast.service';
 import { ChatMessageComponent } from '../chat-message/chat-message.component';
 
@@ -89,6 +90,7 @@ export type StreamRow =
   host: { '(keydown.escape)': 'onEscape($event)' },
   imports: [
     ConfirmDialogComponent,
+    MessageInfoComponent,
     IconComponent,
     AvatarComponent,
     NgClass,
@@ -189,6 +191,10 @@ export class ChatRoomComponent implements AfterViewInit {
   /** The composer is replying to a message, or editing one of yours (ux-design.md §3.4). */
   readonly replying = signal<ShownMessage | null>(null);
   readonly editing = signal<ChatMessage | null>(null);
+  /** Message info, open in the drawer, and what gets focus back when it closes. */
+  readonly infoFor = signal<ChatMessage | null>(null);
+  private infoReturn: HTMLElement | null = null;
+
   /** A quoted message that was jumped to, flashing once. */
   readonly flashId = signal<number | undefined>(undefined);
   readonly deleteFor = signal<'me' | 'all'>('me');
@@ -255,11 +261,13 @@ export class ChatRoomComponent implements AfterViewInit {
 
     // Opening a chat (and switching between chats) resets the view and asks for the latest page.
     // A draft becoming its real chat is the same conversation: the composer keeps its text.
-    let previousPartner: number | undefined;
+    let previous: { id?: number; partnerId?: number } = {};
     effect((onCleanup) => {
       const { id, partnerId } = this.conversation();
-      const sameConversation = partnerId !== undefined && partnerId === previousPartner;
-      previousPartner = partnerId;
+      const sameConversation =
+        (id !== undefined && id === previous.id) ||
+        (partnerId !== undefined && partnerId === previous.partnerId);
+      previous = { id, partnerId };
       const key = id !== undefined ? `c${id}` : `u${partnerId}`;
       if (sameConversation) {
         if (this.draftKey && this.draftKey !== key) {
@@ -276,7 +284,9 @@ export class ChatRoomComponent implements AfterViewInit {
       if (id === undefined) {
         return;
       }
-      void this.chatService.openChat(id);
+      // Opening reads the message store; untracked, or every new message would re-run this
+      // effect and reset the view (it did, in groups, until 1.4).
+      untracked(() => void this.chatService.openChat(id));
       onCleanup(() => this.chatService.closeChat(id));
     });
 
@@ -345,6 +355,20 @@ export class ChatRoomComponent implements AfterViewInit {
       message.sender?.Id === this.me().Id &&
       Date.now() - Date.parse(message.createdAt) <= UNSEND_WINDOW_MS
     );
+  }
+
+  showInfo(message: ShownMessage) {
+    const stored = this.history()?.messages.find((m) => m.id === message.id);
+    if (stored) {
+      this.infoReturn = document.activeElement as HTMLElement | null;
+      this.endSelecting();
+      this.infoFor.set(stored);
+    }
+  }
+
+  closeInfo() {
+    this.infoFor.set(null);
+    this.infoReturn?.focus();
   }
 
   /** "You", or the name of whoever wrote the quoted message. */
@@ -654,6 +678,7 @@ export class ChatRoomComponent implements AfterViewInit {
     this.endSelecting();
     this.replying.set(null);
     this.editing.set(null);
+    this.infoFor.set(null);
     const chat = this.chat();
     this.unreadMark.set(
       chat.id !== undefined && chat.unreadCount > 0

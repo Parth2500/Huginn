@@ -87,6 +87,9 @@
         @if (canEdit()) {
           <button type="button" role="menuitem" (click)="choose('edit')"><app-icon name="pencil" />Edit</button>
         }
+        @if (canInfo()) {
+          <button type="button" role="menuitem" (click)="choose('info')"><app-icon name="info" />Info</button>
+        }
         <button type="button" role="menuitem" (click)="choose('select')"><app-icon name="list-checks" />Select</button>
         <div class="divider" role="separator"></div>
         <button type="button" role="menuitem" class="danger" (click)="choose('remove')"><app-icon name="trash" />Delete…</button>

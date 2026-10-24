@@ -1,0 +1,76 @@
+<div class="scrim" (click)="close.emit()" aria-hidden="true"></div>
+<aside class="panel" role="dialog" aria-modal="false" aria-labelledby="info-title">
+  <header class="panel-head">
+    <h2 id="info-title">Message info</h2>
+    <button #closeButton type="button" class="icon-btn" (click)="close.emit()" aria-label="Close message info">
+      <app-icon name="x" />
+    </button>
+  </header>
+
+  <div class="body">
+    <blockquote class="shown">
+      <p>{{ text() }}</p>
+      <time [attr.datetime]="message().createdAt">{{ message().createdAt | date: 'EEE d MMM, HH:mm' }}</time>
+    </blockquote>
+
+    @if (failed(); as error) {
+      <p class="note" role="alert">{{ error }}</p>
+    } @else if (!info()) {
+      <p class="note" aria-busy="true">Loading…</p>
+    } @else if (direct()) {
+      @let entry = info()!.entries[0];
+      <dl class="times">
+        <div><dt><app-icon name="check-check" />Delivered</dt>
+          <dd>{{ entry?.delivered ? (entry.deliveredAt ? (entry.deliveredAt | date: 'EEE d MMM, HH:mm') : 'Yes') : 'Not yet' }}</dd></div>
+        <div><dt><app-icon class="read" name="check-check" />Read</dt>
+          <dd>{{ entry?.read ? (entry.readAt ? (entry.readAt | date: 'EEE d MMM, HH:mm') : 'Yes') : '—' }}</dd></div>
+      </dl>
+    } @else {
+      <section aria-labelledby="read-by">
+        <h3 id="read-by" class="label">Read by {{ info()!.readCount }} of {{ info()!.entries.length }}</h3>
+        <ul>
+          @for (entry of readers(); track entry.user.Id) {
+            <li>
+              <app-avatar [user]="entry.user" size="sm" />
+              <span class="name">{{ entry.user | displayName }}</span>
+              <time class="when">{{ entry.readAt ? (entry.readAt | date: 'HH:mm') : '' }}</time>
+            </li>
+          }
+          @if (unnamedReaders() > 0) {
+            <li class="quiet">{{ unnamedReaders() }} more, who don't share read receipts</li>
+          }
+          @if (info()!.readCount === 0) {
+            <li class="quiet">Nobody yet</li>
+          }
+        </ul>
+      </section>
+      @if (reached().length) {
+        <section aria-labelledby="delivered-to">
+          <h3 id="delivered-to" class="label">Delivered to</h3>
+          <ul>
+            @for (entry of reached(); track entry.user.Id) {
+              <li>
+                <app-avatar [user]="entry.user" size="sm" />
+                <span class="name">{{ entry.user | displayName }}</span>
+                <time class="when">{{ entry.deliveredAt ? (entry.deliveredAt | date: 'HH:mm') : '' }}</time>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+      @if (waiting().length) {
+        <section aria-labelledby="waiting">
+          <h3 id="waiting" class="label">Waiting</h3>
+          <ul>
+            @for (entry of waiting(); track entry.user.Id) {
+              <li>
+                <app-avatar [user]="entry.user" size="sm" />
+                <span class="name">{{ entry.user | displayName }}</span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
+    }
+  </div>
+</aside>

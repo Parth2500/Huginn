@@ -129,4 +129,54 @@ describe('receipts', () => {
     });
     await ask(c.socket, 'settings.update', { readReceipts: true });
   });
+
+  it('lists who it reached and who read it, with times, in message info', async () => {
+    const a = await open(ana);
+    const b = await open(ben);
+    const c = await open(cy);
+    const group = await ask(a.socket, 'group.create', {
+      title: 'Info crew',
+      memberIds: [ben.id, cy.id],
+    });
+    const chatId = group.chat.id;
+    const sent = await say(a, { chatId }, 'who saw this?');
+    await ask(b.socket, 'chat.delivered', { chatId, upTo: sent.message.id });
+    await ask(c.socket, 'chat.read', { chatId, upTo: sent.message.id });
+
+    const info = await ask(a.socket, 'message.info', {
+      messageId: sent.message.id,
+    });
+    expect(info.readCount).toBe(1);
+    const byName = Object.fromEntries(
+      info.entries.map((e: any) => [e.user.username, e]),
+    );
+    expect(byName['ben.receipts']).toMatchObject({
+      delivered: true,
+      read: false,
+      readAt: null,
+    });
+    expect(byName['ben.receipts'].deliveredAt).not.toBeNull();
+    expect(byName['cy.receipts']).toMatchObject({
+      delivered: true,
+      read: true,
+    });
+    expect(byName['cy.receipts'].readAt).not.toBeNull();
+
+    // Only for your own messages.
+    expect(
+      (await ask(b.socket, 'message.info', { messageId: sent.message.id })).ok,
+    ).toBe(false);
+
+    // Receipts off in a group: still counted, not named.
+    await ask(b.socket, 'settings.update', { readReceipts: false });
+    await ask(b.socket, 'chat.read', { chatId, upTo: sent.message.id });
+    const after = await ask(a.socket, 'message.info', {
+      messageId: sent.message.id,
+    });
+    expect(after.readCount).toBe(2);
+    expect(
+      after.entries.find((e: any) => e.user.username === 'ben.receipts').read,
+    ).toBe(false);
+    await ask(b.socket, 'settings.update', { readReceipts: true });
+  });
 });

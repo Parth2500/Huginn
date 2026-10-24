@@ -439,6 +439,9 @@ Quiet, solid and compact.
 - Delete opens the confirmation dialog with a radio choice, Delete for me / Delete for everyone, when everyone is allowed (all yours and under 15 minutes, or you run the group; everyone is preselected). Otherwise it deletes for you and says so.
 - Tombstones read "You deleted this message", "Deleted by an admin" or "This message was deleted", in italics without a tick; the list preview uses the same words.
 
+### Message Info
+- A right drawer like the profile drawer (360px, Float shadow over the Scrim): your message as an own bubble with its full date, then "Read by N of M" (avatar, name, time), "Delivered to" and "Waiting". Readers who don't share receipts are counted in a muted line, never named. A direct chat shows just Delivered and Read with their times. Esc or the scrim closes it and focus returns.
+
 ### Message Actions
 - **Hover pill (pointer devices):** beside the bubble, two 28px surface circles with the Rest lift: Reply and ⋯. ⋯ opens a floating menu (180px, Float shadow, 36px rows with 16px icons): Reply, Copy text, Edit (yours, within 15 minutes), Select, then Delete… in danger ink under a divider. On touch screens the pill is hidden; a long-press selects, and the bar offers Reply and Edit for one message.
 - **Quote:** inside the bubble above the text, a 3px bar in the quoted person's tone (on own bubbles, on-accent-2) over an 8% current-colour wash: their name (12px 700) and one line of their words (13px). Tapping it scrolls to the original, loading older pages if needed, and rings that bubble in 35% indigo that fades over 600ms.

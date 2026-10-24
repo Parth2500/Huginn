@@ -89,6 +89,17 @@ export interface Receipts {
   readUpTo: number;
 }
 
+/** One member's line in message info: when your message reached them, and when they read it. */
+export interface MessageInfoEntry {
+  user: IPublicUser;
+  /** Reached at least one of their devices; the time is null for history from before 1.4. */
+  delivered: boolean;
+  deliveredAt: Date | null;
+  /** False when they read it but their reads aren't shared (receipts off). */
+  read: boolean;
+  readAt: Date | null;
+}
+
 /** How long a mute lasts; `null` unmutes. */
 export type MuteFor = '8h' | '1w' | 'always' | null;
 
