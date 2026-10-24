@@ -22,6 +22,8 @@ export type ConnectionState = 'connecting' | 'online' | 'offline';
 
 /** Wait before retrying a send the server didn't acknowledge. */
 const RETRY_MS = 3000;
+/** Delivered receipts go out at most this often, one per chat (architecture.md §6). */
+const DELIVERED_BATCH_MS = 300;
 
 /**
  * The client half of realtime protocol v1 (docs/huginn/architecture.md §4–6).
@@ -48,6 +50,8 @@ export class ChatService {
   readonly unauthorized = new Subject<string>();
   readonly typing = new Subject<TypingEvent>();
   readonly userUpdated = new Subject<IUser>();
+  /** Read receipts on (product-spec.md §5.4): sharing yours, and seeing other people's. */
+  readonly readReceipts = signal(true);
 
   private me: IUser | null = null;
   private seq = 0;
@@ -58,6 +62,9 @@ export class ChatService {
   /** The chat on screen: its messages don't count as unread while the tab is visible. */
   private viewingChatId: number | undefined;
   private started = false;
+  /** Newest message received per chat, waiting to be reported as delivered. */
+  private deliveredQueue = new Map<number, number>();
+  private deliveredTimer: ReturnType<typeof setTimeout> | undefined;
 
   constructor() {
     const socket = this.socket;
@@ -70,6 +77,9 @@ export class ChatService {
     socket.on('unauthorized', ({ message }: { message: string }) => this.unauthorized.next(message));
     socket.on('typing', (event: TypingEvent) => this.typing.next(event));
     socket.on('userUpdated', (user: IUser) => this.onUserUpdated(user));
+    socket.on('settings', (settings: { readReceipts: boolean }) =>
+      this.readReceipts.set(settings.readReceipts),
+    );
     socket.on('onlineUsers', (ids: number[]) => this.onlineIds.set(new Set(ids)));
     // New contacts (a new chat or group): who of them is online right now.
     socket.on('presenceBatch', (ids: number[]) =>
@@ -203,6 +213,32 @@ export class ChatService {
       this.applyHidden(chatId, messageIds);
     }
     return null;
+  }
+
+  /** Turns read receipts on or off, for every device. Returns the reason it failed, or null. */
+  async setReadReceipts(on: boolean): Promise<string | null> {
+    const result = await this.socket.request<{ settings: { readReceipts: boolean } }>(
+      'settings.update',
+      { readReceipts: on },
+    );
+    if (!result.ok) {
+      return result.error === 'offline'
+        ? "You're offline. Try again when the connection is back."
+        : result.error;
+    }
+    this.readReceipts.set(result.settings.readReceipts);
+    return null;
+  }
+
+  /** A send the server refused: try it again. */
+  retrySend(clientMessageId: string) {
+    this.outbox.retry(clientMessageId);
+    void this.flushOutbox();
+  }
+
+  /** A send the server refused: drop it. */
+  discardSend(clientMessageId: string) {
+    this.outbox.remove(clientMessageId);
   }
 
   /** The Archived row's numbers. */
@@ -342,6 +378,8 @@ export class ChatService {
     }
     await this.catchUp(hello.seq);
     this.connection.set('online');
+    this.reportUndelivered();
+    void this.loadSettings();
     void this.loadFolders();
     void this.flushOutbox();
     await this.refreshOpenChat();
@@ -451,6 +489,9 @@ export class ChatService {
         const message = update.data.message;
         this.messages.add(message);
         const mine = message.sender?.Id === this.me?.Id;
+        if (!mine) {
+          this.queueDelivered(message.chatId, message.id);
+        }
         const looking = this.viewingChatId === message.chatId && document.visibilityState === 'visible';
         if (!this.chats.applyMessage(message, !mine && !looking)) {
           void this.fetchChat(message.chatId);
@@ -461,6 +502,11 @@ export class ChatService {
         if (looking && !mine) {
           this.markRead(message.chatId);
         }
+        return;
+      }
+      case 'receipt': {
+        const { chatId, ...receipts } = update.data;
+        this.chats.applyReceipts(chatId, receipts);
         return;
       }
       case 'message.deleted': {
@@ -498,6 +544,36 @@ export class ChatService {
     const last = this.chats.get(chatId)?.lastMessage?.id;
     if (last !== undefined && messageIds.includes(last)) {
       void this.fetchChat(chatId, false);
+    }
+  }
+
+  private async loadSettings() {
+    const result = await this.socket.request<{ settings: { readReceipts: boolean } }>('settings.get');
+    if (result.ok) {
+      this.readReceipts.set(result.settings.readReceipts);
+    }
+  }
+
+  /** Messages from others reached this device: say so, one request per chat per batch. */
+  private queueDelivered(chatId: number, messageId: number) {
+    this.deliveredQueue.set(chatId, Math.max(this.deliveredQueue.get(chatId) ?? 0, messageId));
+    this.deliveredTimer ??= setTimeout(() => {
+      this.deliveredTimer = undefined;
+      const batch = [...this.deliveredQueue];
+      this.deliveredQueue.clear();
+      for (const [id, upTo] of batch) {
+        void this.socket.request('chat.delivered', { chatId: id, upTo });
+      }
+    }, DELIVERED_BATCH_MS);
+  }
+
+  /** After a reload or reconnect: chats whose newest message from others isn't reported yet. */
+  private reportUndelivered() {
+    for (const chat of this.chats.chats()) {
+      const last = chat.lastMessage;
+      if (last && last.sender?.Id !== this.me?.Id && last.id > chat.me.lastDeliveredMessageId) {
+        this.queueDelivered(chat.id, last.id);
+      }
     }
   }
 
@@ -544,7 +620,7 @@ export class ChatService {
     clearTimeout(this.retryTimer);
     try {
       for (;;) {
-        const entry = this.outbox.entries()[0];
+        const entry = this.outbox.next();
         if (!entry || !this.me) {
           return;
         }
@@ -556,11 +632,12 @@ export class ChatService {
           this.retryTimer = setTimeout(() => void this.flushOutbox(), RETRY_MS);
           return;
         }
-        this.outbox.remove(entry.clientMessageId);
         if (!result.ok) {
-          this.notices.next({ kind: 'error', text: `Not sent: ${result.error}` });
+          // Refused (blocked, removed, too long…): it stays, marked failed, for Retry or Delete.
+          this.outbox.fail(entry.clientMessageId, result.error);
           continue;
         }
+        this.outbox.remove(entry.clientMessageId);
         if (entry.toUserId !== undefined) {
           this.outbox.attachToChat(entry.toUserId, result.chatId);
           if (!this.chats.get(result.chatId)) {

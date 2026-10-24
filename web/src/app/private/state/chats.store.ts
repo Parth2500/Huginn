@@ -131,6 +131,14 @@ export class ChatsStore {
     }
   }
 
+  /** Someone's watermark moved: the ticks on your messages in this chat. */
+  applyReceipts(chatId: number, receipts: Chat['receipts']) {
+    const chat = this.get(chatId);
+    if (chat) {
+      this.upsert([{ ...chat, receipts }]);
+    }
+  }
+
   /** A message deleted for everyone: if it's the preview, the preview becomes its tombstone. */
   applyDeleted(message: ChatMessage) {
     const chat = this.get(message.chatId);

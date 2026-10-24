@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output, signal } from '@angular/core';
 import { IUser } from 'src/app/models/user.interface';
 import { MessageStatus, ShownMessage } from '../chat-room/chat-room.component';
 import { NgClass, DatePipe } from '@angular/common';
@@ -44,6 +44,11 @@ export class ChatMessageComponent {
   readonly toggle = output<void>();
   /** A long-press on a touch screen: start selecting with this message. */
   readonly press = output<void>();
+  /** A send the server refused: try again, or drop it. */
+  readonly retry = output<void>();
+  readonly discard = output<void>();
+  /** "Not sent. Tap to see why." opens the reason and the choices. */
+  readonly showWhy = signal(false);
   private pressTimer: ReturnType<typeof setTimeout> | undefined;
 
   readonly tombstone = computed(() => {

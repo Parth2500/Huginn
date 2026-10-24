@@ -582,6 +582,19 @@ export class ChatListComponent {
     return chat.kind === 'direct' ? text : `${personName(message.sender)}: ${text}`;
   }
 
+  /** The tick on your own last message, shown before the preview (ux-design.md §2.1). */
+  lastTick(chat: Chat): 'sent' | 'delivered' | 'read' | null {
+    const last = chat.lastMessage;
+    if (!last || last.deleted || chat.kind === 'self' || last.sender?.Id !== this.me().Id) {
+      return null;
+    }
+    return last.id <= chat.receipts.readUpTo
+      ? 'read'
+      : last.id <= chat.receipts.deliveredUpTo
+        ? 'delivered'
+        : 'sent';
+  }
+
   chatTitle(chat: Chat): string {
     return chatTitle(chat, this.me());
   }

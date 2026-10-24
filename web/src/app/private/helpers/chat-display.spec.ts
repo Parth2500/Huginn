@@ -31,6 +31,7 @@ function makeChat(overrides: Partial<Chat>): Chat {
     ],
     lastMessage: null,
     unreadCount: 0,
+    receipts: { deliveredUpTo: 0, readUpTo: 0 },
     me: {
       role: 'member',
       status: 'active',
@@ -39,6 +40,7 @@ function makeChat(overrides: Partial<Chat>): Chat {
       archivedAt: null,
       mutedUntil: null,
       markedUnread: false,
+      lastDeliveredMessageId: 0,
       lastReadMessageId: 0,
       clearedBeforeMessageId: 0,
       hiddenAt: null,

@@ -11,6 +11,7 @@ const me: MyChatState = {
   archivedAt: null,
   mutedUntil: null,
   markedUnread: false,
+  lastDeliveredMessageId: 0,
   lastReadMessageId: 0,
   clearedBeforeMessageId: 0,
   hiddenAt: null,
@@ -41,6 +42,7 @@ const chat: Chat = {
   members: [],
   lastMessage: message(5, '2026-10-20T10:00:00Z'),
   unreadCount: 2,
+  receipts: { deliveredUpTo: 0, readUpTo: 0 },
   me,
   policies: { editInfo: 'admins', addMember: 'admins', send: 'all' },
 };

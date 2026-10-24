@@ -439,6 +439,14 @@ Quiet, solid and compact.
 - Delete opens the confirmation dialog with a radio choice, Delete for me / Delete for everyone, when everyone is allowed (all yours and under 15 minutes, or you run the group; everyone is preselected). Otherwise it deletes for you and says so.
 - Tombstones read "You deleted this message", "Deleted by an admin" or "This message was deleted", in italics without a tick; the list preview uses the same words.
 
+### Ticks
+- 14px icons at the end of your bubble's meta: clock (sending), amber alert (not confirmed yet), check (sent), check-check (delivered), check-check in sky #7dd3fc (read, chosen to read on indigo), rose alert (not sent). Notes to self and tombstones have none.
+- A refused send stays in place with a 12px danger line under it, "Not sent. Tap to see why.", which opens the reason with underlined Retry and Delete.
+- The list shows the same tick before "You: …" on your own last message (sky when read).
+
+### Switch
+- `button.switch[role=switch]`: a 36×20 pill, Line Strong off and indigo on, with a 16px white knob that slides 160ms on the ease-out curve. First used for Read receipts under the profile editor's Privacy section.
+
 ### Pin Reordering
 - In the full main list (no filter), pinned rows drag with a mouse or pen (Angular CDK, vertical only, `grab` cursor). The lifted row takes Slate Rail Raised, the Float shadow and no chevron; its slot stays at 35% opacity, and the other rows slide 200ms on the ease-out curve. On touch screens the long-press menu does it instead.
 

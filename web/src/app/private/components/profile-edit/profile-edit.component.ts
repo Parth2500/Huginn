@@ -15,6 +15,7 @@ import { IconComponent } from '../../../shared/icon/icon.component';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { NgClass } from '@angular/common';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
+import { ChatService } from '../../services/chat.service';
 
 const MAX_SOURCE_BYTES = 15 * 1024 * 1024;
 
@@ -60,6 +61,19 @@ export class ProfileEditComponent implements OnInit {
 
   readonly methods = signal<SignInMethods | null>(null);
   readonly unlinking = signal(false);
+  private readonly chatService = inject(ChatService);
+  /** Read receipts (product-spec.md §5.4), shared with every device. */
+  readonly readReceipts = this.chatService.readReceipts;
+  readonly savingReceipts = signal(false);
+
+  async toggleReceipts() {
+    this.savingReceipts.set(true);
+    const error = await this.chatService.setReadReceipts(!this.readReceipts());
+    this.savingReceipts.set(false);
+    if (error) {
+      this.toast.error(error);
+    }
+  }
 
   readonly me = input<IUser>({});
   readonly saved = output<IUser>();

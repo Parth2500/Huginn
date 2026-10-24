@@ -45,7 +45,8 @@ const TYPING_THROTTLE_MS = 2000;
 /** How long a message that just arrived keeps its highlight. */
 const FRESH_MS = 1000;
 
-export type MessageStatus = 'pending' | 'stalled' | 'sent' | null;
+/** The tick on your own message (product-spec.md §3.1). */
+export type MessageStatus = 'pending' | 'stalled' | 'failed' | 'sent' | 'delivered' | 'read' | null;
 
 /** What a bubble shows: a stored message, or one still in the outbox. */
 export interface ShownMessage {
@@ -55,6 +56,9 @@ export interface ShownMessage {
   createdAt: string;
   deleted: boolean;
   deletedById?: number | null;
+  /** Still in the outbox: its key there, and why the server refused it, if it did. */
+  clientMessageId?: string | null;
+  failed?: string;
 }
 
 export type StreamRow =
@@ -379,6 +383,18 @@ export class ChatRoomComponent implements AfterViewInit {
     this.scrollToBottom(true);
   }
 
+  retrySend(message: ShownMessage) {
+    if (message.clientMessageId) {
+      this.chatService.retrySend(message.clientMessageId);
+    }
+  }
+
+  discardSend(message: ShownMessage) {
+    if (message.clientMessageId) {
+      this.chatService.discardSend(message.clientMessageId);
+    }
+  }
+
   // ---- Selecting messages ---------------------------------------------------------------------
 
   startSelecting(messageId?: number) {
@@ -513,17 +529,28 @@ export class ChatRoomComponent implements AfterViewInit {
     const meId = this.me().Id;
     // Notes to self have no ticks once stored; a note still waiting to send keeps its clock.
     const ticks = this.chat().kind !== 'self';
+    const chat = this.chat();
+    const receipts = chat.id !== undefined ? chat.receipts : { deliveredUpTo: 0, readUpTo: 0 };
+    const tick = (id: number): MessageStatus =>
+      id <= receipts.readUpTo ? 'read' : id <= receipts.deliveredUpTo ? 'delivered' : 'sent';
     const stalled = this.outbox.stalled();
     const fresh = this.freshIds();
     const entries: { message: ShownMessage; status: MessageStatus; key: string }[] = [
       ...(this.history()?.messages ?? []).map((m) => ({
         message: m as ShownMessage,
-        status: (ticks && !m.deleted && m.sender?.Id === meId ? 'sent' : null) as MessageStatus,
+        status: ticks && !m.deleted && m.sender?.Id === meId ? tick(m.id) : null,
         key: `m${m.id}`,
       })),
       ...this.pending().map((p) => ({
-        message: { text: p.text, sender: this.me(), createdAt: p.createdAt, deleted: false },
-        status: (stalled.has(p.clientMessageId) ? 'stalled' : 'pending') as MessageStatus,
+        message: {
+          text: p.text,
+          sender: this.me(),
+          createdAt: p.createdAt,
+          deleted: false,
+          clientMessageId: p.clientMessageId,
+          failed: p.failed,
+        },
+        status: (p.failed ? 'failed' : stalled.has(p.clientMessageId) ? 'stalled' : 'pending') as MessageStatus,
         key: `p${p.clientMessageId}`,
       })),
     ];

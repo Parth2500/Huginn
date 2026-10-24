@@ -9,6 +9,8 @@ export interface OutboxEntry {
   toUserId?: number;
   text: string;
   createdAt: string;
+  /** The server refused it, and why: shown with Retry and Delete instead of sending again. */
+  failed?: string;
 }
 
 const VERSION = 1;

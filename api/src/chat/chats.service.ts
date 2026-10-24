@@ -19,6 +19,7 @@ import {
   ChatSummary,
   MemberDto,
   MyChatState,
+  Receipts,
   UpdatePayload,
 } from './chat.types';
 import { toMessageDto } from './chat.mappers';
@@ -34,6 +35,35 @@ const MAX_GROUP_NAME = 60;
 const MAX_GROUP_DESCRIPTION = 500;
 
 export class ChatRuleError extends Error {}
+
+/** One member's watermarks and receipts setting, for working out everyone's ticks. */
+interface WatermarkRow {
+  chatId: number;
+  userId: number;
+  delivered: number;
+  read: number;
+  receipts: boolean;
+  kind: string;
+}
+
+/** What `viewerId` sees: the lowest watermarks among the chat's other members. */
+function receiptsOf(rows: WatermarkRow[], viewerId: number): Receipts {
+  const others = rows.filter((r) => r.userId !== viewerId);
+  if (others.length === 0) {
+    return { deliveredUpTo: 0, readUpTo: 0 };
+  }
+  const viewer = rows.find((r) => r.userId === viewerId);
+  // Read receipts off works both ways in a direct chat; groups always count reads (§3.1).
+  const hidden =
+    others[0].kind === 'direct' &&
+    (viewer?.receipts === false || others.some((o) => !o.receipts));
+  return {
+    deliveredUpTo: Math.min(
+      ...others.map((o) => Math.max(o.delivered, o.read)),
+    ),
+    readUpTo: hidden ? 0 : Math.min(...others.map((o) => o.read)),
+  };
+}
 
 const directKey = (a: number, b: number) => (a < b ? `${a}:${b}` : `${b}:${a}`);
 
@@ -152,6 +182,7 @@ export class ChatsService {
         throw new ChatRuleError("You're not a member of that chat.");
       }
       const now = new Date();
+      let receipts: { userId: number; payload: UpdatePayload }[] = [];
 
       if ('pin' in change) {
         if (change.pin) {
@@ -225,15 +256,18 @@ export class ChatsService {
           );
         }
         // Everything so far is cleared and read; a deleted chat also leaves the list.
-        await manager.query(
-          `UPDATE chat_member m
-              SET "clearedBeforeMessageId" = GREATEST(m."clearedBeforeMessageId", COALESCE(c."lastMessageId", 0)),
-                  "lastReadMessageId" = GREATEST(m."lastReadMessageId", COALESCE(c."lastMessageId", 0)),
-                  "markedUnread" = false
-             FROM chat c
-            WHERE c.id = m."chatId" AND m."userId" = $1 AND m."chatId" = ANY($2)`,
-          [userId, chatIds],
-        );
+        receipts = await this.withReceipts(manager, chatIds, async () => {
+          await manager.query(
+            `UPDATE chat_member m
+                SET "clearedBeforeMessageId" = GREATEST(m."clearedBeforeMessageId", COALESCE(c."lastMessageId", 0)),
+                    "lastReadMessageId" = GREATEST(m."lastReadMessageId", COALESCE(c."lastMessageId", 0)),
+                    "lastDeliveredMessageId" = GREATEST(m."lastDeliveredMessageId", COALESCE(c."lastMessageId", 0)),
+                    "markedUnread" = false
+               FROM chat c
+              WHERE c.id = m."chatId" AND m."userId" = $1 AND m."chatId" = ANY($2)`,
+            [userId, chatIds],
+          );
+        });
         if ('delete' in change) {
           await manager.update(
             ChatMember,
@@ -249,20 +283,22 @@ export class ChatsService {
         );
       } else {
         // Mark as read: up to each chat's last message.
-        await manager.query(
-          `UPDATE chat_member m
-              SET "lastReadMessageId" = GREATEST(m."lastReadMessageId", COALESCE(c."lastMessageId", 0)),
-                  "markedUnread" = false
-             FROM chat c
-            WHERE c.id = m."chatId" AND m."userId" = $1 AND m."chatId" = ANY($2)`,
-          [userId, chatIds],
-        );
+        receipts = await this.withReceipts(manager, chatIds, async () => {
+          await manager.query(
+            `UPDATE chat_member m
+                SET "lastReadMessageId" = GREATEST(m."lastReadMessageId", COALESCE(c."lastMessageId", 0)),
+                    "lastDeliveredMessageId" = GREATEST(m."lastDeliveredMessageId", COALESCE(c."lastMessageId", 0)),
+                    "markedUnread" = false
+               FROM chat c
+              WHERE c.id = m."chatId" AND m."userId" = $1 AND m."chatId" = ANY($2)`,
+            [userId, chatIds],
+          );
+        });
       }
 
       const chats = await this.summaries(userId, chatIds, manager);
-      const updates = await this.updates.append(
-        manager,
-        chats.map((chat) => ({
+      const updates = await this.updates.append(manager, [
+        ...chats.map((chat) => ({
           userId,
           payload: {
             type: 'chat.state' as const,
@@ -273,7 +309,8 @@ export class ChatsService {
             },
           },
         })),
-      );
+        ...receipts,
+      ]);
       return { chats, updates };
     });
   }
@@ -324,6 +361,89 @@ export class ChatsService {
         })),
       );
       return { chats, updates };
+    });
+  }
+
+  private async watermarkRows(
+    manager: EntityManager,
+    chatIds: number[],
+  ): Promise<WatermarkRow[]> {
+    if (chatIds.length === 0) {
+      return [];
+    }
+    return manager.query(
+      `SELECT m."chatId", m."userId", m."lastDeliveredMessageId" AS delivered,
+              m."lastReadMessageId" AS read, COALESCE(s."readReceipts", true) AS receipts, c.kind
+         FROM chat_member m
+         JOIN chat c ON c.id = m."chatId"
+         LEFT JOIN user_settings s ON s."userId" = m."userId"
+        WHERE m."chatId" = ANY($1) AND m.status = 'active'`,
+      [chatIds],
+    );
+  }
+
+  /**
+   * Runs a change to watermarks (or to who has receipts on) and returns a `receipt` update for
+   * every member whose ticks moved because of it.
+   */
+  async withReceipts(
+    manager: EntityManager,
+    chatIds: number[],
+    run: () => Promise<void>,
+  ): Promise<{ userId: number; payload: UpdatePayload }[]> {
+    const before = await this.watermarkRows(manager, chatIds);
+    await run();
+    const after = await this.watermarkRows(manager, chatIds);
+    const entries: { userId: number; payload: UpdatePayload }[] = [];
+    for (const chatId of chatIds) {
+      const was = before.filter((r) => r.chatId === chatId);
+      const now = after.filter((r) => r.chatId === chatId);
+      for (const { userId } of now) {
+        const a = receiptsOf(was, userId);
+        const b = receiptsOf(now, userId);
+        if (a.deliveredUpTo === b.deliveredUpTo && a.readUpTo === b.readUpTo) {
+          continue;
+        }
+        // Only worth telling them if one of their own messages changed tick.
+        const values = [
+          a.deliveredUpTo,
+          a.readUpTo,
+          b.deliveredUpTo,
+          b.readUpTo,
+        ];
+        const theirs: unknown[] = await manager.query(
+          `SELECT 1 FROM message WHERE "chatId" = $1 AND "senderId" = $2 AND id > $3 AND id <= $4 LIMIT 1`,
+          [chatId, userId, Math.min(...values), Math.max(...values)],
+        );
+        if (theirs.length > 0) {
+          entries.push({
+            userId,
+            payload: { type: 'receipt', data: { chatId, ...b } },
+          });
+        }
+      }
+    }
+    return entries;
+  }
+
+  /**
+   * A device received messages in a chat up to `upTo` (capped at the chat's newest, so a
+   * device can't mark future messages delivered). Returns the `receipt` updates for the others.
+   */
+  async markDelivered(
+    manager: EntityManager,
+    chatId: number,
+    userId: number,
+    upTo: number,
+  ) {
+    return this.withReceipts(manager, [chatId], async () => {
+      await manager.query(
+        `UPDATE chat_member m
+            SET "lastDeliveredMessageId" = GREATEST(m."lastDeliveredMessageId", LEAST($3::int, COALESCE(c."lastMessageId", 0)))
+           FROM chat c
+          WHERE c.id = m."chatId" AND m."chatId" = $1 AND m."userId" = $2 AND m.status = 'active'`,
+        [chatId, userId, upTo],
+      );
     });
   }
 
@@ -408,6 +528,7 @@ export class ChatsService {
       unread.map((u) => [Number(u.chatId), Number(u.count)]),
     );
 
+    const watermarks = await this.watermarkRows(manager, chatIds);
     const summaries: ChatSummary[] = [];
     for (const chat of chats) {
       const me = mine.get(chat.id);
@@ -437,6 +558,10 @@ export class ChatsService {
         lastMessage: visibleLast,
         unreadCount: unreadBy.get(chat.id) ?? 0,
         me: myState(me),
+        receipts: receiptsOf(
+          watermarks.filter((w) => w.chatId === chat.id),
+          userId,
+        ),
         policies: {
           editInfo: chat.editInfoPolicy,
           addMember: chat.addMemberPolicy,
@@ -599,28 +724,71 @@ export class ChatsService {
     return entries;
   }
 
-  /** Marks messages up to `upTo` as read for this person. Returns the new state, or null. */
+  /**
+   * Marks messages up to `upTo` as read (and so delivered) for this person, capped at the chat's
+   * newest message. Returns the new state, or null, and the `receipt` updates for the others.
+   */
   async markRead(
     manager: EntityManager,
     chatId: number,
     userId: number,
     upTo: number,
   ) {
-    const result = await manager
-      .createQueryBuilder()
-      .update(ChatMember)
-      .set({
-        lastReadMessageId: () => `GREATEST("lastReadMessageId", :upTo)`,
-        markedUnread: false,
-      })
-      .setParameter('upTo', upTo)
-      .where('chatId = :chatId AND userId = :userId AND status = :status', {
-        chatId,
-        userId,
-        status: 'active',
-      })
-      .execute();
-    return result.affected ? this.summary(userId, chatId, manager) : null;
+    let affected = 0;
+    const receipts = await this.withReceipts(manager, [chatId], async () => {
+      const result: unknown[] = await manager.query(
+        `UPDATE chat_member m
+            SET "lastReadMessageId" = GREATEST(m."lastReadMessageId", LEAST($3::int, COALESCE(c."lastMessageId", 0))),
+                "lastDeliveredMessageId" = GREATEST(m."lastDeliveredMessageId", LEAST($3::int, COALESCE(c."lastMessageId", 0))),
+                "markedUnread" = false
+           FROM chat c
+          WHERE c.id = m."chatId" AND m."chatId" = $1 AND m."userId" = $2 AND m.status = 'active'`,
+        [chatId, userId, upTo],
+      );
+      affected = Number(result[1] ?? 0);
+    });
+    return {
+      chat: affected ? await this.summary(userId, chatId, manager) : null,
+      receipts,
+    };
+  }
+
+  /** Your read receipts setting (product-spec.md §5.4); on unless you turned it off. */
+  async readReceipts(userId: number): Promise<boolean> {
+    const [row]: { readReceipts: boolean }[] = await this.dataSource.query(
+      `SELECT "readReceipts" FROM user_settings WHERE "userId" = $1`,
+      [userId],
+    );
+    return row?.readReceipts ?? true;
+  }
+
+  /**
+   * Turns read receipts on or off. It works both ways in direct chats, so the ticks on both
+   * sides of each of your direct chats may change: those people get `receipt` updates.
+   */
+  async setReadReceipts(
+    userId: number,
+    on: boolean,
+  ): Promise<{ updates: Addressed[] }> {
+    return this.dataSource.transaction(async (manager) => {
+      const direct: { chatId: number }[] = await manager.query(
+        `SELECT m."chatId" FROM chat_member m JOIN chat c ON c.id = m."chatId"
+          WHERE m."userId" = $1 AND m.status = 'active' AND c.kind = 'direct'`,
+        [userId],
+      );
+      const entries = await this.withReceipts(
+        manager,
+        direct.map((d) => d.chatId),
+        async () => {
+          await manager.query(
+            `INSERT INTO user_settings ("userId", "readReceipts") VALUES ($1, $2)
+             ON CONFLICT ("userId") DO UPDATE SET "readReceipts" = EXCLUDED."readReceipts"`,
+            [userId, on],
+          );
+        },
+      );
+      return { updates: await this.updates.append(manager, entries) };
+    });
   }
 
   /** Everyone who shares at least one chat with the user: the people who see their presence. */
@@ -646,6 +814,7 @@ function myState(m: ChatMember): MyChatState {
     archivedAt: m.archivedAt,
     mutedUntil: m.mutedUntil,
     markedUnread: m.markedUnread,
+    lastDeliveredMessageId: m.lastDeliveredMessageId,
     lastReadMessageId: m.lastReadMessageId,
     clearedBeforeMessageId: m.clearedBeforeMessageId,
     hiddenAt: m.hiddenAt,

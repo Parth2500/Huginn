@@ -134,11 +134,18 @@ export class MessagesService {
         { id: chatId },
         { lastMessageId: saved.id, lastActivityAt: saved.createdAt },
       );
-      // Sending reads everything before it, and a hidden chat comes back for everyone.
-      await manager.update(
-        ChatMember,
-        { chatId, userId: input.senderId },
-        { lastReadMessageId: saved.id, lastDeliveredMessageId: saved.id },
+      // Sending reads everything before it (the others' ticks may turn read), and a hidden
+      // chat comes back for everyone.
+      const receipts = await this.chatsService.withReceipts(
+        manager,
+        [chatId],
+        async () => {
+          await manager.update(
+            ChatMember,
+            { chatId, userId: input.senderId },
+            { lastReadMessageId: saved.id, lastDeliveredMessageId: saved.id },
+          );
+        },
       );
       await manager.update(
         ChatMember,
@@ -164,6 +171,7 @@ export class MessagesService {
           payload: { type: 'message.new', data: { message } },
         });
       }
+      entries.push(...receipts);
       const updates = await this.updatesService.append(manager, entries);
       return { message, chatId: chatId, createdChat, updates };
     });
@@ -333,10 +341,10 @@ export class MessagesService {
     });
   }
 
-  /** Marks read and records `chat.state` for the reader's own devices. */
+  /** Marks read: `chat.state` for the reader's own devices, `receipt` for the senders. */
   async markRead(chatId: number, userId: number, upTo: number) {
     return this.dataSource.transaction(async (manager: EntityManager) => {
-      const chat = await this.chatsService.markRead(
+      const { chat, receipts } = await this.chatsService.markRead(
         manager,
         chatId,
         userId,
@@ -353,8 +361,22 @@ export class MessagesService {
             data: { chatId, me: chat.me, unreadCount: chat.unreadCount },
           },
         },
+        ...receipts,
       ]);
       return { chat, updates };
+    });
+  }
+
+  /** A device received a chat's messages up to `upTo`: the senders' ticks may double. */
+  async markDelivered(chatId: number, userId: number, upTo: number) {
+    return this.dataSource.transaction(async (manager: EntityManager) => {
+      const receipts = await this.chatsService.markDelivered(
+        manager,
+        chatId,
+        userId,
+        upTo,
+      );
+      return { updates: await this.updatesService.append(manager, receipts) };
     });
   }
 }

@@ -191,6 +191,10 @@
         }
       </span>
       <span class="preview-row">
+        @if (lastTick(chat); as tick) {
+          <app-icon class="row-icon tick" [class.read]="tick === 'read'" [name]="tick === 'sent' ? 'check' : 'check-check'"
+            [attr.aria-label]="tick" role="img" />
+        }
         <span class="preview" [class.empty]="!chat.lastMessage">{{ preview(chat) }}</span>
         @if (muted(chat)) {
           <app-icon class="row-icon" name="bell-off" />

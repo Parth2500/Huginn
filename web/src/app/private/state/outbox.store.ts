@@ -41,11 +41,39 @@ export class OutboxStore {
       return;
     }
     this.entries.update((list) =>
-      list.map((e) => (e.toUserId === toUserId ? { clientMessageId: e.clientMessageId, chatId, text: e.text, createdAt: e.createdAt } : e)),
+      list.map((e) =>
+        e.toUserId === toUserId
+          ? { clientMessageId: e.clientMessageId, chatId, text: e.text, createdAt: e.createdAt, failed: e.failed }
+          : e,
+      ),
     );
     this.entries()
       .filter((e) => moved.some((m) => m.clientMessageId === e.clientMessageId))
       .forEach((e) => void this.db.putOutbox(e));
+  }
+
+  /** The next send to try: the oldest that the server hasn't refused. */
+  next(): OutboxEntry | undefined {
+    return this.entries().find((e) => !e.failed);
+  }
+
+  /** The server refused it: keep it, marked, until the person retries or deletes it. */
+  fail(clientMessageId: string, reason: string) {
+    this.patch(clientMessageId, { failed: reason });
+  }
+
+  retry(clientMessageId: string) {
+    this.patch(clientMessageId, { failed: undefined });
+  }
+
+  private patch(clientMessageId: string, change: Partial<OutboxEntry>) {
+    this.entries.update((list) =>
+      list.map((e) => (e.clientMessageId === clientMessageId ? { ...e, ...change } : e)),
+    );
+    const entry = this.entries().find((e) => e.clientMessageId === clientMessageId);
+    if (entry) {
+      void this.db.putOutbox(entry);
+    }
   }
 
   remove(clientMessageId: string) {

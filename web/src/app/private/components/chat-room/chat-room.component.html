@@ -131,6 +131,7 @@
             [meId]="me().Id" [selecting]="selecting() && row.message.id !== undefined"
             [picked]="row.message.id !== undefined && picked().has(row.message.id)"
             (toggle)="togglePick(row.message.id)" (press)="startSelecting(row.message.id)"
+            (retry)="retrySend(row.message)" (discard)="discardSend(row.message)"
             (openSender)="openProfile.emit($event)">
           </app-chat-message>
         }

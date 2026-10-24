@@ -110,7 +110,7 @@ tested and demoable, never half-migrated.
 | 1.2 ✓ | **Multi-select** (done 2026-10-24, [#2](https://github.com/Parth2500/Huginn/issues/2); deleting groups in bulk waits for leaving, 1.7) | Selection mode for chats (bulk archive, mute, read, pin, delete) and for messages (copy, delete) |
 | 1.3 ✓ | **Notes to self** (done 2026-10-24, [#3](https://github.com/Parth2500/Huginn/issues/3)) | Self chat kind, auto-pin, search entry |
 | 1.4 | **Message actions** | Reply with quote and jump, edit (15 minutes, with "edited"), delete for me, delete for everyone (15 minutes; admins always), tombstones, copy, message info |
-| 1.5 | **Ticks** | Sent, delivered and read from watermarks; failed with retry; read-receipt privacy with reciprocity |
+| 1.5 ✓ | **Ticks** (done 2026-10-24, [#5](https://github.com/Parth2500/Huginn/issues/5); message info comes with 1.4) | Sent, delivered and read from watermarks; failed with retry; read-receipt privacy with reciprocity |
 | 1.6 | **Timeline polish** | Unread divider and scroll-to-first-unread, drafts per chat, simple formatting, system messages |
 | 1.7 | **Groups, full** | Group info drawer, edit name/photo/description, members list with roles, add and remove, promote and demote, group settings, leave (with owner transfer), delete for everyone, announcements mode |
 | 1.8 | **Safety and presence** | Block and unblock, the blocked list, message requests (accept, delete, block), privacy settings (last seen, photo, groups), last seen with the 60-second grace period and watch-on-open presence |

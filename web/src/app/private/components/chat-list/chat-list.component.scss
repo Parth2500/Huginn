@@ -110,6 +110,7 @@
 .room.active .unread-dot { background: #fff; }
 
 .row-icon { flex: none; width: 14px; height: 14px; color: var(--side-text-2); }
+.row-icon.tick { margin-right: -4px; &.read { color: #7dd3fc; } }
 .room.active .row-icon { color: var(--on-accent-2); }
 
 /* The row's menu button: shown on hover or focus, in place of the time. */

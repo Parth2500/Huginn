@@ -105,6 +105,30 @@
 
 .msg.pending .bubble { opacity: 0.85; }
 .state.stalled { color: #fde68a; }
+/* Read: the check-check in sky, which reads on the indigo bubble. */
+.state.read { color: #7dd3fc; }
+.state.failed { color: #fecaca; }
+
+.failed-note {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--danger);
+  &.own { justify-content: flex-end; }
+  .link {
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    font: inherit;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+  }
+}
 
 @media (max-width: 767px) {
   .msg { padding-right: 8%; }

@@ -219,7 +219,9 @@ Built in 0.4:
 | `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], hasMore }` / `{}` |
 | `messages.page` | `{ chatId, before?: messageId }` | `{ messages[], hasMore }` |
 | `message.send` | `{ chatId \| toUserId, clientMessageId, text }` | `{ message, chatId }` |
-| `chat.read` | `{ chatId, upTo: messageId }` | `{}` |
+| `chat.read` | `{ chatId, upTo: messageId }`, capped at the chat's newest; also delivers | `{}`, plus `receipt` updates for the senders (1.5) |
+| `chat.delivered` | `{ chatId, upTo: messageId }`, capped likewise | `{}`, plus `receipt` updates (1.5) |
+| `settings.get` / `settings.update` | `{ readReceipts }` for now; the rest with Settings (1.11) | `{ settings }`; your other tabs get a `settings` event |
 | `group.create` | `{ title, description?, memberIds[] }` | `{ chat }` |
 | `typing` | `{ chatId }` | – |
 
@@ -292,6 +294,12 @@ Receipts are **watermarks**, not one row per message per reader.
   but isn't shared. Reciprocity: the server stops sending them read updates too.
 - **Cost:** one row update per reader per batch, not per message. Updates to senders are
   combined and sent at most every 500 ms per chat.
+- **Built 2026-10-24 (1.5):** every chat summary carries `receipts { deliveredUpTo, readUpTo }`,
+  the lowest watermarks among the *other* members, and the client compares its own message ids
+  against them. A watermark change records a `receipt` update only for members whose own
+  messages changed tick, which does the job of the 500 ms batching on the server side; devices
+  batch their `chat.delivered` reports per chat every 300 ms. In groups, reads always count
+  (WhatsApp's rule); receipts off hides reads only in direct chats, both ways.
 
 ---
 

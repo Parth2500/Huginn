@@ -336,6 +336,47 @@ export class ChatGateway
     );
   }
 
+  /** Your settings. For now only read receipts; the rest arrive with Settings (1.11). */
+  @SubscribeMessage('settings.get')
+  onSettingsGet(socket: Socket) {
+    return this.handle(socket, async (user) => ({
+      settings: { readReceipts: await this.chats.readReceipts(user.Id) },
+    }));
+  }
+
+  @SubscribeMessage('settings.update')
+  onSettingsUpdate(socket: Socket, request: { readReceipts?: unknown }) {
+    return this.handle(socket, async (user) => {
+      if (typeof request?.readReceipts !== 'boolean') {
+        throw new ChatRuleError('Say whether read receipts are on or off.');
+      }
+      const { updates } = await this.chats.setReadReceipts(
+        user.Id,
+        request.readReceipts,
+      );
+      this.publish(updates);
+      // Your other devices show the same switch.
+      this.server
+        .to(userChannel(user.Id))
+        .emit('settings', { readReceipts: request.readReceipts });
+      return { settings: { readReceipts: request.readReceipts } };
+    });
+  }
+
+  /** This device received a chat's messages up to `upTo` (protocol: delivered receipts). */
+  @SubscribeMessage('chat.delivered')
+  onChatDelivered(socket: Socket, request: { chatId: number; upTo: number }) {
+    return this.handle(socket, async (user) => {
+      const { updates } = await this.messages.markDelivered(
+        Number(request?.chatId),
+        user.Id,
+        Math.max(0, Math.floor(Number(request?.upTo) || 0)),
+      );
+      this.publish(updates);
+      return {};
+    });
+  }
+
   /** Delete for me (`scope: 'me'`) or for everyone (`'all'`), one or more messages. */
   @SubscribeMessage('message.delete')
   onMessageDelete(

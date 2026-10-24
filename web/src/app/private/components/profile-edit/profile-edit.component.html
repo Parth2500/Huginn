@@ -133,5 +133,23 @@
         }
       </section>
     }
+
+    <section class="methods privacy" aria-labelledby="privacy-title">
+      <h2 id="privacy-title" class="label">Privacy</h2>
+      <ul>
+        <li>
+          <app-icon name="check-check" />
+          <div class="method-text">
+            <span class="method-name" id="receipts-label">Read receipts</span>
+            <span class="method-detail" id="receipts-help">
+              Turn off to stop sharing when you've read direct messages. You won't see other people's either. Groups always show reads.
+            </span>
+          </div>
+          <button type="button" class="switch" role="switch" [attr.aria-checked]="readReceipts()"
+            aria-labelledby="receipts-label" aria-describedby="receipts-help" (click)="toggleReceipts()"
+            [disabled]="savingReceipts()"></button>
+        </li>
+      </ul>
+    </section>
   </div>
 </section>

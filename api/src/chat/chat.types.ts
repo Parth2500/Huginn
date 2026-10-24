@@ -39,6 +39,7 @@ export interface MyChatState {
   archivedAt: Date | null;
   mutedUntil: Date | null;
   markedUnread: boolean;
+  lastDeliveredMessageId: number;
   lastReadMessageId: number;
   clearedBeforeMessageId: number;
   /** Deleted from your list at this time; a newer message brings the chat back. */
@@ -57,11 +58,23 @@ export interface ChatSummary {
   lastMessage: MessageDto | null;
   unreadCount: number;
   me: MyChatState;
+  /** How far every other member has received and read: your ticks (architecture.md §6). */
+  receipts: Receipts;
   policies: {
     editInfo: GroupPolicy;
     addMember: GroupPolicy;
     send: GroupPolicy;
   };
+}
+
+/**
+ * Your messages up to `deliveredUpTo` reached every other member (✓✓), and up to `readUpTo`
+ * every other member read them (✓✓ in the read colour). In a direct chat, read stays 0 unless
+ * both of you have read receipts on.
+ */
+export interface Receipts {
+  deliveredUpTo: number;
+  readUpTo: number;
 }
 
 /** How long a mute lasts; `null` unmutes. */
@@ -91,6 +104,8 @@ export type UpdatePayload =
       type: 'chat.state';
       data: { chatId: number; me: MyChatState; unreadCount: number };
     }
+  /** Someone's watermark moved, and with it the ticks on your messages. */
+  | { type: 'receipt'; data: { chatId: number } & Receipts }
   /** Deleted for everyone: the message comes again as a tombstone (no text). */
   | { type: 'message.deleted'; data: { message: MessageDto } }
   /** Deleted for me: only your own devices hear it. */

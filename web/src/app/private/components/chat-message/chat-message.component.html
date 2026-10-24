@@ -41,12 +41,38 @@
           <app-icon name="alert-circle" /><span class="visually-hidden">, not confirmed yet</span>
         </span>
       }
+      @case ('failed') {
+        <span class="state failed" title="Not sent">
+          <app-icon name="alert-circle" /><span class="visually-hidden">, not sent</span>
+        </span>
+      }
       @case ('sent') {
+        <span class="state" title="Sent">
+          <app-icon name="check" /><span class="visually-hidden">, sent</span>
+        </span>
+      }
+      @case ('delivered') {
         <span class="state" title="Delivered">
-          <app-icon name="check" /><span class="visually-hidden">, delivered</span>
+          <app-icon name="check-check" /><span class="visually-hidden">, delivered</span>
+        </span>
+      }
+      @case ('read') {
+        <span class="state read" title="Read">
+          <app-icon name="check-check" /><span class="visually-hidden">, read</span>
         </span>
       }
     }
   </span></p>
 </div>
 </div>
+@if (status() === 'failed') {
+  <div class="failed-note" [class.own]="own()">
+    @if (showWhy()) {
+      <span class="why">Not sent: {{ message().failed }}</span>
+      <button type="button" class="link" (click)="retry.emit()">Retry</button>
+      <button type="button" class="link" (click)="discard.emit()">Delete</button>
+    } @else {
+      <button type="button" class="link" (click)="showWhy.set(true)">Not sent. Tap to see why.</button>
+    }
+  </div>
+}

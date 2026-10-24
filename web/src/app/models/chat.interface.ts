@@ -39,10 +39,20 @@ export interface MyChatState {
   archivedAt: string | null;
   mutedUntil: string | null;
   markedUnread: boolean;
+  lastDeliveredMessageId: number;
   lastReadMessageId: number;
   clearedBeforeMessageId: number;
   /** Deleted from your list at this time; a newer message brings the chat back. */
   hiddenAt: string | null;
+}
+
+/**
+ * Your messages up to `deliveredUpTo` reached every other member (✓✓); up to `readUpTo`, every
+ * other member read them. In a direct chat, read stays 0 unless both of you share receipts.
+ */
+export interface Receipts {
+  deliveredUpTo: number;
+  readUpTo: number;
 }
 
 /** How long a mute lasts; `null` unmutes. */
@@ -75,6 +85,8 @@ export interface Chat {
   lastMessage: ChatMessage | null;
   unreadCount: number;
   me: MyChatState;
+  /** How far every other member has received and read: the ticks on your messages. */
+  receipts: Receipts;
   policies: { editInfo: GroupPolicy; addMember: GroupPolicy; send: GroupPolicy };
 }
 
@@ -94,6 +106,7 @@ export type Update =
   | { seq: number; type: 'chat.new'; data: { chat: Chat } }
   | { seq: number; type: 'message.new'; data: { message: ChatMessage } }
   | { seq: number; type: 'chat.state'; data: { chatId: number; me: MyChatState; unreadCount: number } }
+  | { seq: number; type: 'receipt'; data: { chatId: number } & Receipts }
   | { seq: number; type: 'message.deleted'; data: { message: ChatMessage } }
   | { seq: number; type: 'message.hidden'; data: { chatId: number; messageIds: number[] } };
 
