@@ -125,6 +125,9 @@
         @if (row.kind === 'day') {
           <div class="day"><span>{{ row.label }}</span></div>
         }
+        @if (row.kind === 'unread') {
+          <div class="unread-divider" role="separator" [attr.aria-label]="row.label"><span>{{ row.label }}</span></div>
+        }
         @if (row.kind === 'message') {
           <app-chat-message [message]="row.message" [own]="row.own"
             [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh" [showSender]="chat().kind === 'group'"

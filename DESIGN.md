@@ -439,6 +439,9 @@ Quiet, solid and compact.
 - Delete opens the confirmation dialog with a radio choice, Delete for me / Delete for everyone, when everyone is allowed (all yours and under 15 minutes, or you run the group; everyone is preselected). Otherwise it deletes for you and says so.
 - Tombstones read "You deleted this message", "Deleted by an admin" or "This message was deleted", in italics without a tick; the list preview uses the same words.
 
+### Unread Divider
+- "3 unread messages": a full-width 1px indigo hairline at 35% with a centred pill (accent-soft fill, Indigo Ink 12px 700 text). Opening a chat with unread messages scrolls so it sits a third of the way down when there's room. It stays until you leave the chat.
+
 ### Ticks
 - 14px icons at the end of your bubble's meta: clock (sending), amber alert (not confirmed yet), check (sent), check-check (delivered), check-check in sky #7dd3fc (read, chosen to read on indigo), rose alert (not sent). Notes to self and tombstones have none.
 - A refused send stays in place with a 12px danger line under it, "Not sent. Tap to see why.", which opens the reason with underlined Retry and Delete.

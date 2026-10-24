@@ -1,3 +1,23 @@
+/* The stream's dividers and selection mode, kept apart to hold each stylesheet under budget. */
+
+/* "3 unread messages": a full-width hairline with a centred pill (ux-design.md §3.5). */
+.unread-divider {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  margin: 14px 0 6px;
+  &::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; border-top: 1px solid var(--accent); opacity: 0.35; }
+  span {
+    position: relative;
+    padding: 3px 12px;
+    border-radius: 99px;
+    background: var(--accent-soft);
+    color: var(--accent-ink);
+    font-size: 12px;
+    font-weight: 700;
+  }
+}
+
 /* Selecting messages: the header counts them, and the composer gives way to Copy and Delete. */
 .select-title { flex: 1; font-size: 16px; font-weight: 650; }
 .select-messages { margin-left: auto; color: var(--text-2); }

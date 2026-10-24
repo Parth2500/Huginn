@@ -63,6 +63,7 @@ export interface ShownMessage {
 
 export type StreamRow =
   | { kind: 'day'; key: string; label: string }
+  | { kind: 'unread'; key: string; label: string }
   | {
       kind: 'message';
       key: string;
@@ -77,7 +78,7 @@ export type StreamRow =
 @Component({
   selector: 'app-chat-room',
   templateUrl: './chat-room.component.html',
-  styleUrls: ['./chat-room.component.scss', './chat-room-select.scss'],
+  styleUrls: ['./chat-room.component.scss', './chat-room-parts.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(keydown.escape)': 'onEscape($event)' },
   imports: [
@@ -183,6 +184,11 @@ export class ChatRoomComponent implements AfterViewInit {
   /** Who is typing right now, by user id. */
   private readonly typing = signal(new Map<number, string>());
   private readonly freshIds = signal(new Set<number>());
+  /**
+   * Where your unread messages started when you opened the chat (product-spec.md §3.7). The
+   * divider stays there until you leave, even though reading moves the real watermark.
+   */
+  private readonly unreadMark = signal<{ after: number; count: number } | null>(null);
 
   readonly membersLabel = computed(() => {
     const others = this.otherMembers().map((u) => personName(u));
@@ -226,6 +232,8 @@ export class ChatRoomComponent implements AfterViewInit {
   private typingTimers = new Map<number, ReturnType<typeof setTimeout>>();
   /** Newest message id already on screen, to tell live arrivals from history. */
   private newestShown = 0;
+  /** The view already jumped to the unread divider once. */
+  private unreadScrolled = false;
 
   constructor() {
     const destroyRef = inject(DestroyRef);
@@ -483,9 +491,16 @@ export class ChatRoomComponent implements AfterViewInit {
 
   private resetView() {
     this.endSelecting();
+    const chat = this.chat();
+    this.unreadMark.set(
+      chat.id !== undefined && chat.unreadCount > 0
+        ? { after: chat.me.lastReadMessageId, count: chat.unreadCount }
+        : null,
+    );
     this.unseen.set(0);
     this.pinned = true;
     this.newestShown = 0;
+    this.unreadScrolled = false;
     this.loadingOlder.set(false);
     this.freshIds.set(new Set());
     this.clearTyping();
@@ -504,7 +519,14 @@ export class ChatRoomComponent implements AfterViewInit {
     const firstLoad = this.newestShown === 0;
     const arrived = messages.filter((m) => m.id > this.newestShown);
     this.newestShown = newest.id;
-    if (firstLoad) {
+    const mark = this.unreadMark();
+    // The device's copy may not hold the unread messages yet; scroll once they're here.
+    const unreadHere =
+      !!mark && !this.unreadScrolled && messages.some((m) => m.id > mark.after && m.sender?.Id !== this.me().Id);
+    if (unreadHere) {
+      this.unreadScrolled = true;
+      this.scrollToUnread();
+    } else if (firstLoad) {
       this.scrollToBottom(true);
     } else {
       const fromOthers = arrived.filter((m) => m.sender?.Id !== this.me().Id);
@@ -557,12 +579,30 @@ export class ChatRoomComponent implements AfterViewInit {
 
     const rows: StreamRow[] = [];
     let lastDay = '';
+    const mark = this.unreadMark();
+    const firstUnread = mark
+      ? entries.findIndex(
+          (e) => e.message.id !== undefined && e.message.id > mark.after && e.message.sender?.Id !== meId,
+        )
+      : -1;
     entries.forEach((entry, i) => {
       const date = new Date(entry.message.createdAt);
       const day = date.toDateString();
       if (day !== lastDay) {
         rows.push({ kind: 'day', key: `d${day}`, label: this.dayLabel(date) });
         lastDay = day;
+      }
+      if (i === firstUnread && mark) {
+        const count = Math.max(
+          mark.count,
+          entries.filter((e) => e.message.id !== undefined && e.message.id > mark.after && e.message.sender?.Id !== meId)
+            .length,
+        );
+        rows.push({
+          kind: 'unread',
+          key: 'unread',
+          label: count === 1 ? '1 unread message' : `${count} unread messages`,
+        });
       }
       const prev = entries[i - 1]?.message;
       const next = entries[i + 1]?.message;
@@ -626,6 +666,20 @@ export class ChatRoomComponent implements AfterViewInit {
     }
     const format = date.getFullYear() === today.getFullYear() ? 'EEEE, d MMMM' : 'd MMMM y';
     return formatDate(date, format, this.locale);
+  }
+
+  /** Opens on the first unread message, with its divider a third of the way down (ux §3.5). */
+  private scrollToUnread() {
+    setTimeout(() => {
+      const scroller = this.messagesScroller()?.nativeElement;
+      const divider = scroller?.querySelector<HTMLElement>('.unread-divider');
+      if (!scroller || !divider) {
+        this.scrollToBottom(true);
+        return;
+      }
+      scroller.scrollTop = divider.offsetTop - scroller.clientHeight / 3;
+      this.pinned = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < PIN_THRESHOLD_PX;
+    });
   }
 
   /** Follows new messages unless the reader has scrolled up to read history. */
