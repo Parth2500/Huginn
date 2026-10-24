@@ -437,6 +437,7 @@ Quiet, solid and compact.
 - **Style:** 32px pill, raised surface, 1px hairline, 14px 500 text, with an xs avatar leading.
 - **State:** removable chips carry a 26px circular remove button that fills with hairline on hover. Your own chip comes first with a muted "(you)" and no remove button.
 - **Entry:** a new chip scales in from 94% over 200ms on the ease-out curve.
+- **Filter chips (rail):** All · Unread · Groups under the list title: 28px pills with a slate-line border, 13px 500 muted text, hover filling Slate Rail Raised. The chosen one is indigo with white text (on the slate rail the accent-soft fill would glare). They're toggle buttons (`aria-pressed`) in a labelled group.
 
 ### Inputs / Fields
 - **Style:** 44px tall, 10px radius, white surface, strong hairline, 14px side padding, placeholder in muted ink.

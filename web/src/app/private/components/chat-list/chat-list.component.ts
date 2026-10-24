@@ -23,9 +23,17 @@ import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
 import { ChatMenuComponent } from '../chat-menu/chat-menu.component';
 
+type ChatFilter = 'all' | 'unread' | 'groups';
+
+const FILTERS: { value: ChatFilter; label: string }[] = [
+  { value: 'all', label: 'All' },
+  { value: 'unread', label: 'Unread' },
+  { value: 'groups', label: 'Groups' },
+];
+
 /**
- * The rail's chat list (ux-design.md §2): the main list with pins first, the Archived folder
- * and its view, each row's badges, and the row menu.
+ * The rail's chat list (ux-design.md §2): the filter chips, the main list with pins first, the
+ * Archived folder and its view, each row's badges, and the row menu.
  */
 @Component({
   selector: 'app-chat-list',
@@ -62,9 +70,26 @@ export class ChatListComponent {
   readonly allChats = this.store.chats;
   /** Which list shows: the main one, or the Archived folder. */
   readonly folder = signal<'main' | 'archived'>('main');
-  readonly listChats = computed(() =>
-    this.folder() === 'archived' ? this.store.archivedChats() : this.store.mainChats(),
-  );
+  /** The main list's filter chips (product-spec.md §1.9). */
+  readonly filters = FILTERS;
+  readonly filter = signal<ChatFilter>('all');
+  readonly listChats = computed(() => {
+    if (this.folder() === 'archived') {
+      return this.store.archivedChats();
+    }
+    const filter = this.filter();
+    const open = this.selectedChatId();
+    return this.store
+      .mainChats()
+      .filter((chat) =>
+        filter === 'groups'
+          ? chat.kind === 'group'
+          : filter === 'unread'
+            ? // The open chat stays, so reading it doesn't pull the row from under the pointer.
+              chat.unreadCount > 0 || chat.me.markedUnread || chat.id === open
+            : true,
+      );
+  });
   readonly archivedFolder = computed(() => this.store.folders().archived);
   readonly hasMoreChats = computed(() =>
     this.folder() === 'archived' ? !!this.store.nextArchived() : !!this.store.next(),

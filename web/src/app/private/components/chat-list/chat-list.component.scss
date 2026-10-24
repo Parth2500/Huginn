@@ -16,6 +16,28 @@
   .count { font-size: 12px; font-weight: 600; color: var(--side-text-2); padding: 0 7px; border-radius: 99px; background: var(--side-bg-2); }
 }
 
+/* Filter chips: on the slate rail, the chosen one takes the accent. */
+.filters {
+  display: flex;
+  gap: 6px;
+  padding: 0 16px 10px;
+}
+.filter {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--side-line);
+  border-radius: 99px;
+  background: transparent;
+  color: var(--side-text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+  &:hover { background: var(--side-bg-2); color: var(--side-text); }
+  &[aria-pressed='true'] { border-color: var(--accent); background: var(--accent); color: var(--on-accent); }
+}
+
 .room-list {
   flex: 1;
   min-height: 0;

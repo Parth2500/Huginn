@@ -11,6 +11,14 @@
     <span class="count tabular">{{ listChats().length }}{{ hasMoreChats() ? '+' : '' }}</span>
   }
 </div>
+@if (folder() === 'main' && loaded() && allChats().length > 0) {
+  <div class="filters" role="group" aria-label="Filter chats">
+    @for (option of filters; track option.value) {
+      <button type="button" class="filter" [attr.aria-pressed]="filter() === option.value"
+        (click)="filter.set(option.value)">{{ option.label }}</button>
+    }
+  </div>
+}
 <nav class="room-list" [attr.aria-label]="folder() === 'archived' ? 'Archived chats' : 'Chats'">
   <!-- Loading -->
   @if (!loaded()) {
@@ -24,7 +32,7 @@
     </ul>
   }
   <!-- The Archived folder row, above the main list -->
-  @if (loaded() && folder() === 'main' && archivedFolder().count > 0) {
+  @if (loaded() && folder() === 'main' && filter() === 'all' && archivedFolder().count > 0) {
     <button type="button" class="room folder-row" (click)="showArchived()"
       [attr.aria-label]="'Archived, ' + archivedFolder().count + ' chats' + (archivedFolder().unread ? ', ' + archivedFolder().unread + ' unread' : '')">
       <span class="folder-icon"><app-icon name="archive" /></span>
@@ -104,6 +112,17 @@
     <div class="side-empty">
       <p class="title">No archived chats</p>
       <p>Archive a chat to keep your list tidy without leaving it.</p>
+    </div>
+  }
+  @if (loaded() && folder() === 'main' && filter() !== 'all' && allChats().length > 0 && listChats().length === 0) {
+    <div class="side-empty">
+      @if (filter() === 'unread') {
+        <p class="title">No unread chats</p>
+        <p>You're all caught up.</p>
+      } @else {
+        <p class="title">No groups yet</p>
+        <p>Use New group to start one with two or more people.</p>
+      }
     </div>
   }
   <!-- Empty -->
