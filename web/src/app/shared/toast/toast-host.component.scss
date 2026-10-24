@@ -27,6 +27,44 @@
   &.error > app-icon { color: #fca5a5; }
   p { font-size: 14px; line-height: 1.4; padding: 6px 0; }
   .icon-btn { width: 32px; height: 32px; color: var(--side-text-2); }
+
+  &.has-action { position: relative; overflow: hidden; grid-template-columns: auto 1fr auto auto; }
+}
+
+/* Undo: the toast's one action, in the light indigo that reads on slate. */
+.toast-action {
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--radius-s);
+  background: transparent;
+  color: #a5b4fc;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  &:hover { background: var(--side-bg-2); color: #c7d2fe; }
+}
+
+/* How long Undo stays on offer; it waits while the pointer or focus is on the toast. */
+.countdown {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 100%;
+  background: #a5b4fc;
+  transform-origin: left;
+  animation: countdown linear forwards;
+}
+.toast:hover .countdown, .toast:focus-within .countdown { animation-play-state: paused; }
+
+@keyframes countdown {
+  to { transform: scaleX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .countdown { display: none; }
 }
 
 @keyframes toast-in {

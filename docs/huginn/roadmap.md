@@ -1,6 +1,7 @@
 # Huginn roadmap
 
-Phases build on each other. Each milestone is a shippable slice: it ends with the app working,
+Phases build on each other. Each feature below is tracked as a GitHub issue
+([Parth2500/Huginn issues](https://github.com/Parth2500/Huginn/issues), one milestone per phase). Each milestone is a shippable slice: it ends with the app working,
 tested and demoable, never half-migrated.
 
 ## Why this order
@@ -105,7 +106,7 @@ tested and demoable, never half-migrated.
 
 | # | Milestone | Includes |
 |---|---|---|
-| 1.1 | **Chat list power** (in progress: pin, mute, read/unread, archive and the row menu done 2026-10-22; clear and delete chat, and the filters, done 2026-10-24) | Pin (limit 5, drag to reorder), the Archived and Message requests folders, mute (8h, 1 week, always), mark read/unread, delete chat, clear chat, filters (All, Unread, Groups), row menus, swipe actions, Undo snackbars |
+| 1.1 | **Chat list power** (in progress: pin, mute, read/unread, archive and the row menu done 2026-10-22; clear and delete chat, the filters, and Undo done 2026-10-24; tracked in [#1](https://github.com/Parth2500/Huginn/issues/1)) | Pin (limit 5, drag to reorder), the Archived and Message requests folders, mute (8h, 1 week, always), mark read/unread, delete chat, clear chat, filters (All, Unread, Groups), row menus, swipe actions, Undo snackbars |
 | 1.2 | **Multi-select** | Selection mode for chats (bulk archive, mute, read, pin, delete) and for messages (copy, delete) |
 | 1.3 | **Notes to self** | Self chat kind, auto-pin, search entry |
 | 1.4 | **Message actions** | Reply with quote and jump, edit (15 minutes, with "edited"), delete for me, delete for everyone (15 minutes; admins always), tombstones, copy, message info |

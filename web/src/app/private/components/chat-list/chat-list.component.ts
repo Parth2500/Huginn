@@ -198,11 +198,27 @@ export class ChatListComponent {
     if ('unread' in change && change.unread && this.isSelected(chat)) {
       this.closeSelected.emit();
     }
+    const wasPinned = !!chat.me.pinnedAt;
     const error = await this.chatService.changeState([chat.id], change);
     if (error) {
       this.toast.error(error);
     } else if ('archive' in change) {
-      this.toast.show(change.archive ? 'Chat archived.' : 'Chat moved back to your chats.');
+      // Archiving unpinned it; undoing pins it again (which also unarchives).
+      const undo: ChatStateChange = change.archive
+        ? wasPinned
+          ? { pin: true }
+          : { archive: false }
+        : { archive: true };
+      this.toast.undoable(change.archive ? 'Chat archived.' : 'Chat moved back to your chats.', () =>
+        void this.undo(chat.id, undo),
+      );
+    }
+  }
+
+  private async undo(chatId: number, change: ChatStateChange) {
+    const error = await this.chatService.changeState([chatId], change);
+    if (error) {
+      this.toast.error(error);
     }
   }
 

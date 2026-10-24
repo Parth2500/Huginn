@@ -498,6 +498,7 @@ Quiet, solid and compact.
 
 ### Toasts
 - Slate panel, 10px radius, Float shadow, 18px leading icon (green for success, rose for error), 32px dismiss button. Top right under the header on desktop, bottom full-width on phones.
+- **Undo:** a reversible action ("Chat archived.") gets a 700-weight "Undo" text button in light indigo (#a5b4fc, readable on slate) before the dismiss button, and a 2px light-indigo countdown along the bottom edge that empties over 5 seconds. The clock stops while the pointer or focus is on the toast. Under reduced motion the countdown bar is hidden; the time is the same.
 
 ### Empty and Loading States
 - Empty states centre a 48-56px indigo-wash icon tile, a title, a muted line and, where useful, a primary button. Loading uses pulsing skeletons at 10% of the current colour, shaped like the content they replace (bubble-shaped in the stream, row-shaped in the rail).
