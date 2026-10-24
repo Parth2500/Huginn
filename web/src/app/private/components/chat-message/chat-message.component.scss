@@ -89,6 +89,15 @@
   .msg.own & { color: var(--on-accent-2); }
 }
 
+.text code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, currentColor 12%, transparent);
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.9em;
+}
+.text b { font-weight: 700; }
+
 .text a {
   color: var(--link);
   font-weight: 500;

@@ -5,7 +5,7 @@ import { NgClass, DatePipe } from '@angular/common';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { TonePipe } from '../../../shared/pipes/avatar.pipes';
-import { LinkifyPipe } from '../../../shared/pipes/linkify.pipe';
+import { RichTextPipe } from '../../../shared/pipes/rich-text.pipe';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 
 @Component({
@@ -19,7 +19,7 @@ import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
     IconComponent,
     DatePipe,
     TonePipe,
-    LinkifyPipe,
+    RichTextPipe,
     DisplayNamePipe
 ],
 })

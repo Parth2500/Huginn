@@ -22,13 +22,7 @@
       <button type="button" class="sender" [ngClass]="message().sender?.Id | tone"
       (click)="emitSender()">{{ message().sender | displayName }}</button>
     }
-    <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().sender | displayName) }}: </span>@if (message().deleted) {<em class="deleted">{{ tombstone() }}</em>} @else {@for (part of message().text | linkify; track $index) {
-    @if (part.href) {
-      <a [href]="part.href" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>
-    } @else {
-      {{ part.text }}
-    }
-    }}<span class="meta">
+    <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().sender | displayName) }}: </span>@if (message().deleted) {<em class="deleted">{{ tombstone() }}</em>} @else {@for (part of message().text | richText; track $index) {@switch (part.style) {@case ('bold') {<b>{{ part.text }}</b>} @case ('italic') {<i>{{ part.text }}</i>} @case ('strike') {<s>{{ part.text }}</s>} @case ('code') {<code>{{ part.text }}</code>} @default {@if (part.href) {<a [href]="part.href" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>} @else {{{ part.text }}}}}}}<span class="meta">
     <time [attr.datetime]="message().createdAt" [title]="message().createdAt | date: 'EEEE d MMMM y, HH:mm'">{{ message().createdAt | date: 'HH:mm' }}</time>
     @switch (status()) {
       @case ('pending') {
