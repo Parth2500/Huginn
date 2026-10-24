@@ -13,7 +13,7 @@
         </button>
       </header>
       <app-chat-search [chats]="chats()" [me]="user()" [onlineIds]="onlineIds()" (activeChange)="searching.set($event)"
-      (openChat)="selectChat($event)" (openPerson)="openPerson($event)" />
+      (openChat)="selectChat($event)" (openPerson)="openPerson($event)" (openNotes)="openPerson(user())" />
       <app-chat-list [hidden]="searching()" [me]="user()" [selectedChatId]="selectedChatId()" [onlineIds]="onlineIds()"
         (open)="selectChat($event)" (closeSelected)="closeChat()" />
       <footer class="me">
@@ -47,7 +47,7 @@
       }
       @if (!creating() && !editingProfile() && !openChat()) {
         <app-start-chat [me]="user()" [hasRooms]="chats().length > 0"
-        [onlineIds]="onlineIds()" (pick)="openPerson($event)" />
+        [onlineIds]="onlineIds()" (pick)="openPerson($event)" (openNotes)="openPerson(user())" />
       }
       @if (profileUser(); as person) {
         <app-profile-panel [person]="person" [me]="user()"

@@ -92,16 +92,14 @@ export class DashboardComponent {
       const chat = this.store.get(selection.chatId);
       return chat && !isHidden(chat) ? chat : undefined;
     }
-    const existing = this.store.directWith(selection.draft.Id!);
+    const own = selection.draft.Id === this.user().Id;
+    const existing = own ? this.store.selfChat() : this.store.directWith(selection.draft.Id!);
     if (existing) {
       return existing;
     }
-    const draft: DraftChat = {
-      kind: 'direct',
-      title: null,
-      description: null,
-      members: [this.user(), selection.draft],
-    };
+    const draft: DraftChat = own
+      ? { kind: 'self', title: null, description: null, members: [this.user()] }
+      : { kind: 'direct', title: null, description: null, members: [this.user(), selection.draft] };
     return draft;
   });
 
@@ -221,6 +219,12 @@ export class DashboardComponent {
       return;
     }
     this.closePanels();
+    if (person.Id === this.user().Id) {
+      // Notes to self: the chat, or a draft until the first note.
+      const own = this.store.selfChat();
+      this.selection.set(own ? { chatId: own.id } : { draft: this.user() });
+      return;
+    }
     const found = await this.chatService.findDirect(person.Id);
     if (!found) {
       return;

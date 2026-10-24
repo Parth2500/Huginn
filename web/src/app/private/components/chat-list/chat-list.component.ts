@@ -455,9 +455,12 @@ export class ChatListComponent {
   preview(chat: Chat): string {
     const message = chat.lastMessage;
     if (!message) {
-      return `No messages yet · ${this.members(chat)}`;
+      return chat.kind === 'self' ? 'Only you can see this' : `No messages yet · ${this.members(chat)}`;
     }
     const text = message.deleted ? 'Message deleted' : message.text ?? '';
+    if (chat.kind === 'self') {
+      return text; // every note is yours
+    }
     if (message.sender?.Id === this.me().Id) {
       return `You: ${text}`;
     }

@@ -541,14 +541,12 @@ export class ChatService {
 
   /** Once a draft's chat exists, queued messages to that person go to the chat. */
   private outboxFollows(chat: Chat) {
-    if (chat.kind !== 'direct') {
-      return;
-    }
-    const partner = chat.members.find((m) => m.Id !== this.me?.Id);
-    if (partner?.Id !== undefined) {
-      this.outbox.attachToChat(partner.Id, chat.id);
+    const target = chat.kind === 'self' ? this.me : chat.kind === 'direct' ? chat.members.find((m) => m.Id !== this.me?.Id) : undefined;
+    if (target?.Id !== undefined) {
+      this.outbox.attachToChat(target.Id, chat.id);
     }
   }
+
 
   private onUserUpdated(user: IUser) {
     if (user.Id === this.me?.Id) {

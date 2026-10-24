@@ -16,4 +16,5 @@ export class StartChatComponent {
   readonly hasRooms = input(false);
   readonly onlineIds = input<Set<number> | null>(null);
   readonly pick = output<IUser>();
+  readonly openNotes = output<void>();
 }

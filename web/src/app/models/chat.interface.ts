@@ -76,10 +76,10 @@ export interface Chat {
   policies: { editInfo: GroupPolicy; addMember: GroupPolicy; send: GroupPolicy };
 }
 
-/** A direct chat that doesn't exist yet: it's created by the first message. */
+/** A direct chat (or your Notes to self) that doesn't exist yet: the first message creates it. */
 export interface DraftChat {
   id?: undefined;
-  kind: 'direct';
+  kind: 'direct' | 'self';
   title: null;
   description: null;
   members: IUser[];

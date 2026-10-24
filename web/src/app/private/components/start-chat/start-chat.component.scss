@@ -31,6 +31,19 @@
 
 .start-search { margin-top: 6px; }
 
+.notes-link { color: var(--text-2); font-size: 14px; }
+.link-btn {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--link);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
 .steps {
   display: grid;
   gap: 12px;

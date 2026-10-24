@@ -25,22 +25,38 @@
           @if (partner(chat); as person) {
             <app-avatar [user]="person"
             [online]="!!onlineIds()?.has(person.Id!)"></app-avatar>
+          } @else if (chat.kind === 'self') {
+            <span class="avatar notes"><app-icon name="bookmark"></app-icon></span>
           } @else {
             <span class="avatar" [ngClass]="chat.id | tone">{{ chat.title | initials }}</span>
           }
           <span class="lines">
             <span class="name">{{ title(chat) }}</span>
-            <span class="sub">{{ partner(chat) ? '@' + partner(chat)!.username : chat.members.length + ' members' }}</span>
+            <span class="sub">{{ chat.kind === 'self' ? 'Only you' : partner(chat) ? '@' + partner(chat)!.username : chat.members.length + ' members' }}</span>
           </span>
         </div>
       }
     }
+    @if (notesDraft()) {
+      @if (!matchingChats().length) {
+        <p class="group-label" role="presentation">Chats</p>
+      }
+      <div class="result" role="option" [id]="'chat-search-' + matchingChats().length"
+        [class.active]="active() === matchingChats().length" [attr.aria-selected]="active() === matchingChats().length"
+        (mouseenter)="active.set(matchingChats().length)" (mousedown)="$event.preventDefault()" (click)="pickNotes()">
+        <span class="avatar notes"><app-icon name="bookmark"></app-icon></span>
+        <span class="lines">
+          <span class="name">Notes to self</span>
+          <span class="sub">Only you</span>
+        </span>
+      </div>
+    }
     @if (newPeople().length) {
       <p class="group-label" role="presentation">People</p>
       @for (user of newPeople(); track user.Id; let j = $index) {
-        <div class="result" role="option" [id]="'chat-search-' + (matchingChats().length + j)"
-          [class.active]="active() === matchingChats().length + j" [attr.aria-selected]="active() === matchingChats().length + j"
-          (mouseenter)="active.set(matchingChats().length + j)" (mousedown)="$event.preventDefault()" (click)="pickPerson(user)">
+        <div class="result" role="option" [id]="'chat-search-' + (notesOffset() + j)"
+          [class.active]="active() === notesOffset() + j" [attr.aria-selected]="active() === notesOffset() + j"
+          (mouseenter)="active.set(notesOffset() + j)" (mousedown)="$event.preventDefault()" (click)="pickPerson(user)">
           <app-avatar [user]="user" [online]="!!onlineIds()?.has(user.Id!)"></app-avatar>
           <span class="lines">
             <span class="name">{{ user | displayName }}</span>

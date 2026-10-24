@@ -8,6 +8,7 @@
       [excludeIds]="[me().Id]" [onlineIds]="onlineIds()" (pick)="pick.emit($event)">
       Type any part of a username to see matches.
     </app-people-search>
+    <p class="notes-link">Or write in <button type="button" class="link-btn" (click)="openNotes.emit()">Notes to self</button>, a chat only you can see.</p>
 
     <ol class="steps">
       <li><span class="step-n">1</span><span><b>Find someone</b> here or in the sidebar search. Only usernames are shown, never emails.</span></li>

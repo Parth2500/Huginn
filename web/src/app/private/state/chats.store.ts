@@ -50,6 +50,9 @@ export class ChatsStore {
     return this.byId().get(chatId);
   }
 
+  /** Your Notes to self, once it exists (and while it isn't deleted). */
+  readonly selfChat = computed(() => this.chats().find((chat) => chat.kind === 'self'));
+
   directWith(userId: number): Chat | undefined {
     return this.chats().find(
       (chat) => chat.kind === 'direct' && chat.members.some((m) => m.Id === userId),

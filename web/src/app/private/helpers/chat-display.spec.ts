@@ -5,6 +5,7 @@ import {
   byListOrder,
   chatPartner,
   chatTitle,
+  draftTarget,
   isHidden,
   isMuted,
   mutedForever,
@@ -61,6 +62,14 @@ describe('chat display helpers', () => {
   it('titles a draft with the person it will be with', () => {
     const draft = { kind: 'direct' as const, title: null, description: null, members: [me, sam] };
     expect(chatTitle(draft, me)).toBe('Sam Rivera');
+  });
+
+  it('titles Notes to self, and sends its first note to you', () => {
+    const notes = makeChat({ kind: 'self', members: [{ ...me, role: 'owner' }] });
+    expect(chatTitle(notes, me)).toBe('Notes to self');
+    expect(chatPartner(notes, me)).toBeUndefined();
+    expect(draftTarget(notes, me)).toBe(1);
+    expect(draftTarget(direct, me)).toBe(2);
   });
 
   it('falls back from display name to username', () => {

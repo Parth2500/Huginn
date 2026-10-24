@@ -20,7 +20,10 @@ export interface SendInput {
   senderId: number;
   clientMessageId: string;
   text: string;
-  /** Exactly one of these: an existing chat, or a person (a direct chat, created on first send). */
+  /**
+   * Exactly one of these: an existing chat, or a person (a direct chat, created on first send;
+   * yourself means Notes to self).
+   */
   chatId?: number;
   toUserId?: number;
 }
@@ -77,25 +80,32 @@ export class MessagesService {
       let chatId = input.chatId;
       let createdChat = false;
       if (input.toUserId !== undefined) {
-        if (
-          !Number.isInteger(input.toUserId) ||
-          input.toUserId === input.senderId
-        ) {
+        if (!Number.isInteger(input.toUserId)) {
           throw new ChatRuleError("That person couldn't be found.");
         }
-        const other = await manager.findOne(User, {
-          where: { Id: input.toUserId },
-        });
-        if (!other) {
-          throw new ChatRuleError("That person couldn't be found.");
+        if (input.toUserId === input.senderId) {
+          // Writing to yourself: Notes to self.
+          const own = await this.chatsService.findOrCreateSelf(
+            manager,
+            input.senderId,
+          );
+          chatId = own.chat.id;
+          createdChat = own.created;
+        } else {
+          const other = await manager.findOne(User, {
+            where: { Id: input.toUserId },
+          });
+          if (!other) {
+            throw new ChatRuleError("That person couldn't be found.");
+          }
+          const direct = await this.chatsService.findOrCreateDirect(
+            manager,
+            input.senderId,
+            other.Id,
+          );
+          chatId = direct.chat.id;
+          createdChat = direct.created;
         }
-        const direct = await this.chatsService.findOrCreateDirect(
-          manager,
-          input.senderId,
-          other.Id,
-        );
-        chatId = direct.chat.id;
-        createdChat = direct.created;
       }
       if (!Number.isInteger(chatId)) {
         throw new ChatRuleError("You're not a member of that chat.");

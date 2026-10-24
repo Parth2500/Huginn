@@ -160,7 +160,21 @@ export class ChatsService {
             where: { userId, status: 'active', pinnedAt: Not(IsNull()) },
             select: { chatId: true, pinOrder: true },
           });
-          if (pinned.length + toPin.length > PIN_LIMIT) {
+          // Notes to self doesn't count towards the limit.
+          const selfIds = new Set(
+            (
+              await manager.find(Chat, {
+                where: {
+                  id: In([...pinned, ...toPin].map((r) => r.chatId)),
+                  kind: 'self',
+                },
+                select: { id: true },
+              })
+            ).map((c) => c.id),
+          );
+          const counted = (list: { chatId: number }[]) =>
+            list.filter((r) => !selfIds.has(r.chatId)).length;
+          if (counted(pinned) + counted(toPin) > PIN_LIMIT) {
             throw new ChatRuleError(
               `You can pin up to ${PIN_LIMIT} chats. Unpin one to pin this.`,
             );
@@ -428,6 +442,41 @@ export class ChatsService {
     return this.chats.findOne({
       where: { directKey: directKey(userId, otherId) },
     });
+  }
+
+  /**
+   * Finds or creates your Notes to self (product-spec.md §2.2). A new one is pinned first, and
+   * it doesn't count towards the pin limit. Safe when two devices start it at once.
+   */
+  async findOrCreateSelf(
+    manager: EntityManager,
+    userId: number,
+  ): Promise<{ chat: Chat; created: boolean }> {
+    const key = `${userId}`;
+    const inserted: { id: number }[] = await manager.query(
+      `INSERT INTO "chat" ("kind", "directKey", "createdById") VALUES ('self', $1, $2)
+       ON CONFLICT ("directKey") WHERE "directKey" IS NOT NULL DO NOTHING
+       RETURNING "id"`,
+      [key, userId],
+    );
+    if (inserted.length) {
+      const chatId = inserted[0].id;
+      await manager.insert(ChatMember, {
+        chatId,
+        userId,
+        role: 'owner',
+        pinnedAt: new Date(),
+        pinOrder: 0,
+      });
+      return {
+        chat: await manager.findOneByOrFail(Chat, { id: chatId }),
+        created: true,
+      };
+    }
+    return {
+      chat: await manager.findOneByOrFail(Chat, { directKey: key }),
+      created: false,
+    };
   }
 
   /** Finds or creates the one direct chat for a pair. Safe when both start it at once. */

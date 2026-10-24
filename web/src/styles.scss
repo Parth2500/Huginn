@@ -333,6 +333,8 @@ time, .tabular { font-variant-numeric: tabular-nums; }
   &.xs { width: 24px; height: 24px; font-size: 11px; }
   &.lg { width: 64px; height: 64px; font-size: 22px; }
   &.xl { width: 112px; height: 112px; font-size: 38px; }
+  /* Notes to self: the bookmark on indigo, in place of initials. */
+  &.notes app-icon { width: 45%; height: 45%; }
 
   img {
     display: block;

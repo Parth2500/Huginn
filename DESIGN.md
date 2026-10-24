@@ -498,6 +498,10 @@ Quiet, solid and compact.
 
 **The Ring Matches Ground Rule.** The presence dot's ring is the colour of whatever the avatar sits on, set through `--ring` by the host: slate rail, raised slate on hover, indigo on the active row, the darker footer, the white header. Any new surface that shows presence sets its ring, including its hover and active states.
 
+### Notes to self
+- Its avatar is the bookmark icon (45% of the circle) on the default indigo avatar, in the rail, search and header. The header's status line reads "Only you can see this"; there are no member stack, presence, typing or ticks (a note still waiting to send keeps its clock).
+- The draft and empty state use the bookmark in the indigo-wash tile: "Notes to self. Only you can see this." Search offers it by name before the first note, and the start guide links to it.
+
 ### Profile Drawer
 - A 360px Surface panel from the right of the detail pane with a 1px hairline left edge, the Float shadow and the scrim, sliding 24px in over 280ms on the ease-out curve. A 64px header with the 16px 700 "Profile" title and a close icon button.
 - The body centres an xl avatar with presence, the 22px name, the muted @handle and a 13px presence line, then a primary "Message" button (160px minimum) when you are not already in a chat with them. Below a hairline, a stacked facts list: 12px 600 muted labels over values, each fact divided by a hairline, 14px vertical padding. A 13px muted note closes it ("Emails are never shown to other people."), with a spinner line while the full profile loads.

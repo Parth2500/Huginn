@@ -148,6 +148,8 @@
     @if (directPartner(chat); as person) {
       <app-avatar [user]="person"
       [online]="onlineIds().has(person.Id!)" />
+    } @else if (chat.kind === 'self') {
+      <span class="avatar notes"><app-icon name="bookmark" /></span>
     } @else {
       <span class="avatar" [ngClass]="chat.id | tone">{{ chat.title | initials }}</span>
     }

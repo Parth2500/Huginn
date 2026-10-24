@@ -20,7 +20,11 @@
         </span>
       </button>
     } @else {
-      <span class="avatar" [ngClass]="chat().id | tone">{{ chat().title | initials }}</span>
+      @if (chat().kind === 'self') {
+        <span class="avatar notes"><app-icon name="bookmark"></app-icon></span>
+      } @else {
+        <span class="avatar" [ngClass]="chat().id | tone">{{ chat().title | initials }}</span>
+      }
       <div class="titles">
         <h1>{{ title() }}</h1>
         @if (typingLabel(); as typing) {
@@ -32,7 +36,7 @@
         }
       </div>
     }
-    @if (!partner()) {
+    @if (chat().kind === 'group') {
       <div class="people" role="group" [attr.aria-label]="membersLabel()">
         <span class="stack">
           @for (member of otherMembers() | slice: 0 : 3; track member.Id) {
@@ -76,6 +80,10 @@
             } @else {
               <p>Messages you send appear for {{ title() }} straight away.</p>
             }
+          } @else if (chat().kind === 'self') {
+            <span class="empty-icon"><app-icon name="bookmark"></app-icon></span>
+            <p class="title">Notes to self</p>
+            <p>Only you can see this. Keep notes, links and drafts here; they're on all your devices.</p>
           } @else {
             <span class="empty-icon"><app-icon name="users"></app-icon></span>
             <p class="title">No messages yet</p>
@@ -96,7 +104,7 @@
       }
       @if (loaded() && !truncated() && rows().length > 0) {
         <p class="history-note">
-          {{ partner() ? 'This is the start of your chat with ' + title() + '.' : 'This is the start of ' + title() + '.' }}
+          {{ chat().kind === 'self' ? 'This is the start of your notes.' : partner() ? 'This is the start of your chat with ' + title() + '.' : 'This is the start of ' + title() + '.' }}
         </p>
       }
 
@@ -106,7 +114,7 @@
         }
         @if (row.kind === 'message') {
           <app-chat-message [message]="row.message" [own]="row.own"
-            [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh" [showSender]="!partner()"
+            [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh" [showSender]="chat().kind === 'group'"
             (openSender)="openProfile.emit($event)">
           </app-chat-message>
         }

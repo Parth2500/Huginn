@@ -23,7 +23,7 @@ import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
 import { InitialsPipe, TonePipe } from '../../../shared/pipes/avatar.pipes';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
-import { chatPartner, chatTitle, personName } from '../../helpers/chat-display';
+import { chatPartner, chatTitle, draftTarget, personName } from '../../helpers/chat-display';
 import { ChatService, ConnectionState } from '../../services/chat.service';
 import { MessagesStore } from '../../state/messages.store';
 import { OutboxStore } from '../../state/outbox.store';
@@ -115,7 +115,7 @@ export class ChatRoomComponent implements AfterViewInit {
   private readonly conversation = computed(
     () => ({
       id: this.chatId(),
-      partnerId: this.chat().kind === 'direct' ? this.partner()?.Id : undefined,
+      partnerId: this.chat().kind !== 'group' ? draftTarget(this.chat(), this.me()) : undefined,
     }),
     { equal: (a, b) => a.id === b.id && a.partnerId === b.partnerId },
   );
@@ -128,7 +128,7 @@ export class ChatRoomComponent implements AfterViewInit {
   /** This chat's sends still in the outbox, including a draft's first message. */
   private readonly pending = computed(() => {
     const id = this.chatId();
-    const partnerId = this.chat().kind === 'direct' ? this.partner()?.Id : undefined;
+    const partnerId = this.chat().kind !== 'group' ? draftTarget(this.chat(), this.me()) : undefined;
     return this.outbox
       .entries()
       .filter(
@@ -168,6 +168,9 @@ export class ChatRoomComponent implements AfterViewInit {
   });
 
   readonly statusLine = computed(() => {
+    if (this.chat().kind === 'self') {
+      return 'Only you can see this';
+    }
     const partner = this.partner();
     if (partner) {
       const online = this.onlineIds().has(partner.Id!) || partner.online;
@@ -271,7 +274,7 @@ export class ChatRoomComponent implements AfterViewInit {
       return;
     }
     const id = this.chatId();
-    const partnerId = this.partner()?.Id;
+    const partnerId = draftTarget(this.chat(), this.me());
     if (id !== undefined) {
       this.chatService.send({ chatId: id }, text);
     } else if (partnerId !== undefined) {
@@ -286,7 +289,8 @@ export class ChatRoomComponent implements AfterViewInit {
     this.resizeComposer();
     const now = Date.now();
     const id = this.chatId();
-    if (id !== undefined && this.chatMessage.value?.trim() && now - this.lastTypingSent > TYPING_THROTTLE_MS) {
+    const alone = this.chat().kind === 'self';
+    if (id !== undefined && !alone && this.chatMessage.value?.trim() && now - this.lastTypingSent > TYPING_THROTTLE_MS) {
       this.lastTypingSent = now;
       this.chatService.sendTyping(id);
     }
@@ -387,12 +391,14 @@ export class ChatRoomComponent implements AfterViewInit {
 
   private buildRows(): StreamRow[] {
     const meId = this.me().Id;
+    // Notes to self have no ticks once stored; a note still waiting to send keeps its clock.
+    const ticks = this.chat().kind !== 'self';
     const stalled = this.outbox.stalled();
     const fresh = this.freshIds();
     const entries: { message: ShownMessage; status: MessageStatus; key: string }[] = [
       ...(this.history()?.messages ?? []).map((m) => ({
         message: m as ShownMessage,
-        status: (m.sender?.Id === meId ? 'sent' : null) as MessageStatus,
+        status: (ticks && m.sender?.Id === meId ? 'sent' : null) as MessageStatus,
         key: `m${m.id}`,
       })),
       ...this.pending().map((p) => ({

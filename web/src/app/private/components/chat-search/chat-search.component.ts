@@ -26,7 +26,7 @@ import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { TonePipe, InitialsPipe } from '../../../shared/pipes/avatar.pipes';
 import { DisplayNamePipe } from '../../../shared/pipes/display-name.pipe';
 
-type Result = { kind: 'chat'; chat: Chat } | { kind: 'person'; user: IUser };
+type Result = { kind: 'chat'; chat: Chat } | { kind: 'notes' } | { kind: 'person'; user: IUser };
 
 /**
  * The sidebar's one search box: filters your chats and finds people by username.
@@ -56,6 +56,8 @@ export class ChatSearchComponent implements OnInit, OnDestroy {
   readonly onlineIds = input<Set<number> | null>(null);
   readonly openChat = output<Chat>();
   readonly openPerson = output<IUser>();
+  /** Notes to self, before its first note (once it exists, it's one of the chats). */
+  readonly openNotes = output<void>();
   readonly activeChange = output<boolean>();
   private readonly input = viewChild<ElementRef<HTMLInputElement>>('input');
 
@@ -88,8 +90,22 @@ export class ChatSearchComponent implements OnInit, OnDestroy {
     return this.people().filter((user) => !shown.has(user.Id));
   });
 
+  /** Offer Notes to self when the query names it and it isn't a chat yet. */
+  readonly notesDraft = computed(() => {
+    const needle = this.term().toLowerCase();
+    return (
+      needle.length > 1 &&
+      'notes to self'.includes(needle) &&
+      !this.chats().some((chat) => chat.kind === 'self')
+    );
+  });
+
+  /** Where the people start in the keyboard order. */
+  readonly notesOffset = computed(() => this.matchingChats().length + (this.notesDraft() ? 1 : 0));
+
   readonly results = computed<Result[]>(() => [
     ...this.matchingChats().map((chat) => ({ kind: 'chat' as const, chat })),
+    ...(this.notesDraft() ? [{ kind: 'notes' as const }] : []),
     ...this.newPeople().map((user) => ({ kind: 'person' as const, user })),
   ]);
 
@@ -171,6 +187,8 @@ export class ChatSearchComponent implements OnInit, OnDestroy {
   choose(result: Result) {
     if (result.kind === 'chat') {
       this.openChat.emit(result.chat);
+    } else if (result.kind === 'notes') {
+      this.openNotes.emit();
     } else {
       this.openPerson.emit(result.user);
     }
@@ -179,6 +197,10 @@ export class ChatSearchComponent implements OnInit, OnDestroy {
 
   pickChat(chat: Chat) {
     this.choose({ kind: 'chat', chat });
+  }
+
+  pickNotes() {
+    this.choose({ kind: 'notes' });
   }
 
   pickPerson(user: IUser) {

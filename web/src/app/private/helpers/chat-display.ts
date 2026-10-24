@@ -14,8 +14,16 @@ export function personName(user: IUser | undefined | null): string {
   return user?.displayName || user?.username || 'Someone';
 }
 
+/** Who a draft's first message goes to: the other person, or you for Notes to self. */
+export function draftTarget(chat: OpenChat, me: IUser): number | undefined {
+  return chat.kind === 'self' ? me.Id : chatPartner(chat, me)?.Id;
+}
+
 /** A direct chat is titled with the other person's name; a group with its own name. */
 export function chatTitle(chat: OpenChat | undefined | null, me: IUser): string {
+  if (chat?.kind === 'self') {
+    return 'Notes to self';
+  }
   const partner = chatPartner(chat, me);
   return partner ? personName(partner) : chat?.title ?? 'Chat';
 }
