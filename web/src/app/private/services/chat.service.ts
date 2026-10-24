@@ -6,6 +6,7 @@ import {
   ChatMessage,
   ChatStateChange,
   ChatStateResult,
+  MyChatState,
   PROTOCOL_VERSION,
   TypingEvent,
   Update,
@@ -139,8 +140,8 @@ export class ChatService {
   // ---- Chats ---------------------------------------------------------------------------------
 
   /**
-   * Pins, archives, mutes, or marks chats read or unread (`chat.state`). Returns null when it
-   * worked, or the reason it didn't, to show as is.
+   * Pins, archives, mutes, marks read or unread, clears or deletes chats (`chat.state`).
+   * Returns null when it worked, or the reason it didn't, to show as is.
    */
   async changeState(chatIds: number[], change: ChatStateChange): Promise<string | null> {
     const result = await this.socket.request<{ results: ChatStateResult[] }>('chat.state', {
@@ -153,9 +154,9 @@ export class ChatService {
         : result.error;
     }
     for (const { chatId, me, unreadCount } of result.results) {
-      this.chats.applyState(chatId, me, unreadCount);
+      this.applyState(chatId, me, unreadCount);
     }
-    if ('archive' in change || 'pin' in change) {
+    if ('archive' in change || 'pin' in change || 'delete' in change) {
       void this.loadFolders();
     }
     return null;
@@ -421,12 +422,21 @@ export class ChatService {
       }
       case 'chat.state': {
         const wasArchived = !!this.chats.get(update.data.chatId)?.me.archivedAt;
-        this.chats.applyState(update.data.chatId, update.data.me, update.data.unreadCount);
+        this.applyState(update.data.chatId, update.data.me, update.data.unreadCount);
         if (live && (wasArchived || update.data.me.archivedAt)) {
           void this.loadFolders();
         }
         return;
       }
+    }
+  }
+
+  /** Your state in a chat, from an acknowledgement or an update. Clearing drops the history. */
+  private applyState(chatId: number, me: MyChatState, unreadCount: number) {
+    const before = this.chats.get(chatId)?.me.clearedBeforeMessageId ?? 0;
+    this.chats.applyState(chatId, me, unreadCount);
+    if (me.clearedBeforeMessageId > before) {
+      this.messages.clearUpTo(chatId, me.clearedBeforeMessageId);
     }
   }
 

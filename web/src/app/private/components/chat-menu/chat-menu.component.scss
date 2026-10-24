@@ -35,6 +35,14 @@
   &:focus-visible { box-shadow: inset 0 0 0 2px var(--accent); }
 }
 
+[role='menuitem'].danger {
+  color: var(--danger);
+  > app-icon { color: currentColor; }
+  &:hover, &:focus-visible { background: var(--danger-soft); }
+}
+
+.divider { height: 1px; margin: 6px 4px; background: var(--line); }
+
 .item-text { display: grid; flex: 1; }
 .hint { color: var(--text-2); font-size: 12px; }
 .caret { margin-left: auto; }

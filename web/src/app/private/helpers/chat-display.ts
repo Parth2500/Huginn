@@ -45,6 +45,11 @@ export function isMuted(chat: Chat, now = Date.now()): boolean {
   return !!chat.me.mutedUntil && new Date(chat.me.mutedUntil).getTime() > now;
 }
 
+/** Deleted from your list, and nothing has arrived since (the server's rule for the list). */
+export function isHidden(chat: Chat): boolean {
+  return !!chat.me.hiddenAt && Date.parse(chat.lastActivityAt) <= Date.parse(chat.me.hiddenAt);
+}
+
 /** "Always" is stored as the year 9999. */
 export function mutedForever(chat: Chat): boolean {
   return !!chat.me.mutedUntil && new Date(chat.me.mutedUntil).getUTCFullYear() >= 9999;

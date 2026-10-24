@@ -39,6 +39,8 @@ export interface MyChatState {
   markedUnread: boolean;
   lastReadMessageId: number;
   clearedBeforeMessageId: number;
+  /** Deleted from your list at this time; a newer message brings the chat back. */
+  hiddenAt: string | null;
 }
 
 /** How long a mute lasts; `null` unmutes. */
@@ -49,7 +51,9 @@ export type ChatStateChange =
   | { pin: boolean }
   | { archive: boolean }
   | { mute: MuteFor }
-  | { unread: boolean };
+  | { unread: boolean }
+  | { clear: true }
+  | { delete: true };
 
 export interface ChatStateResult {
   chatId: number;

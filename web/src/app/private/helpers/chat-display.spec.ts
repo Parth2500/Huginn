@@ -5,6 +5,7 @@ import {
   byListOrder,
   chatPartner,
   chatTitle,
+  isHidden,
   isMuted,
   mutedForever,
   personName,
@@ -39,6 +40,7 @@ function makeChat(overrides: Partial<Chat>): Chat {
       markedUnread: false,
       lastReadMessageId: 0,
       clearedBeforeMessageId: 0,
+      hiddenAt: null,
     },
     policies: { editInfo: 'admins', addMember: 'admins', send: 'all' },
     ...overrides,
@@ -121,5 +123,14 @@ describe('chat list order and mute', () => {
     expect(isMuted(mutedUntil(null), now)).toBe(false);
     expect(mutedForever(mutedUntil('9999-12-31T00:00:00Z'))).toBe(true);
     expect(mutedForever(mutedUntil('2026-10-21T13:00:00Z'))).toBe(false);
+  });
+
+  it('hides a deleted chat until something newer arrives', () => {
+    const deleted = (lastActivityAt: string) =>
+      makeChat({ lastActivityAt, me: { ...makeChat({}).me, hiddenAt: '2026-10-21T12:00:00Z' } });
+    expect(isHidden(deleted('2026-10-21T11:00:00Z'))).toBe(true);
+    expect(isHidden(deleted('2026-10-21T12:00:00Z'))).toBe(true);
+    expect(isHidden(deleted('2026-10-21T12:00:01Z'))).toBe(false);
+    expect(isHidden(makeChat({}))).toBe(false);
   });
 });

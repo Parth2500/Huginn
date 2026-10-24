@@ -83,6 +83,15 @@ export class MessagesStore {
     }
   }
 
+  /** "Clear chat" (here or on another device): messages up to `upTo` are gone for you. */
+  clearUpTo(chatId: number, upTo: number) {
+    const current = this.history(chatId);
+    if (current) {
+      this.set(chatId, { ...current, messages: current.messages.filter((m) => m.id > upTo) });
+    }
+    void this.db.deleteMessages(chatId, upTo);
+  }
+
   applyUser(user: IUser) {
     this.histories.update((map) => {
       const copy = new Map<number, ChatHistory>();

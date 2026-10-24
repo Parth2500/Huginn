@@ -173,7 +173,7 @@ export class ChatGateway
     return this.handle(socket, (user) => this.chats.folders(user.Id));
   }
 
-  /** Pin, archive, mute, or mark read or unread: one change for one or more chats. */
+  /** Pin, archive, mute, mark read or unread, clear or delete: one change for one or more chats. */
   @SubscribeMessage('chat.state')
   onChatState(
     socket: Socket,
@@ -189,7 +189,7 @@ export class ChatGateway
       const change = parseStateChange(request);
       if (!change) {
         throw new ChatRuleError(
-          'Say what to change: pin, archive, mute or unread.',
+          'Say what to change: pin, archive, mute, unread, clear or delete.',
         );
       }
       const { chats, updates } = await this.chats.changeState(
@@ -491,7 +491,7 @@ export class ChatGateway
 function parseStateChange(
   request: Record<string, unknown>,
 ): ChatStateChange | null {
-  const keys = ['pin', 'archive', 'mute', 'unread'].filter(
+  const keys = ['pin', 'archive', 'mute', 'unread', 'clear', 'delete'].filter(
     (k) => request?.[k] !== undefined,
   );
   if (keys.length !== 1) {
@@ -501,6 +501,14 @@ function parseStateChange(
   if (keys[0] === 'mute') {
     const mutes: MuteFor[] = ['8h', '1w', 'always', null];
     return mutes.includes(value as MuteFor) ? { mute: value as MuteFor } : null;
+  }
+  if (keys[0] === 'clear' || keys[0] === 'delete') {
+    // There's no undoing either, so only `true` means anything.
+    return value === true
+      ? keys[0] === 'clear'
+        ? { clear: true }
+        : { delete: true }
+      : null;
   }
   if (typeof value !== 'boolean') {
     return null;

@@ -1,7 +1,7 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { Chat, ChatCursor, ChatMessage, MyChatState } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
-import { byActivity, byListOrder, isMuted, withUpdatedUser } from '../helpers/chat-display';
+import { byActivity, byListOrder, isHidden, isMuted, withUpdatedUser } from '../helpers/chat-display';
 import { LocalDb } from './local-db';
 
 /** How long a chat that arrived live keeps its highlight. */
@@ -24,8 +24,13 @@ export class ChatsStore {
   /** Chats that arrived live this session, highlighted briefly. */
   readonly fresh = signal(new Set<number>());
 
-  /** Every chat this device holds, archived included (search uses these). */
-  readonly chats = computed(() => [...this.byId().values()].sort(byActivity));
+  /**
+   * Every chat in your lists, archived included (search uses these). Deleted chats stay on the
+   * device, out of sight, so a new message can bring them back.
+   */
+  readonly chats = computed(() =>
+    [...this.byId().values()].filter((chat) => !isHidden(chat)).sort(byActivity),
+  );
   /** The main list: not archived; pinned first. */
   readonly mainChats = computed(() =>
     this.chats()
@@ -114,10 +119,12 @@ export class ChatsStore {
     return true;
   }
 
+  /** Your own state changed. A clear point past the preview removes the preview too. */
   applyState(chatId: number, me: MyChatState, unreadCount: number) {
     const chat = this.get(chatId);
     if (chat) {
-      this.upsert([{ ...chat, me, unreadCount }]);
+      const cleared = !!chat.lastMessage && chat.lastMessage.id <= me.clearedBeforeMessageId;
+      this.upsert([{ ...chat, me, unreadCount, lastMessage: cleared ? null : chat.lastMessage }]);
     }
   }
 

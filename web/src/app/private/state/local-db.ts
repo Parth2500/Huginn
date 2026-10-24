@@ -89,6 +89,22 @@ export class LocalDb {
     return this.write('messages', (store) => messages.forEach((m) => store.put(m)));
   }
 
+  /** Removes a chat's messages up to and including `upTo` (cleared or deleted chats). */
+  deleteMessages(chatId: number, upTo: number) {
+    return this.write('messages', (store) => {
+      const cursor = store.index('chatId').openCursor(IDBKeyRange.only(chatId));
+      cursor.onsuccess = () => {
+        const row = cursor.result;
+        if (row) {
+          if ((row.value as ChatMessage).id <= upTo) {
+            row.delete();
+          }
+          row.continue();
+        }
+      };
+    });
+  }
+
   async getHasMore(chatId: number): Promise<boolean | null> {
     return (await this.get<{ hasMore: boolean }>('history', chatId))?.hasMore ?? null;
   }

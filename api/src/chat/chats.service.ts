@@ -134,7 +134,8 @@ export class ChatsService {
   /**
    * Pins, archives, mutes or marks chats read or unread for one person, and records a
    * `chat.state` update for each, in one transaction. Rules (product-spec.md §1.2–1.7):
-   * at most PIN_LIMIT pins; pinning unarchives; archiving unpins.
+   * at most PIN_LIMIT pins; pinning unarchives; archiving unpins; only direct and self chats
+   * can be deleted (a group is left first).
    */
   async changeState(
     userId: number,
@@ -199,6 +200,33 @@ export class ChatsService {
           { chatId: In(chatIds), userId },
           { mutedUntil: until },
         );
+      } else if ('clear' in change || 'delete' in change) {
+        const chats = await manager.find(Chat, {
+          where: { id: In(chatIds) },
+          select: { id: true, kind: true },
+        });
+        if ('delete' in change && chats.some((c) => c.kind === 'group')) {
+          throw new ChatRuleError(
+            'To delete a group, leave it first. Your other chats were not changed.',
+          );
+        }
+        // Everything so far is cleared and read; a deleted chat also leaves the list.
+        await manager.query(
+          `UPDATE chat_member m
+              SET "clearedBeforeMessageId" = GREATEST(m."clearedBeforeMessageId", COALESCE(c."lastMessageId", 0)),
+                  "lastReadMessageId" = GREATEST(m."lastReadMessageId", COALESCE(c."lastMessageId", 0)),
+                  "markedUnread" = false
+             FROM chat c
+            WHERE c.id = m."chatId" AND m."userId" = $1 AND m."chatId" = ANY($2)`,
+          [userId, chatIds],
+        );
+        if ('delete' in change) {
+          await manager.update(
+            ChatMember,
+            { chatId: In(chatIds), userId },
+            { hiddenAt: now, pinnedAt: null, pinOrder: null, archivedAt: null },
+          );
+        }
       } else if (change.unread) {
         await manager.update(
           ChatMember,
@@ -495,5 +523,6 @@ function myState(m: ChatMember): MyChatState {
     markedUnread: m.markedUnread,
     lastReadMessageId: m.lastReadMessageId,
     clearedBeforeMessageId: m.clearedBeforeMessageId,
+    hiddenAt: m.hiddenAt,
   };
 }

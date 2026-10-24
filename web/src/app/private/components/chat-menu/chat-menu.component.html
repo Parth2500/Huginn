@@ -37,4 +37,17 @@
     <app-icon [name]="archived() ? 'archive-restore' : 'archive'" />
     {{ archived() ? 'Unarchive' : 'Archive chat' }}
   </button>
+
+  <div class="divider" role="separator"></div>
+
+  <button type="button" role="menuitem" class="danger" (click)="pick({ clear: true })">
+    <app-icon name="eraser" />
+    Clear chat…
+  </button>
+  @if (chat().kind !== 'group') {
+    <button type="button" role="menuitem" class="danger" (click)="pick({ delete: true })">
+      <app-icon name="trash" />
+      Delete chat…
+    </button>
+  }
 </div>

@@ -25,7 +25,7 @@ import { CreateRoomComponent, NewGroup } from '../../components/create-room/crea
 import { ProfileEditComponent } from '../../components/profile-edit/profile-edit.component';
 import { ProfilePanelComponent } from '../../components/profile-panel/profile-panel.component';
 import { StartChatComponent } from '../../components/start-chat/start-chat.component';
-import { chatPartner } from '../../helpers/chat-display';
+import { chatPartner, isHidden } from '../../helpers/chat-display';
 import { ChatService } from '../../services/chat.service';
 import { ChatsStore } from '../../state/chats.store';
 
@@ -88,7 +88,9 @@ export class DashboardComponent {
       return undefined;
     }
     if ('chatId' in selection) {
-      return this.store.get(selection.chatId);
+      // A chat deleted here or on another device closes.
+      const chat = this.store.get(selection.chatId);
+      return chat && !isHidden(chat) ? chat : undefined;
     }
     const existing = this.store.directWith(selection.draft.Id!);
     if (existing) {

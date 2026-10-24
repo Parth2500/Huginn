@@ -39,6 +39,8 @@ export interface MyChatState {
   markedUnread: boolean;
   lastReadMessageId: number;
   clearedBeforeMessageId: number;
+  /** Deleted from your list at this time; a newer message brings the chat back. */
+  hiddenAt: Date | null;
 }
 
 export interface ChatSummary {
@@ -65,13 +67,16 @@ export type MuteFor = '8h' | '1w' | 'always' | null;
 
 /**
  * One change to your own state in one or more chats (`chat.state`). Exactly one field is set.
- * `unread: false` marks the chats read up to their last message.
+ * `unread: false` marks the chats read up to their last message. `clear` hides every message so
+ * far, for you only; `delete` also takes a direct chat out of your list until a new message.
  */
 export type ChatStateChange =
   | { pin: boolean }
   | { archive: boolean }
   | { mute: MuteFor }
-  | { unread: boolean };
+  | { unread: boolean }
+  | { clear: true }
+  | { delete: true };
 
 /** The list's folders. The main list leaves archived chats out. */
 export type ChatFolder = 'main' | 'archived';

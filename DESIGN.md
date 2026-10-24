@@ -418,9 +418,20 @@ Quiet, solid and compact.
 - **Primary:** indigo fill, white 600-weight text, 16px side padding, optional 18px leading icon with 8px gap.
 - **Secondary:** white surface with a strong hairline, ink text; hover fills with the raised surface.
 - **Hover / Focus:** 120ms colour transition; focus is a 2px indigo outline offset 2px. Disabled drops to 50% opacity.
+- **Danger:** danger fill with white text (night: the bright danger with near-black text); hover deepens (night: lightens). Only as a confirmation dialog's action for something that can't be undone.
 - **Icon button:** 40px square, transparent, 20px icon; hover fills with 10% of the current text colour so it works on both slate and white.
 - **Send button:** 44px indigo circle at the composer's right; presses down to 92% scale; disabled turns raised-surface grey.
 - **Identity buttons:** a person's avatar or name in the conversation pane is a bare button that opens their profile drawer. The direct-chat header identity (avatar, name, status line) fills with Surface Raised at 10px radius on hover; member-stack avatars lift 1px; sender names underline at a 2px offset; sender avatars and the draft partner avatar are bare circles. The account bar is the same kind of button on slate, filling Slate Rail Raised on hover and while the editor is open.
+
+### Menu (chat row)
+- Floating surface panel: 6px padding, 1px hairline, 10px radius, Float shadow, at least 232px wide, kept inside the window. Rows are 40px with an 18px muted icon and 14px text; hover and keyboard focus fill with the raised surface, and focus adds an inset 2px indigo ring.
+- The mute submenu opens inline, indented under a hairline, with 36px rows.
+- Destructive items (Clear chat…, Delete chat…) sit below a 1px divider in danger ink, icon included, and fill with danger-wash on hover. A trailing "…" means a confirmation follows.
+
+### Confirmation Dialog
+- A native modal dialog: at most 400px wide, 24px padding, 16px radius, hairline, Float shadow, over the Scrim. It rises 6px and fades in over 200ms.
+- An 18px 650-weight title that names the result ("Delete chat with Sam Rivera?"), one muted sentence of consequence, then Cancel (secondary) and the action (danger) right-aligned, 8px apart. Below 480px wide the buttons stack, action on top, at 44px.
+- Cancel has focus first, Esc and a click on the scrim cancel, and focus goes back to where it was (or to the list, when the row is gone).
 
 ### Chips
 - **Style:** 32px pill, raised surface, 1px hairline, 14px 500 text, with an xs avatar leading.

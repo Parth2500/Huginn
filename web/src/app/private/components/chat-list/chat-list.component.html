@@ -117,3 +117,8 @@
 @if (menu(); as open) {
   <app-chat-menu [chat]="open.chat" [at]="open.at" (choose)="onMenuChoice(open.chat, $event)" (close)="closeMenu()" />
 }
+@if (confirming(); as pending) {
+  @let text = confirmText(pending.chat, pending.action);
+  <app-confirm-dialog [title]="text.title" [body]="text.body" [action]="text.action"
+    (confirm)="confirmAction()" (cancel)="cancelConfirm()" />
+}

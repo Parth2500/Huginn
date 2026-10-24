@@ -25,7 +25,7 @@ const MUTE_CHOICES: { value: Exclude<MuteFor, null>; label: string }[] = [
 /**
  * A chat row's menu (ux-design.md §2.2): opened by right-click, the row's chevron, or a
  * long-press. A menu, not a dialog: arrow keys move, Esc or a click outside closes it, and focus
- * returns to the row.
+ * returns to the row. Clear and delete come out as choices too; the list confirms them first.
  */
 @Component({
   selector: 'app-chat-menu',

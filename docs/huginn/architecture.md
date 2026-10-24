@@ -212,7 +212,7 @@ Built in 0.4:
 | `sync` | `{ sinceSeq }` | `{ updates[], seq, hasMore, reset }` (§5) |
 | `chats.list` | `{ before?, folder?: 'main' \| 'archived' }` | `{ chats[], next }`; the main list leaves archived chats out, and its first page carries every pin |
 | `chats.folders` | – | `{ archived: { count, unread } }` (1.1) |
-| `chat.state` | `{ chatIds[], pin \| archive \| mute: '8h' \| '1w' \| 'always' \| null \| unread }`, one change | `{ results[]: { chatId, me, unreadCount } }`, plus a `chat.state` update per chat to every device (1.1) |
+| `chat.state` | `{ chatIds[], pin \| archive \| mute: '8h' \| '1w' \| 'always' \| null \| unread \| clear: true \| delete: true }`, one change (delete refuses groups) | `{ results[]: { chatId, me, unreadCount } }`, plus a `chat.state` update per chat to every device (1.1) |
 | `chat.get` | `{ chatId }` | `{ chat }` |
 | `direct.open` | `{ userId }` | `{ partner, chat }`, where `chat` is null until the first message creates it |
 | `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], hasMore }` / `{}` |

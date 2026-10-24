@@ -2,6 +2,9 @@ import { NgClass } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
+  ElementRef,
+  Injector,
+  afterNextRender,
   computed,
   inject,
   input,
@@ -10,6 +13,7 @@ import {
 } from '@angular/core';
 import { Chat, ChatStateChange } from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
+import { ConfirmDialogComponent } from 'src/app/shared/confirm-dialog/confirm-dialog.component';
 import { ToastService } from 'src/app/shared/toast/toast.service';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
@@ -28,12 +32,22 @@ import { ChatMenuComponent } from '../chat-menu/chat-menu.component';
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-list.component.html',
   styleUrls: ['./chat-list.component.scss'],
-  imports: [NgClass, AvatarComponent, IconComponent, ChatMenuComponent, InitialsPipe, TonePipe],
+  imports: [
+    NgClass,
+    AvatarComponent,
+    IconComponent,
+    ChatMenuComponent,
+    ConfirmDialogComponent,
+    InitialsPipe,
+    TonePipe,
+  ],
 })
 export class ChatListComponent {
   private readonly store = inject(ChatsStore);
   private readonly chatService = inject(ChatService);
   private readonly toast = inject(ToastService);
+  private readonly host = inject<ElementRef<HTMLElement>>(ElementRef);
+  private readonly injector = inject(Injector);
 
   readonly me = input.required<IUser>();
   /** The chat open in the detail pane, highlighted here. */
@@ -58,6 +72,10 @@ export class ChatListComponent {
   readonly loadingMore = signal(false);
   /** The open row menu, where it opened, and what gets focus back when it closes. */
   readonly menu = signal<{ chat: Chat; at: { x: number; y: number }; returnFocus: HTMLElement } | null>(
+    null,
+  );
+  /** Clear or delete, waiting for the dialog's answer. */
+  readonly confirming = signal<{ chat: Chat; action: 'clear' | 'delete'; focus: HTMLElement } | null>(
     null,
   );
   private longPress: ReturnType<typeof setTimeout> | undefined;
@@ -144,7 +162,14 @@ export class ChatListComponent {
   }
 
   async onMenuChoice(chat: Chat, change: ChatStateChange) {
+    const focus = this.menu()?.returnFocus;
     this.closeMenu();
+    if ('clear' in change || 'delete' in change) {
+      if (focus) {
+        this.confirming.set({ chat, action: 'clear' in change ? 'clear' : 'delete', focus });
+      }
+      return;
+    }
     if ('unread' in change && change.unread && this.isSelected(chat)) {
       this.closeSelected.emit();
     }
@@ -154,6 +179,60 @@ export class ChatListComponent {
     } else if ('archive' in change) {
       this.toast.show(change.archive ? 'Chat archived.' : 'Chat moved back to your chats.');
     }
+  }
+
+  /** What the dialog says (product-spec.md §1.4–1.5): the result, not the mechanism. */
+  confirmText(chat: Chat, action: 'clear' | 'delete') {
+    const title = this.chatTitle(chat);
+    const others = chat.kind === 'group' ? 'Other members keep theirs.' : `${title} keeps theirs.`;
+    return action === 'delete'
+      ? {
+          title: `Delete chat with ${title}?`,
+          body: `Your copy of these messages will be removed. ${others}`,
+          action: 'Delete chat',
+        }
+      : {
+          title: chat.kind === 'group' ? `Clear ${title}?` : `Clear chat with ${title}?`,
+          body: `Every message so far will be removed for you. ${others}`,
+          action: 'Clear chat',
+        };
+  }
+
+  cancelConfirm() {
+    const pending = this.confirming();
+    this.confirming.set(null);
+    this.focusAfterDialog(pending?.focus);
+  }
+
+  async confirmAction() {
+    const pending = this.confirming();
+    if (!pending) {
+      return;
+    }
+    const { chat, action } = pending;
+    this.confirming.set(null);
+    if (action === 'delete' && this.isSelected(chat)) {
+      this.closeSelected.emit();
+    }
+    const error = await this.chatService.changeState(
+      [chat.id],
+      action === 'delete' ? { delete: true } : { clear: true },
+    );
+    if (error) {
+      this.toast.error(error);
+    } else {
+      this.toast.show(action === 'delete' ? 'Chat deleted.' : 'Chat cleared.');
+    }
+    // A deleted row is gone: keep the keyboard in the list.
+    this.focusAfterDialog(action === 'clear' || error ? pending.focus : undefined);
+  }
+
+  /** Everything outside a modal dialog is inert, so focus moves once the dialog has gone. */
+  private focusAfterDialog(target: HTMLElement | undefined) {
+    afterNextRender(
+      () => (target ?? this.host.nativeElement.querySelector<HTMLElement>('.room'))?.focus(),
+      { injector: this.injector },
+    );
   }
 
   // ---- What a row shows ----------------------------------------------------------------------
