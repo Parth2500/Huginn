@@ -3,54 +3,67 @@
     <button type="button" class="icon-btn back" (click)="back.emit()" aria-label="Back to chats">
       <app-icon name="arrow-left"></app-icon>
     </button>
-    <!-- In a direct chat the header is the way into the other person's profile. -->
-    @if (partner(); as person) {
-      <button type="button" class="identity" (click)="openProfile.emit(person)"
-        [attr.aria-label]="'View profile of ' + title()">
-        <app-avatar [user]="person" [online]="onlineIds().has(person.Id!)"></app-avatar>
-        <span class="titles">
-          <span class="title-text" role="heading" aria-level="1">{{ title() }}</span>
-          @if (typingLabel(); as typing) {
-            <span class="sub typing" aria-live="polite">
-              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typing }}
-            </span>
-          } @else {
-            <span class="sub">{{ statusLine() }}</span>
-          }
-        </span>
+    @if (selecting()) {
+      <button type="button" class="icon-btn" (click)="endSelecting()" aria-label="Stop selecting">
+        <app-icon name="x"></app-icon>
       </button>
+      <h1 class="select-title" aria-live="polite">{{ picked().size }} selected</h1>
     } @else {
-      @if (chat().kind === 'self') {
-        <span class="avatar notes"><app-icon name="bookmark"></app-icon></span>
+      <!-- In a direct chat the header is the way into the other person's profile. -->
+      @if (partner(); as person) {
+        <button type="button" class="identity" (click)="openProfile.emit(person)"
+          [attr.aria-label]="'View profile of ' + title()">
+          <app-avatar [user]="person" [online]="onlineIds().has(person.Id!)"></app-avatar>
+          <span class="titles">
+            <span class="title-text" role="heading" aria-level="1">{{ title() }}</span>
+            @if (typingLabel(); as typing) {
+              <span class="sub typing" aria-live="polite">
+                <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typing }}
+              </span>
+            } @else {
+              <span class="sub">{{ statusLine() }}</span>
+            }
+          </span>
+        </button>
       } @else {
-        <span class="avatar" [ngClass]="chat().id | tone">{{ chat().title | initials }}</span>
-      }
-      <div class="titles">
-        <h1>{{ title() }}</h1>
-        @if (typingLabel(); as typing) {
-          <p class="typing" aria-live="polite">
-            <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typing }}
-          </p>
+        @if (chat().kind === 'self') {
+          <span class="avatar notes"><app-icon name="bookmark"></app-icon></span>
         } @else {
-          <p>{{ statusLine() }}</p>
+          <span class="avatar" [ngClass]="chat().id | tone">{{ chat().title | initials }}</span>
         }
-      </div>
-    }
-    @if (chat().kind === 'group') {
-      <div class="people" role="group" [attr.aria-label]="membersLabel()">
-        <span class="stack">
-          @for (member of otherMembers() | slice: 0 : 3; track member.Id) {
-            <button type="button" class="member"
-              (click)="openProfile.emit(member)" [attr.aria-label]="'View profile of ' + (member | displayName)"
-              [title]="(member | displayName) + (onlineIds().has(member.Id!) ? ' · online' : '')">
-              <app-avatar [user]="member" size="sm" [online]="onlineIds().has(member.Id!)"></app-avatar>
-            </button>
+        <div class="titles">
+          <h1>{{ title() }}</h1>
+          @if (typingLabel(); as typing) {
+            <p class="typing" aria-live="polite">
+              <span class="dots" aria-hidden="true"><i></i><i></i><i></i></span>{{ typing }}
+            </p>
+          } @else {
+            <p>{{ statusLine() }}</p>
           }
-          @if (otherMembers().length > 3) {
-            <span class="avatar sm more" aria-hidden="true">+{{ otherMembers().length - 3 }}</span>
-          }
-        </span>
-      </div>
+        </div>
+      }
+      @if (chat().kind === 'group') {
+        <div class="people" role="group" [attr.aria-label]="membersLabel()">
+          <span class="stack">
+            @for (member of otherMembers() | slice: 0 : 3; track member.Id) {
+              <button type="button" class="member"
+                (click)="openProfile.emit(member)" [attr.aria-label]="'View profile of ' + (member | displayName)"
+                [title]="(member | displayName) + (onlineIds().has(member.Id!) ? ' · online' : '')">
+                <app-avatar [user]="member" size="sm" [online]="onlineIds().has(member.Id!)"></app-avatar>
+              </button>
+            }
+            @if (otherMembers().length > 3) {
+              <span class="avatar sm more" aria-hidden="true">+{{ otherMembers().length - 3 }}</span>
+            }
+          </span>
+        </div>
+      }
+      @if (!isDraft()) {
+        <button type="button" class="icon-btn select-messages" (click)="startSelecting()" aria-label="Select messages"
+          title="Select messages">
+          <app-icon name="list-checks"></app-icon>
+        </button>
+      }
     }
   </header>
 
@@ -115,6 +128,9 @@
         @if (row.kind === 'message') {
           <app-chat-message [message]="row.message" [own]="row.own"
             [first]="row.first" [last]="row.last" [status]="row.status" [fresh]="row.fresh" [showSender]="chat().kind === 'group'"
+            [meId]="me().Id" [selecting]="selecting() && row.message.id !== undefined"
+            [picked]="row.message.id !== undefined && picked().has(row.message.id)"
+            (toggle)="togglePick(row.message.id)" (press)="startSelecting(row.message.id)"
             (openSender)="openProfile.emit($event)">
           </app-chat-message>
         }
@@ -131,29 +147,54 @@
     }
   </div>
 
-  <form class="composer" (ngSubmit)="sendMessage()">
-    @if (connection() !== 'online') {
-      <p class="offline" role="status">
-        <app-icon name="wifi-off"></app-icon>
-        {{ connection() === 'connecting' ? 'Connecting to the chat server…' : "You're offline. Messages you send will go out when the connection is back." }}
-      </p>
-    }
-    <div class="composer-row">
-      <label class="visually-hidden" for="composer-input">Message {{ title() }}</label>
-      <textarea id="composer-input" #composer rows="1" [formControl]="chatMessage"
-        [placeholder]="'Message ' + title()" (keydown)="onComposerKeydown($event)"
-      (input)="onComposerInput()" enterkeyhint="send" aria-describedby="composer-hint" maxlength="2000"></textarea>
-      <button type="submit" class="send" [disabled]="!canSend" aria-label="Send message">
-        <app-icon name="send"></app-icon>
+  @if (selecting()) {
+    <div class="select-bar" role="toolbar" aria-label="Actions for selected messages">
+      <button type="button" class="btn btn-secondary" (click)="copyPicked()" [disabled]="picked().size === 0">
+        <app-icon name="copy"></app-icon>Copy
+      </button>
+      <button type="button" class="btn btn-secondary danger" (click)="askDelete()" [disabled]="picked().size === 0">
+        <app-icon name="trash"></app-icon>Delete
       </button>
     </div>
-    <p class="hint" id="composer-hint">
-      <span><kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
-      @if ((chatMessage.value?.length ?? 0) > 1800) {
-        <span class="count tabular" [class.at-limit]="(chatMessage.value?.length ?? 0) >= 2000">
-          {{ chatMessage.value?.length }} / 2000
-        </span>
+  } @else {
+    <form class="composer" (ngSubmit)="sendMessage()">
+      @if (connection() !== 'online') {
+        <p class="offline" role="status">
+          <app-icon name="wifi-off"></app-icon>
+          {{ connection() === 'connecting' ? 'Connecting to the chat server…' : "You're offline. Messages you send will go out when the connection is back." }}
+        </p>
       }
-    </p>
-  </form>
+      <div class="composer-row">
+        <label class="visually-hidden" for="composer-input">Message {{ title() }}</label>
+        <textarea id="composer-input" #composer rows="1" [formControl]="chatMessage"
+          [placeholder]="'Message ' + title()" (keydown)="onComposerKeydown($event)"
+        (input)="onComposerInput()" enterkeyhint="send" aria-describedby="composer-hint" maxlength="2000"></textarea>
+        <button type="submit" class="send" [disabled]="!canSend" aria-label="Send message">
+          <app-icon name="send"></app-icon>
+        </button>
+      </div>
+      <p class="hint" id="composer-hint">
+        <span><kbd>Enter</kbd> to send · <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
+        @if ((chatMessage.value?.length ?? 0) > 1800) {
+          <span class="count tabular" [class.at-limit]="(chatMessage.value?.length ?? 0) >= 2000">
+            {{ chatMessage.value?.length }} / 2000
+          </span>
+        }
+      </p>
+    </form>
+  }
+
 </section>
+
+@if (confirmingDelete()) {
+  @let text = deleteText();
+  <app-confirm-dialog [title]="text.title" [body]="canDeleteForAll() ? 'Choose who it\'s deleted for.' : 'They\'ll be removed from your devices. Everyone else keeps their copy.'"
+    [action]="text.action" (confirm)="confirmDelete()" (cancel)="confirmingDelete.set(false)">
+    @if (canDeleteForAll()) {
+      <div class="delete-scope" role="radiogroup" aria-label="Delete for">
+        <label><input type="radio" name="delete-for" [checked]="deleteFor() === 'me'" (change)="deleteFor.set('me')" /> Delete for me</label>
+        <label><input type="radio" name="delete-for" [checked]="deleteFor() === 'all'" (change)="deleteFor.set('all')" /> Delete for everyone</label>
+      </div>
+    }
+  </app-confirm-dialog>
+}

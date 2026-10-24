@@ -105,6 +105,10 @@ export class LocalDb {
     });
   }
 
+  deleteMessageIds(ids: number[]) {
+    return this.write('messages', (store) => ids.forEach((id) => store.delete(id)));
+  }
+
   async getHasMore(chatId: number): Promise<boolean | null> {
     return (await this.get<{ hasMore: boolean }>('history', chatId))?.hasMore ?? null;
   }

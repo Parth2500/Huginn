@@ -22,6 +22,8 @@ export interface ChatMessage {
   createdAt: string;
   editedAt: string | null;
   deleted: boolean;
+  /** Who deleted it for everyone: the sender, or a group admin. */
+  deletedById: number | null;
 }
 
 export interface ChatMember extends IUser {
@@ -91,7 +93,9 @@ export type OpenChat = Chat | DraftChat;
 export type Update =
   | { seq: number; type: 'chat.new'; data: { chat: Chat } }
   | { seq: number; type: 'message.new'; data: { message: ChatMessage } }
-  | { seq: number; type: 'chat.state'; data: { chatId: number; me: MyChatState; unreadCount: number } };
+  | { seq: number; type: 'chat.state'; data: { chatId: number; me: MyChatState; unreadCount: number } }
+  | { seq: number; type: 'message.deleted'; data: { message: ChatMessage } }
+  | { seq: number; type: 'message.hidden'; data: { chatId: number; messageIds: number[] } };
 
 export type Ack<T> = ({ ok: true } & T) | { ok: false; error: string };
 

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, input, output } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { IUser } from 'src/app/models/user.interface';
 import { MessageStatus, ShownMessage } from '../chat-room/chat-room.component';
 import { NgClass, DatePipe } from '@angular/common';
@@ -35,6 +35,44 @@ export class ChatMessageComponent {
   /** Groups name and picture each sender; a direct chat has only one other person. */
   readonly showSender = input(true);
   readonly openSender = output<IUser>();
+  /** Who's reading: tombstones say "You deleted this message" to the person who did. */
+  readonly meId = input<number | undefined>();
+  /** Selection mode (product-spec.md §3.6): a checkbox leads the message. */
+  readonly selecting = input(false);
+  readonly picked = input(false);
+  /** Toggle this message's selection (a click in selection mode, or Ctrl/⌘+click). */
+  readonly toggle = output<void>();
+  /** A long-press on a touch screen: start selecting with this message. */
+  readonly press = output<void>();
+  private pressTimer: ReturnType<typeof setTimeout> | undefined;
+
+  readonly tombstone = computed(() => {
+    const message = this.message();
+    if (message.deletedById === this.meId() && message.deletedById !== null) {
+      return 'You deleted this message';
+    }
+    if (message.deletedById !== null && message.deletedById !== message.sender?.Id) {
+      return 'Deleted by an admin';
+    }
+    return 'This message was deleted';
+  });
+
+  onClick(event: MouseEvent) {
+    if (this.selecting() || event.ctrlKey || event.metaKey) {
+      event.preventDefault();
+      this.toggle.emit();
+    }
+  }
+
+  pressStart(event: PointerEvent) {
+    if (event.pointerType === 'touch' && !this.selecting()) {
+      this.pressTimer = setTimeout(() => this.press.emit(), 500);
+    }
+  }
+
+  pressEnd() {
+    clearTimeout(this.pressTimer);
+  }
 
   emitSender() {
     const sender = this.message().sender;

@@ -336,6 +336,33 @@ export class ChatGateway
     );
   }
 
+  /** Delete for me (`scope: 'me'`) or for everyone (`'all'`), one or more messages. */
+  @SubscribeMessage('message.delete')
+  onMessageDelete(
+    socket: Socket,
+    request: { messageIds?: unknown; scope?: unknown },
+  ) {
+    return this.handle(socket, async (user) => {
+      const messageIds = Array.isArray(request?.messageIds)
+        ? [...new Set(request.messageIds.map(Number))].filter(Number.isInteger)
+        : [];
+      const scope = request?.scope;
+      if (messageIds.length === 0 || messageIds.length > 100) {
+        throw new ChatRuleError('Choose between 1 and 100 messages.');
+      }
+      if (scope !== 'me' && scope !== 'all') {
+        throw new ChatRuleError("Say who it's deleted for: me or all.");
+      }
+      const { updates } = await this.messages.delete(
+        user.Id,
+        messageIds,
+        scope,
+      );
+      this.publish(updates);
+      return {};
+    });
+  }
+
   @SubscribeMessage('chat.read')
   onChatRead(socket: Socket, request: { chatId: number; upTo: number }) {
     return this.handle(socket, async (user) => {

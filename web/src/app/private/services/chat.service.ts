@@ -187,6 +187,24 @@ export class ChatService {
     return null;
   }
 
+  /**
+   * Deletes messages for me or for everyone (`message.delete`). Returns null when it worked, or
+   * the reason it didn't. Deleting for me disappears at once; for everyone, the update that
+   * comes back turns them into tombstones on every device.
+   */
+  async deleteMessages(chatId: number, messageIds: number[], scope: 'me' | 'all'): Promise<string | null> {
+    const result = await this.socket.request('message.delete', { messageIds, scope });
+    if (!result.ok) {
+      return result.error === 'offline'
+        ? "You're offline. Try again when the connection is back."
+        : result.error;
+    }
+    if (scope === 'me') {
+      this.applyHidden(chatId, messageIds);
+    }
+    return null;
+  }
+
   /** The Archived row's numbers. */
   async loadFolders() {
     const result = await this.socket.request<{ archived: { count: number; unread: number } }>(
@@ -445,6 +463,15 @@ export class ChatService {
         }
         return;
       }
+      case 'message.deleted': {
+        this.messages.replace(update.data.message);
+        this.chats.applyDeleted(update.data.message);
+        return;
+      }
+      case 'message.hidden': {
+        this.applyHidden(update.data.chatId, update.data.messageIds);
+        return;
+      }
       case 'chat.state': {
         const wasArchived = !!this.chats.get(update.data.chatId)?.me.archivedAt;
         this.applyState(update.data.chatId, update.data.me, update.data.unreadCount);
@@ -465,16 +492,25 @@ export class ChatService {
     }
   }
 
+  /** Messages deleted for me: off this device, and a hidden preview is fetched again. */
+  private applyHidden(chatId: number, messageIds: number[]) {
+    this.messages.remove(chatId, messageIds);
+    const last = this.chats.get(chatId)?.lastMessage?.id;
+    if (last !== undefined && messageIds.includes(last)) {
+      void this.fetchChat(chatId, false);
+    }
+  }
+
   private setSeq(seq: number) {
     this.seq = seq;
     void this.db.setSeq(seq);
   }
 
   /** A chat this device didn't know about (for example, missed while offline). */
-  private async fetchChat(chatId: number) {
+  private async fetchChat(chatId: number, fresh = true) {
     const result = await this.socket.request<{ chat: Chat }>('chat.get', { chatId });
     if (result.ok) {
-      this.chats.upsert([result.chat], { fresh: true });
+      this.chats.upsert([result.chat], { fresh });
       this.outboxFollows(result.chat);
     }
   }

@@ -27,7 +27,12 @@ import { chatPartner, chatTitle, draftTarget, personName } from '../../helpers/c
 import { ChatService, ConnectionState } from '../../services/chat.service';
 import { MessagesStore } from '../../state/messages.store';
 import { OutboxStore } from '../../state/outbox.store';
+import { ConfirmDialogComponent } from 'src/app/shared/confirm-dialog/confirm-dialog.component';
+import { ToastService } from 'src/app/shared/toast/toast.service';
 import { ChatMessageComponent } from '../chat-message/chat-message.component';
+
+/** How long after sending a message can be deleted for everyone (product-spec.md §3.4). */
+const UNSEND_WINDOW_MS = 15 * 60 * 1000;
 
 /** Consecutive messages from one person within this window share a bubble group. */
 const GROUP_WINDOW_MS = 5 * 60 * 1000;
@@ -49,6 +54,7 @@ export interface ShownMessage {
   sender: IUser | null;
   createdAt: string;
   deleted: boolean;
+  deletedById?: number | null;
 }
 
 export type StreamRow =
@@ -67,9 +73,11 @@ export type StreamRow =
 @Component({
   selector: 'app-chat-room',
   templateUrl: './chat-room.component.html',
-  styleUrls: ['./chat-room.component.scss'],
+  styleUrls: ['./chat-room.component.scss', './chat-room-select.scss'],
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: { '(keydown.escape)': 'onEscape($event)' },
   imports: [
+    ConfirmDialogComponent,
     IconComponent,
     AvatarComponent,
     NgClass,
@@ -87,6 +95,7 @@ export class ChatRoomComponent implements AfterViewInit {
   private messagesStore = inject(MessagesStore);
   private outbox = inject(OutboxStore);
   private locale = inject(LOCALE_ID);
+  private toast = inject(ToastService);
 
   readonly chat = input.required<OpenChat>();
   readonly me = input<IUser>({});
@@ -139,6 +148,30 @@ export class ChatRoomComponent implements AfterViewInit {
   });
 
   readonly rows = computed(() => this.buildRows());
+
+  /** Selecting messages (product-spec.md §3.6): the composer becomes Copy and Delete. */
+  readonly selecting = signal(false);
+  readonly picked = signal(new Set<number>());
+  readonly pickedMessages = computed(() =>
+    (this.history()?.messages ?? []).filter((m) => this.picked().has(m.id)),
+  );
+  /** Everyone's delete: all yours and under 15 minutes old, or you run this group. */
+  readonly canDeleteForAll = computed(() => {
+    const chat = this.chat();
+    const picked = this.pickedMessages().filter((m) => !m.deleted);
+    if (picked.length === 0 || chat.kind === 'self') {
+      return false;
+    }
+    if (chat.id !== undefined && chat.kind === 'group' && ['owner', 'admin'].includes(chat.me.role)) {
+      return true;
+    }
+    const now = Date.now();
+    return picked.every(
+      (m) => m.sender?.Id === this.me().Id && now - Date.parse(m.createdAt) <= UNSEND_WINDOW_MS,
+    );
+  });
+  readonly confirmingDelete = signal(false);
+  readonly deleteFor = signal<'me' | 'all'>('me');
 
   /** Messages from others that arrived while the reader was scrolled up. */
   readonly unseen = signal(0);
@@ -346,7 +379,94 @@ export class ChatRoomComponent implements AfterViewInit {
     this.scrollToBottom(true);
   }
 
+  // ---- Selecting messages ---------------------------------------------------------------------
+
+  startSelecting(messageId?: number) {
+    this.selecting.set(true);
+    if (messageId !== undefined) {
+      this.picked.set(new Set([messageId]));
+    }
+  }
+
+  togglePick(messageId: number | undefined) {
+    if (messageId === undefined) {
+      return; // still sending: nothing to copy or delete yet
+    }
+    this.selecting.set(true);
+    const next = new Set(this.picked());
+    if (next.has(messageId)) {
+      next.delete(messageId);
+    } else {
+      next.add(messageId);
+    }
+    this.picked.set(next);
+    if (next.size === 0) {
+      this.endSelecting();
+    }
+  }
+
+  /** Esc leaves selection mode, unless it's closing a dialog or menu inside it. */
+  onEscape(event: Event) {
+    if (!(event.target as Element).closest('dialog, [role=menu]')) {
+      this.endSelecting();
+    }
+  }
+
+  endSelecting() {
+    this.selecting.set(false);
+    this.picked.set(new Set());
+    this.confirmingDelete.set(false);
+  }
+
+  /** One message copies as its text; several as "Name, 14:05: text" lines. */
+  async copyPicked() {
+    const messages = this.pickedMessages().filter((m) => !m.deleted && m.text);
+    const text =
+      messages.length === 1
+        ? messages[0].text!
+        : messages
+            .map((m) => `${m.sender?.Id === this.me().Id ? 'You' : personName(m.sender)}, ${this.timeLabel(m.createdAt)}: ${m.text}`)
+            .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      this.toast.show(messages.length === 1 ? 'Copied.' : `${messages.length} messages copied.`);
+    } catch {
+      this.toast.error("Couldn't copy. Your browser didn't allow it.");
+    }
+    this.endSelecting();
+  }
+
+  askDelete() {
+    this.deleteFor.set(this.canDeleteForAll() ? 'all' : 'me');
+    this.confirmingDelete.set(true);
+  }
+
+  readonly deleteText = computed(() => {
+    const count = this.pickedMessages().length;
+    const title = count === 1 ? 'Delete message?' : `Delete ${count} messages?`;
+    return { title, action: 'Delete' };
+  });
+
+  async confirmDelete() {
+    const chatId = this.chatId();
+    const ids = this.pickedMessages().map((m) => m.id);
+    const scope = this.deleteFor();
+    this.endSelecting();
+    if (chatId === undefined || ids.length === 0) {
+      return;
+    }
+    const error = await this.chatService.deleteMessages(chatId, ids, scope);
+    if (error) {
+      this.toast.error(error);
+    }
+  }
+
+  private timeLabel(iso: string) {
+    return formatDate(iso, 'HH:mm', this.locale);
+  }
+
   private resetView() {
+    this.endSelecting();
     this.unseen.set(0);
     this.pinned = true;
     this.newestShown = 0;
@@ -398,7 +518,7 @@ export class ChatRoomComponent implements AfterViewInit {
     const entries: { message: ShownMessage; status: MessageStatus; key: string }[] = [
       ...(this.history()?.messages ?? []).map((m) => ({
         message: m as ShownMessage,
-        status: (ticks && m.sender?.Id === meId ? 'sent' : null) as MessageStatus,
+        status: (ticks && !m.deleted && m.sender?.Id === meId ? 'sent' : null) as MessageStatus,
         key: `m${m.id}`,
       })),
       ...this.pending().map((p) => ({

@@ -49,7 +49,10 @@ const FILTERS: { value: ChatFilter; label: string }[] = [
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './chat-list.component.html',
   styleUrls: ['./chat-list.component.scss', './chat-list-gestures.scss'],
-  host: { '(keydown.escape)': 'endSelection()' },
+  host: {
+    '(keydown.escape)': 'onEscape($event)',
+    '(keydown)': 'stepRow($event)',
+  },
   imports: [
     NgClass,
     NgTemplateOutlet,
@@ -337,8 +340,38 @@ export class ChatListComponent {
     }
   }
 
+  /** While selecting, ↑/↓ move between rows, and with Shift they pick as they go. */
+  stepRow(event: Event) {
+    const key = (event as KeyboardEvent).key;
+    if (key !== 'ArrowDown' && key !== 'ArrowUp') {
+      return;
+    }
+    const step = key === 'ArrowDown' ? 1 : -1;
+    const shift = (event as KeyboardEvent).shiftKey;
+    const rows = [...this.host.nativeElement.querySelectorAll<HTMLElement>('.room-list .row > .room')];
+    const from = rows.indexOf(document.activeElement as HTMLElement);
+    if (!this.selecting() || from < 0) {
+      return;
+    }
+    event.preventDefault();
+    const to = Math.max(0, Math.min(rows.length - 1, from + step));
+    rows[to].focus();
+    const chat = this.listChats()[to];
+    if (shift && chat && !this.picked().has(chat.id)) {
+      this.picked.update((set) => new Set(set).add(chat.id));
+      this.anchor = chat.id;
+    }
+  }
+
   pickAll() {
     this.picked.set(new Set(this.listChats().map((chat) => chat.id)));
+  }
+
+  /** Esc leaves selection mode, unless it's closing a dialog or menu inside it. */
+  onEscape(event: Event) {
+    if (!(event.target as Element).closest('dialog, [role=menu]')) {
+      this.endSelection();
+    }
   }
 
   endSelection() {
@@ -535,7 +568,10 @@ export class ChatListComponent {
     if (!message) {
       return chat.kind === 'self' ? 'Only you can see this' : `No messages yet · ${this.members(chat)}`;
     }
-    const text = message.deleted ? 'Message deleted' : message.text ?? '';
+    if (message.deleted) {
+      return message.deletedById === this.me().Id ? 'You deleted this message' : 'This message was deleted';
+    }
+    const text = message.text ?? '';
     if (chat.kind === 'self') {
       return text; // every note is yours
     }

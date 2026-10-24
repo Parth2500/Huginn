@@ -27,6 +27,7 @@ const message = (id: number, createdAt: string): ChatMessage => ({
   createdAt,
   editedAt: null,
   deleted: false,
+  deletedById: null,
 });
 
 const chat: Chat = {

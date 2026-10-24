@@ -90,6 +90,7 @@ describe('chat display helpers', () => {
         createdAt: '2026-10-20T10:00:00Z',
         editedAt: null,
         deleted: false,
+        deletedById: null,
       },
     });
     const updated = withUpdatedUser(withLast, { Id: 2, displayName: 'Sam R.' });

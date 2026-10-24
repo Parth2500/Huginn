@@ -15,5 +15,6 @@ export function toMessageDto(message: Message): MessageDto {
     createdAt: message.createdAt,
     editedAt: message.editedAt,
     deleted,
+    deletedById: deleted ? message.deletedById : null,
   };
 }

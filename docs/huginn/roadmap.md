@@ -107,7 +107,7 @@ tested and demoable, never half-migrated.
 | # | Milestone | Includes |
 |---|---|---|
 | 1.1 | **Chat list power** (in progress: pin, mute, read/unread, archive and the row menu done 2026-10-22; clear and delete chat, the filters, Undo, pin reordering and swipe actions done 2026-10-24; message requests come with 1.8; tracked in [#1](https://github.com/Parth2500/Huginn/issues/1)) | Pin (limit 5, drag to reorder), the Archived and Message requests folders, mute (8h, 1 week, always), mark read/unread, delete chat, clear chat, filters (All, Unread, Groups), row menus, swipe actions, Undo snackbars |
-| 1.2 | **Multi-select** | Selection mode for chats (bulk archive, mute, read, pin, delete) and for messages (copy, delete) |
+| 1.2 ✓ | **Multi-select** (done 2026-10-24, [#2](https://github.com/Parth2500/Huginn/issues/2); deleting groups in bulk waits for leaving, 1.7) | Selection mode for chats (bulk archive, mute, read, pin, delete) and for messages (copy, delete) |
 | 1.3 ✓ | **Notes to self** (done 2026-10-24, [#3](https://github.com/Parth2500/Huginn/issues/3)) | Self chat kind, auto-pin, search entry |
 | 1.4 | **Message actions** | Reply with quote and jump, edit (15 minutes, with "edited"), delete for me, delete for everyone (15 minutes; admins always), tombstones, copy, message info |
 | 1.5 | **Ticks** | Sent, delivered and read from watermarks; failed with retry; read-receipt privacy with reciprocity |

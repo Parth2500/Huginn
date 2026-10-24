@@ -359,6 +359,33 @@ export class ChatsService {
         })
       : [];
     const byId = new Map(lastMessages.map((m) => [m.id, m]));
+    // "Delete for me" on a chat's last message: its preview is the newest one left.
+    const hiddenLast: { messageId: number }[] = lastIds.length
+      ? await manager.query(
+          `SELECT "messageId" FROM message_hidden WHERE "userId" = $1 AND "messageId" = ANY($2)`,
+          [userId, lastIds],
+        )
+      : [];
+    for (const { messageId } of hiddenLast) {
+      const hidden = byId.get(messageId);
+      if (!hidden) {
+        continue;
+      }
+      const before = await manager
+        .createQueryBuilder(Message, 'msg')
+        .leftJoinAndSelect('msg.sender', 'sender')
+        .where('msg.chatId = :chatId', { chatId: hidden.chatId })
+        .andWhere(
+          `NOT EXISTS (SELECT 1 FROM message_hidden h WHERE h."messageId" = msg.id AND h."userId" = :userId)`,
+          { userId },
+        )
+        .orderBy('msg.id', 'DESC')
+        .getOne();
+      byId.delete(messageId);
+      if (before) {
+        byId.set(messageId, before);
+      }
+    }
 
     const unread: { chatId: number; count: string }[] = await manager
       .createQueryBuilder(Message, 'msg')

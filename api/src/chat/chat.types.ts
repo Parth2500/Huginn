@@ -22,6 +22,8 @@ export interface MessageDto {
   createdAt: Date;
   editedAt: Date | null;
   deleted: boolean;
+  /** Who deleted it for everyone: the sender, or a group admin. */
+  deletedById: number | null;
 }
 
 export interface MemberDto extends IPublicUser {
@@ -88,7 +90,11 @@ export type UpdatePayload =
   | {
       type: 'chat.state';
       data: { chatId: number; me: MyChatState; unreadCount: number };
-    };
+    }
+  /** Deleted for everyone: the message comes again as a tombstone (no text). */
+  | { type: 'message.deleted'; data: { message: MessageDto } }
+  /** Deleted for me: only your own devices hear it. */
+  | { type: 'message.hidden'; data: { chatId: number; messageIds: number[] } };
 
 export type UpdateDto = UpdatePayload & { seq: number };
 

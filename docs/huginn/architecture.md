@@ -239,9 +239,11 @@ easy to audit. Their effects reach other people as updates.
 ### 4.3 Server → client
 
 - `update { seq, type, data }`: the only push channel for state changes. Built so far:
-  `chat.new`, `message.new` and `chat.state` (per-member state with the unread count). Coming
-  with their features: `message.edited`, `message.deleted`, `chat.updated`, `chat.member`,
-  `receipt`, `user.updated` and `block`.
+  `chat.new`, `message.new`, `chat.state` (per-member state with the unread count),
+  `message.deleted` (to every member: the message again as a tombstone, with `deletedById`)
+  and `message.hidden` (to your own devices: `{ chatId, messageIds }` deleted for you). Coming
+  with their features: `message.edited`, `chat.updated`, `chat.member`, `receipt`,
+  `user.updated` and `block`.
 - `hello { protocol, seq }` on every connect, `presence` and `onlineUsers` for who's online,
   and `userUpdated` for profile changes (it moves into `update` as `user.updated`).
 - `typing` and `presence` are **ephemeral**. They aren't logged in `update` and are never

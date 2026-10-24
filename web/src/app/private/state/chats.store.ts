@@ -131,6 +131,14 @@ export class ChatsStore {
     }
   }
 
+  /** A message deleted for everyone: if it's the preview, the preview becomes its tombstone. */
+  applyDeleted(message: ChatMessage) {
+    const chat = this.get(message.chatId);
+    if (chat?.lastMessage?.id === message.id) {
+      this.upsert([{ ...chat, lastMessage: message }]);
+    }
+  }
+
   /** A new pin order, shown before the server confirms it. */
   applyPinOrder(chatIds: number[]) {
     const chats: Chat[] = [];

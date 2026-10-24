@@ -433,6 +433,12 @@ Quiet, solid and compact.
 - Docked under the list on the slate rail, above the account bar, with a hairline above: equal-width icon-over-label buttons (18px icon, 11px 600 label) for Archive, Mute (an inline menu of durations, or Unmute), Read / Unread, Pin / Unpin, Delete (rose ink) and, for one chat, More. Disabled actions drop to 40% and say why in a tooltip and to screen readers.
 - The list title becomes "✕ N selected" with a light-indigo "Select all"; rows lead with an 18px checkbox (4px radius, indigo fill and check when on) and picked rows take a 22% indigo wash. The row chevron hides.
 
+### Selecting Messages
+- Entered by the header's Select button, Ctrl/⌘+click on a message, or a long-press. Each message row leads with the same 18px checkbox at the far left (own messages included) and the whole row toggles; picked rows take a 12% indigo wash.
+- The header becomes "✕ N selected"; the composer gives way to a bar with secondary Copy and Delete (danger ink) buttons, centred.
+- Delete opens the confirmation dialog with a radio choice, Delete for me / Delete for everyone, when everyone is allowed (all yours and under 15 minutes, or you run the group; everyone is preselected). Otherwise it deletes for you and says so.
+- Tombstones read "You deleted this message", "Deleted by an admin" or "This message was deleted", in italics without a tick; the list preview uses the same words.
+
 ### Pin Reordering
 - In the full main list (no filter), pinned rows drag with a mouse or pen (Angular CDK, vertical only, `grab` cursor). The lifted row takes Slate Rail Raised, the Float shadow and no chevron; its slot stays at 35% opacity, and the other rows slide 200ms on the ease-out curve. On touch screens the long-press menu does it instead.
 

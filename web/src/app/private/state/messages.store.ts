@@ -83,6 +83,27 @@ export class MessagesStore {
     }
   }
 
+  /** Deleted for everyone: the message stays in place as a tombstone. */
+  replace(message: ChatMessage) {
+    const current = this.history(message.chatId);
+    if (current) {
+      this.set(message.chatId, {
+        ...current,
+        messages: current.messages.map((m) => (m.id === message.id ? message : m)),
+      });
+    }
+    void this.db.putMessages([message]);
+  }
+
+  /** Deleted for me: gone from this device. */
+  remove(chatId: number, ids: number[]) {
+    const current = this.history(chatId);
+    if (current) {
+      this.set(chatId, { ...current, messages: current.messages.filter((m) => !ids.includes(m.id)) });
+    }
+    void this.db.deleteMessageIds(ids);
+  }
+
   /** "Clear chat" (here or on another device): messages up to `upTo` are gone for you. */
   clearUpTo(chatId: number, upTo: number) {
     const current = this.history(chatId);

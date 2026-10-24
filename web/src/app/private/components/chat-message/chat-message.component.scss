@@ -115,3 +115,26 @@
   color: var(--text-2);
   font-style: italic;
 }
+
+/* Selection mode: the whole row toggles, led by a checkbox. */
+.msg.selecting { cursor: pointer; border-radius: var(--radius-m); }
+.msg.picked { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.pick {
+  display: grid;
+  place-items: center;
+  flex: none;
+  align-self: center;
+  width: 18px;
+  height: 18px;
+  margin-right: 10px;
+  padding: 0;
+  border: 2px solid var(--text-2);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--on-accent);
+  cursor: pointer;
+  app-icon { width: 14px; height: 14px; }
+}
+.msg.picked .pick { border-color: var(--accent); background: var(--accent); }
+.msg.own .pick { order: 2; margin-right: auto; }
+.msg.own.selecting { padding-left: 0; }

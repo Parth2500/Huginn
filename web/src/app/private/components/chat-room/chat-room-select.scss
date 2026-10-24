@@ -1,0 +1,23 @@
+/* Selecting messages: the header counts them, and the composer gives way to Copy and Delete. */
+.select-title { flex: 1; font-size: 16px; font-weight: 650; }
+.select-messages { margin-left: auto; color: var(--text-2); }
+
+.select-bar {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--surface);
+
+  .btn { flex: 0 1 160px; }
+  .danger { color: var(--danger); }
+}
+
+.delete-scope {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+  label { display: flex; align-items: center; gap: 10px; font-size: 15px; cursor: pointer; }
+  input { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+}

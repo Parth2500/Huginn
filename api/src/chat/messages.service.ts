@@ -12,6 +12,8 @@ import { ChatRuleError, ChatsService } from './chats.service';
 import { Addressed, UpdatesService } from './updates.service';
 
 export const MAX_MESSAGE_LENGTH = 2000;
+/** How long after sending you can edit a message or delete it for everyone. */
+export const UNSEND_WINDOW_MS = 15 * 60 * 1000;
 const HISTORY_PAGE = 30;
 const UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -215,6 +217,120 @@ export class MessagesService {
       where: { userId, messageId: In(messageIds) },
     });
     return new Set(rows.map((r) => r.messageId));
+  }
+
+  /**
+   * Delete for me (hidden on your devices only) or for everyone (product-spec.md §3.4). For
+   * everyone needs every message to be your own and under 15 minutes old, unless you're an
+   * admin of the group. All or nothing: one message that can't go stops the request.
+   */
+  async delete(
+    userId: number,
+    messageIds: number[],
+    scope: 'me' | 'all',
+  ): Promise<{ updates: Addressed[] }> {
+    return this.dataSource.transaction(async (manager) => {
+      const messages = await manager.find(Message, {
+        where: { id: In(messageIds) },
+      });
+      const chatIds = [...new Set(messages.map((m) => m.chatId))];
+      const members = await manager.find(ChatMember, {
+        where: { userId, chatId: In(chatIds), status: 'active' },
+      });
+      const memberOf = new Map(members.map((m) => [m.chatId, m]));
+      // Messages you can't see count as not found.
+      const visible = messages.filter((m) => {
+        const member = memberOf.get(m.chatId);
+        return (
+          member &&
+          m.id > member.joinedAfterMessageId &&
+          m.id > member.clearedBeforeMessageId
+        );
+      });
+      if (visible.length !== messageIds.length) {
+        throw new ChatRuleError("Some of those messages couldn't be found.");
+      }
+      const byChat = (list: Message[]) =>
+        chatIds
+          .map((chatId) => ({
+            chatId,
+            ids: list.filter((m) => m.chatId === chatId).map((m) => m.id),
+          }))
+          .filter((group) => group.ids.length > 0);
+
+      if (scope === 'me') {
+        await manager
+          .createQueryBuilder()
+          .insert()
+          .into(MessageHidden)
+          .values(visible.map((m) => ({ userId, messageId: m.id })))
+          .orIgnore()
+          .execute();
+        return {
+          updates: await this.updatesService.append(
+            manager,
+            byChat(visible).map(({ chatId, ids }) => ({
+              userId,
+              payload: {
+                type: 'message.hidden' as const,
+                data: { chatId, messageIds: ids },
+              },
+            })),
+          ),
+        };
+      }
+
+      const chats = await manager.find(Chat, { where: { id: In(chatIds) } });
+      const now = Date.now();
+      for (const m of visible) {
+        const chat = chats.find((c) => c.id === m.chatId);
+        const role = memberOf.get(m.chatId)?.role;
+        const admin =
+          chat?.kind === 'group' && (role === 'owner' || role === 'admin');
+        const ownAndRecent =
+          m.senderId === userId &&
+          now - m.createdAt.getTime() <= UNSEND_WINDOW_MS;
+        if (m.kind === 'system' || (!ownAndRecent && !admin)) {
+          throw new ChatRuleError(
+            m.senderId === userId
+              ? 'You can delete a message for everyone only within 15 minutes of sending it. You can still delete it for yourself.'
+              : "Only group admins can delete other people's messages for everyone. You can delete them for yourself.",
+          );
+        }
+      }
+      const fresh = visible.filter((m) => !m.deletedForAllAt);
+      if (fresh.length > 0) {
+        await manager.update(
+          Message,
+          { id: In(fresh.map((m) => m.id)) },
+          // The content goes; the row stays as the tombstone.
+          { deletedForAllAt: new Date(now), deletedById: userId, body: '' },
+        );
+      }
+      const deleted = await manager.find(Message, {
+        where: { id: In(fresh.map((m) => m.id)) },
+        relations: { sender: true },
+      });
+      const entries: { userId: number; payload: UpdatePayload }[] = [];
+      for (const chatId of chatIds) {
+        const memberIds = await this.chatsService.activeMemberIds(
+          chatId,
+          manager,
+        );
+        for (const message of deleted.filter((m) => m.chatId === chatId)) {
+          for (const memberId of memberIds) {
+            entries.push({
+              userId: memberId,
+              payload: {
+                type: 'message.deleted',
+                data: { message: toMessageDto(message) },
+              },
+            });
+          }
+        }
+      }
+      return { updates: await this.updatesService.append(manager, entries) };
+    });
   }
 
   /** Marks read and records `chat.state` for the reader's own devices. */

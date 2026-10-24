@@ -21,6 +21,7 @@ import {
       (cancel)="$event.preventDefault(); cancel.emit()" (click)="onBackdrop($event)">
       <h2 id="confirm-title">{{ title() }}</h2>
       <p id="confirm-body">{{ body() }}</p>
+      <ng-content />
       <div class="actions">
         <button type="button" class="btn btn-secondary" (click)="cancel.emit()" autofocus>Cancel</button>
         <button type="button" class="btn" [class.btn-danger]="danger()" [class.btn-primary]="!danger()"

@@ -1,5 +1,13 @@
 <div class="msg" [class.own]="own()" [class.first]="first()" [class.last]="last()" [class.fresh]="fresh()"
-  [class.pending]="status() === 'pending' || status() === 'stalled'">
+  [class.pending]="status() === 'pending' || status() === 'stalled'" [class.selecting]="selecting()" [class.picked]="picked()"
+  (click)="onClick($event)" (pointerdown)="pressStart($event)" (pointerup)="pressEnd()" (pointercancel)="pressEnd()"
+  (pointermove)="pressEnd()">
+  @if (selecting()) {
+    <button type="button" class="pick" role="checkbox" [attr.aria-checked]="picked()"
+      [attr.aria-label]="'Select message from ' + (own() ? 'you' : (message().sender | displayName))">
+      @if (picked()) { <app-icon name="check" /> }
+    </button>
+  }
   @if (!own() && showSender()) {
     <button type="button" class="sender-avatar" [class.placeholder]="!last()"
       [tabindex]="last() ? 0 : -1" (click)="emitSender()"
@@ -14,7 +22,7 @@
       <button type="button" class="sender" [ngClass]="message().sender?.Id | tone"
       (click)="emitSender()">{{ message().sender | displayName }}</button>
     }
-    <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().sender | displayName) }}: </span>@if (message().deleted) {<em class="deleted">This message was deleted</em>} @else {@for (part of message().text | linkify; track $index) {
+    <p class="text"><span class="visually-hidden">{{ own() ? 'You' : (message().sender | displayName) }}: </span>@if (message().deleted) {<em class="deleted">{{ tombstone() }}</em>} @else {@for (part of message().text | linkify; track $index) {
     @if (part.href) {
       <a [href]="part.href" target="_blank" rel="noopener noreferrer">{{ part.text }}</a>
     } @else {
