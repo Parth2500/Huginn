@@ -213,6 +213,7 @@ Built in 0.4:
 | `chats.list` | `{ before?, folder?: 'main' \| 'archived' }` | `{ chats[], next }`; the main list leaves archived chats out, and its first page carries every pin |
 | `chats.folders` | – | `{ archived: { count, unread } }` (1.1) |
 | `chat.state` | `{ chatIds[], pin \| archive \| mute: '8h' \| '1w' \| 'always' \| null \| unread \| clear: true \| delete: true }`, one change (delete refuses groups) | `{ results[]: { chatId, me, unreadCount } }`, plus a `chat.state` update per chat to every device (1.1) |
+| `chat.pins` | `{ chatIds[] }`: every pinned chat, first to last | `{ results[]: { chatId, me, unreadCount } }`, plus a `chat.state` update per chat (1.1). Refused unless the ids are exactly the chats pinned now |
 | `chat.get` | `{ chatId }` | `{ chat }` |
 | `direct.open` | `{ userId }` | `{ partner, chat }`, where `chat` is null until the first message creates it |
 | `chat.open` / `chat.close` | `{ chatId }` | `{ messages[], hasMore }` / `{}` |

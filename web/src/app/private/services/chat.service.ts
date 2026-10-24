@@ -162,6 +162,31 @@ export class ChatService {
     return null;
   }
 
+  /**
+   * Puts the pinned chats in this order (`chat.pins`), at once on screen. If the server refuses,
+   * the old order comes back and the reason is returned.
+   */
+  async reorderPins(chatIds: number[]): Promise<string | null> {
+    const before = this.chats
+      .mainChats()
+      .filter((chat) => !!chat.me.pinnedAt)
+      .map((chat) => chat.id);
+    this.chats.applyPinOrder(chatIds);
+    const result = await this.socket.request<{ results: ChatStateResult[] }>('chat.pins', {
+      chatIds,
+    });
+    if (!result.ok) {
+      this.chats.applyPinOrder(before);
+      return result.error === 'offline'
+        ? "You're offline. Try again when the connection is back."
+        : result.error;
+    }
+    for (const { chatId, me, unreadCount } of result.results) {
+      this.applyState(chatId, me, unreadCount);
+    }
+    return null;
+  }
+
   /** The Archived row's numbers. */
   async loadFolders() {
     const result = await this.socket.request<{ archived: { count: number; unread: number } }>(

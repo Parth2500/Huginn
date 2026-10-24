@@ -112,6 +112,21 @@
 .row-icon { flex: none; width: 14px; height: 14px; color: var(--side-text-2); }
 .room.active .row-icon { color: var(--on-accent-2); }
 
+/* Dragging a pin: the row lifts (it floats, so it takes the Float shadow), the others make room. */
+.pinned { margin-bottom: 2px; }
+.row.cdk-drag-preview {
+  list-style: none;
+  border-radius: var(--radius-m);
+  background: var(--side-bg-2);
+  color: var(--side-text);
+  box-shadow: var(--shadow-2);
+  .row-menu { display: none; }
+}
+.row.cdk-drag-placeholder { opacity: 0.35; }
+.pinned.cdk-drop-list-dragging .row:not(.cdk-drag-placeholder),
+.row.cdk-drag-animating { transition: transform 200ms var(--ease-out); }
+.pinned:not(.cdk-drop-list-disabled) .room { cursor: grab; }
+
 /* The row's menu button: shown on hover or focus, in place of the time. */
 .row { position: relative; }
 .row-menu {

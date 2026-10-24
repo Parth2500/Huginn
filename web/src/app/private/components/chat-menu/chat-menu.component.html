@@ -3,6 +3,18 @@
     <app-icon [name]="pinned() ? 'pin-off' : 'pin'" />
     {{ pinned() ? 'Unpin chat' : 'Pin chat' }}
   </button>
+  @if (moves().up) {
+    <button type="button" role="menuitem" (click)="move.emit('up')">
+      <app-icon name="arrow-up" />
+      Move up
+    </button>
+  }
+  @if (moves().down) {
+    <button type="button" role="menuitem" (click)="move.emit('down')">
+      <app-icon name="arrow-down" />
+      Move down
+    </button>
+  }
 
   @if (muted()) {
     <button type="button" role="menuitem" (click)="pick({ mute: null })">

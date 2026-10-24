@@ -208,6 +208,31 @@ export class ChatGateway
     });
   }
 
+  /** A new order for your pinned chats: every pinned chat id, first to last. */
+  @SubscribeMessage('chat.pins')
+  onChatPins(socket: Socket, request: { chatIds?: unknown }) {
+    return this.handle(socket, async (user) => {
+      const chatIds = Array.isArray(request?.chatIds)
+        ? request.chatIds.map(Number)
+        : [];
+      if (
+        !chatIds.every(Number.isInteger) ||
+        new Set(chatIds).size !== chatIds.length
+      ) {
+        throw new ChatRuleError('List each pinned chat once.');
+      }
+      const { chats, updates } = await this.chats.reorderPins(user.Id, chatIds);
+      this.publish(updates);
+      return {
+        results: chats.map((c) => ({
+          chatId: c.id,
+          me: c.me,
+          unreadCount: c.unreadCount,
+        })),
+      };
+    });
+  }
+
   @SubscribeMessage('chat.get')
   onChatGet(socket: Socket, request: { chatId: number }) {
     return this.handle(socket, async (user) => {

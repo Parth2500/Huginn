@@ -264,6 +264,55 @@ export class ChatsService {
     });
   }
 
+  /**
+   * Puts your pinned chats in a new order. `chatIds` must be exactly the chats pinned now, so a
+   * device with a stale list can't drop or add a pin by reordering.
+   */
+  async reorderPins(
+    userId: number,
+    chatIds: number[],
+  ): Promise<{ chats: ChatSummary[]; updates: Addressed[] }> {
+    return this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(1, $1)', [userId]);
+      const pinned = await manager.find(ChatMember, {
+        where: { userId, status: 'active', pinnedAt: Not(IsNull()) },
+        select: { chatId: true },
+      });
+      const current = new Set(pinned.map((p) => p.chatId));
+      if (
+        chatIds.length !== current.size ||
+        chatIds.some((id) => !current.has(id))
+      ) {
+        throw new ChatRuleError(
+          'Your pinned chats changed on another device. Try again.',
+        );
+      }
+      for (const [index, chatId] of chatIds.entries()) {
+        await manager.update(
+          ChatMember,
+          { chatId, userId },
+          { pinOrder: index + 1 },
+        );
+      }
+      const chats = await this.summaries(userId, chatIds, manager);
+      const updates = await this.updates.append(
+        manager,
+        chats.map((chat) => ({
+          userId,
+          payload: {
+            type: 'chat.state' as const,
+            data: {
+              chatId: chat.id,
+              me: chat.me,
+              unreadCount: chat.unreadCount,
+            },
+          },
+        })),
+      );
+      return { chats, updates };
+    });
+  }
+
   async summary(userId: number, chatId: number, manager?: EntityManager) {
     return (await this.summaries(userId, [chatId], manager))[0] ?? null;
   }

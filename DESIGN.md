@@ -426,7 +426,11 @@ Quiet, solid and compact.
 ### Menu (chat row)
 - Floating surface panel: 6px padding, 1px hairline, 10px radius, Float shadow, at least 232px wide, kept inside the window. Rows are 40px with an 18px muted icon and 14px text; hover and keyboard focus fill with the raised surface, and focus adds an inset 2px indigo ring.
 - The mute submenu opens inline, indented under a hairline, with 36px rows.
+- A pinned chat in the full main list also gets *Move up* / *Move down* (arrow icons) under Pin: the keyboard's way to reorder pins.
 - Destructive items (Clear chat…, Delete chat…) sit below a 1px divider in danger ink, icon included, and fill with danger-wash on hover. A trailing "…" means a confirmation follows.
+
+### Pin Reordering
+- In the full main list (no filter), pinned rows drag with a mouse or pen (Angular CDK, vertical only, `grab` cursor). The lifted row takes Slate Rail Raised, the Float shadow and no chevron; its slot stays at 35% opacity, and the other rows slide 200ms on the ease-out curve. On touch screens the long-press menu does it instead.
 
 ### Confirmation Dialog
 - A native modal dialog: at most 400px wide, 24px padding, 16px radius, hairline, Float shadow, over the Scrim. It rises 6px and fades in over 200ms.

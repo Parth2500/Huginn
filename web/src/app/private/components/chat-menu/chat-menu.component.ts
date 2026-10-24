@@ -45,7 +45,10 @@ export class ChatMenuComponent implements AfterViewInit {
   readonly chat = input.required<Chat>();
   /** Where it opened, in viewport pixels (the pointer, or below the chevron). */
   readonly at = input.required<{ x: number; y: number }>();
+  /** For a pinned chat in the main list: whether it can move up or down among the pins. */
+  readonly moves = input({ up: false, down: false });
   readonly choose = output<ChatStateChange>();
+  readonly move = output<'up' | 'down'>();
   readonly close = output<void>();
 
   readonly muteChoices = MUTE_CHOICES;

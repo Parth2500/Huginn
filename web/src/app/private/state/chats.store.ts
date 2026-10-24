@@ -128,6 +128,18 @@ export class ChatsStore {
     }
   }
 
+  /** A new pin order, shown before the server confirms it. */
+  applyPinOrder(chatIds: number[]) {
+    const chats: Chat[] = [];
+    chatIds.forEach((id, index) => {
+      const chat = this.get(id);
+      if (chat) {
+        chats.push({ ...chat, me: { ...chat.me, pinOrder: index + 1 } });
+      }
+    });
+    this.upsert(chats);
+  }
+
   /** Reading up to a message, before the server confirms it. */
   markReadLocally(chatId: number, upTo: number) {
     const chat = this.get(chatId);

@@ -50,58 +50,27 @@
   @if (loaded() && folder() === 'archived') {
     <p class="folder-note">Archived chats stay here when new messages arrive.</p>
   }
-  <!-- Chats -->
+  <!-- Chats: pins first (drag to reorder them), then the rest -->
   @if (loaded() && listChats().length > 0) {
-    <ul>
-      @for (chat of listChats(); track chat.id) {
-        <li class="row" [class.menu-open]="menu()?.chat?.id === chat.id">
-          <button type="button" class="room" (click)="onRowClick(chat)"
-            (contextmenu)="openMenuAt($event, chat)"
-            (pointerdown)="pressStart($event, chat)" (pointerup)="pressEnd()" (pointercancel)="pressEnd()"
-            (pointerleave)="pressEnd()"
-            [class.active]="isSelected(chat)"
-            [class.fresh]="fresh().has(chat.id)"
-            [class.has-unread]="chat.unreadCount > 0 || chat.me.markedUnread"
-            [class.muted]="muted(chat)"
-            [attr.aria-current]="isSelected(chat) ? 'true' : null"
-            [attr.aria-label]="rowLabel(chat)">
-            @if (directPartner(chat); as person) {
-              <app-avatar [user]="person"
-              [online]="onlineIds().has(person.Id!)" />
-            } @else {
-              <span class="avatar" [ngClass]="chat.id | tone">{{ chat.title | initials }}</span>
-            }
-            <span class="lines">
-              <span class="name-row">
-                <span class="name">{{ chatTitle(chat) }}</span>
-                @if (chat.me.pinnedAt && folder() === 'main') {
-                  <app-icon class="row-icon pin" name="pin" />
-                }
-                @if (chat.lastMessage) {
-                  <time class="when" [attr.datetime]="chat.lastMessage.createdAt">{{ activityLabel(chat) }}</time>
-                }
-              </span>
-              <span class="preview-row">
-                <span class="preview" [class.empty]="!chat.lastMessage">{{ preview(chat) }}</span>
-                @if (muted(chat)) {
-                  <app-icon class="row-icon" name="bell-off" />
-                }
-                @if (chat.unreadCount; as count) {
-                  <span class="badge tabular" [class.muted]="muted(chat)">{{ count > 99 ? '99+' : count }}</span>
-                } @else if (chat.me.markedUnread) {
-                  <span class="unread-dot" [class.muted]="muted(chat)"></span>
-                }
-              </span>
-            </span>
-          </button>
-          <button type="button" class="row-menu" (click)="openMenuBelow($event, chat)"
-            aria-haspopup="menu" [attr.aria-expanded]="menu()?.chat?.id === chat.id"
-            [attr.aria-label]="'More actions for ' + chatTitle(chat)">
-            <app-icon name="chevron-down" />
-          </button>
-        </li>
-      }
-    </ul>
+    @if (pinnedRows().length > 0) {
+      <ul class="pinned" cdkDropList cdkDropListLockAxis="y" [cdkDropListDisabled]="!canDrag()"
+        (cdkDropListDropped)="dropPin($event)" aria-label="Pinned chats">
+        @for (chat of pinnedRows(); track chat.id) {
+          <li class="row" cdkDrag [cdkDragData]="chat" [class.menu-open]="menu()?.chat?.id === chat.id">
+            <ng-container *ngTemplateOutlet="rowBody; context: { $implicit: chat }" />
+          </li>
+        }
+      </ul>
+    }
+    @if (otherRows().length > 0) {
+      <ul>
+        @for (chat of otherRows(); track chat.id) {
+          <li class="row" [class.menu-open]="menu()?.chat?.id === chat.id">
+            <ng-container *ngTemplateOutlet="rowBody; context: { $implicit: chat }" />
+          </li>
+        }
+      </ul>
+    }
   }
   @if (hasMoreChats()) {
     <button type="button" class="more-chats" (click)="loadMoreChats()" [disabled]="loadingMore()">
@@ -134,10 +103,59 @@
   }
 </nav>
 @if (menu(); as open) {
-  <app-chat-menu [chat]="open.chat" [at]="open.at" (choose)="onMenuChoice(open.chat, $event)" (close)="closeMenu()" />
+  <app-chat-menu [chat]="open.chat" [at]="open.at" [moves]="pinMoves(open.chat)"
+    (choose)="onMenuChoice(open.chat, $event)" (move)="movePin(open.chat, $event)" (close)="closeMenu()" />
 }
 @if (confirming(); as pending) {
   @let text = confirmText(pending.chat, pending.action);
   <app-confirm-dialog [title]="text.title" [body]="text.body" [action]="text.action"
     (confirm)="confirmAction()" (cancel)="cancelConfirm()" />
 }
+
+<!-- One chat row: the row button and its menu chevron. -->
+<ng-template #rowBody let-chat>
+  <button type="button" class="room" (click)="onRowClick(chat)"
+    (contextmenu)="openMenuAt($event, chat)"
+    (pointerdown)="pressStart($event, chat)" (pointerup)="pressEnd()" (pointercancel)="pressEnd()"
+    (pointerleave)="pressEnd()"
+    [class.active]="isSelected(chat)"
+    [class.fresh]="fresh().has(chat.id)"
+    [class.has-unread]="chat.unreadCount > 0 || chat.me.markedUnread"
+    [class.muted]="muted(chat)"
+    [attr.aria-current]="isSelected(chat) ? 'true' : null"
+    [attr.aria-label]="rowLabel(chat)">
+    @if (directPartner(chat); as person) {
+      <app-avatar [user]="person"
+      [online]="onlineIds().has(person.Id!)" />
+    } @else {
+      <span class="avatar" [ngClass]="chat.id | tone">{{ chat.title | initials }}</span>
+    }
+    <span class="lines">
+      <span class="name-row">
+        <span class="name">{{ chatTitle(chat) }}</span>
+        @if (chat.me.pinnedAt && folder() === 'main') {
+          <app-icon class="row-icon pin" name="pin" />
+        }
+        @if (chat.lastMessage) {
+          <time class="when" [attr.datetime]="chat.lastMessage.createdAt">{{ activityLabel(chat) }}</time>
+        }
+      </span>
+      <span class="preview-row">
+        <span class="preview" [class.empty]="!chat.lastMessage">{{ preview(chat) }}</span>
+        @if (muted(chat)) {
+          <app-icon class="row-icon" name="bell-off" />
+        }
+        @if (chat.unreadCount; as count) {
+          <span class="badge tabular" [class.muted]="muted(chat)">{{ count > 99 ? '99+' : count }}</span>
+        } @else if (chat.me.markedUnread) {
+          <span class="unread-dot" [class.muted]="muted(chat)"></span>
+        }
+      </span>
+    </span>
+  </button>
+  <button type="button" class="row-menu" (click)="openMenuBelow($event, chat)"
+    aria-haspopup="menu" [attr.aria-expanded]="menu()?.chat?.id === chat.id"
+    [attr.aria-label]="'More actions for ' + chatTitle(chat)">
+    <app-icon name="chevron-down" />
+  </button>
+</ng-template>

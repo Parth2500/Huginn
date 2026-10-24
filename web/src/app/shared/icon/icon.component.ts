@@ -10,6 +10,8 @@ const ICONS: Record<string, string[]> = {
   plus: ['M5 12h14', 'M12 5v14'],
   'log-out': ['m16 17 5-5-5-5', 'M21 12H9', 'M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'],
   'arrow-left': ['m12 19-7-7 7-7', 'M19 12H5'],
+  'arrow-up': ['m5 12 7-7 7 7', 'M12 19V5'],
+  'arrow-down': ['M12 5v14', 'm19 12-7 7-7-7'],
   'chevron-left': ['m15 18-6-6 6-6'],
   'chevron-right': ['m9 18 6-6-6-6'],
   search: ['M11 3a8 8 0 1 0 0 16a8 8 0 1 0 0-16', 'm21 21-4.3-4.3'],

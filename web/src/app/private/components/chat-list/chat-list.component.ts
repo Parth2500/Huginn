@@ -1,4 +1,5 @@
-import { NgClass } from '@angular/common';
+import { CdkDrag, CdkDragDrop, CdkDropList, moveItemInArray } from '@angular/cdk/drag-drop';
+import { NgClass, NgTemplateOutlet } from '@angular/common';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -42,6 +43,9 @@ const FILTERS: { value: ChatFilter; label: string }[] = [
   styleUrls: ['./chat-list.component.scss'],
   imports: [
     NgClass,
+    NgTemplateOutlet,
+    CdkDropList,
+    CdkDrag,
     AvatarComponent,
     IconComponent,
     ChatMenuComponent,
@@ -90,6 +94,20 @@ export class ChatListComponent {
             : true,
       );
   });
+  /** Pins can be reordered in the full main list (not filtered, not archived). */
+  readonly pinnedRows = computed(() =>
+    this.folder() === 'main' && this.filter() === 'all'
+      ? this.listChats().filter((chat) => !!chat.me.pinnedAt)
+      : [],
+  );
+  readonly otherRows = computed(() => {
+    const pinned = new Set(this.pinnedRows());
+    return this.listChats().filter((chat) => !pinned.has(chat));
+  });
+  /** Dragging needs a mouse or pen; on touch, a long-press opens the menu (Move up / down). */
+  readonly canDrag = computed(
+    () => this.pinnedRows().length > 1 && matchMedia('(pointer: fine)').matches,
+  );
   readonly archivedFolder = computed(() => this.store.folders().archived);
   readonly hasMoreChats = computed(() =>
     this.folder() === 'archived' ? !!this.store.nextArchived() : !!this.store.next(),
@@ -217,6 +235,37 @@ export class ChatListComponent {
 
   private async undo(chatId: number, change: ChatStateChange) {
     const error = await this.chatService.changeState([chatId], change);
+    if (error) {
+      this.toast.error(error);
+    }
+  }
+
+  // ---- Pin order ---------------------------------------------------------------------------
+
+  dropPin(event: CdkDragDrop<unknown>) {
+    if (event.previousIndex !== event.currentIndex) {
+      const ids = this.pinnedRows().map((chat) => chat.id);
+      moveItemInArray(ids, event.previousIndex, event.currentIndex);
+      void this.reorder(ids);
+    }
+  }
+
+  /** Which ways a pinned chat can move from the menu, the keyboard's way to reorder. */
+  pinMoves(chat: Chat): { up: boolean; down: boolean } {
+    const index = this.pinnedRows().indexOf(chat);
+    return { up: index > 0, down: index >= 0 && index < this.pinnedRows().length - 1 };
+  }
+
+  movePin(chat: Chat, direction: 'up' | 'down') {
+    const ids = this.pinnedRows().map((c) => c.id);
+    const from = ids.indexOf(chat.id);
+    this.closeMenu();
+    moveItemInArray(ids, from, from + (direction === 'up' ? -1 : 1));
+    void this.reorder(ids);
+  }
+
+  private async reorder(ids: number[]) {
+    const error = await this.chatService.reorderPins(ids);
     if (error) {
       this.toast.error(error);
     }

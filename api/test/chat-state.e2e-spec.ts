@@ -185,6 +185,35 @@ describe('chat list state', () => {
     expect(list.chat.me.markedUnread).toBe(false);
   });
 
+  it('reorders pins, and only with the full current set', async () => {
+    const m = await open(me);
+    const before = await ask(m.socket, 'chats.list', {});
+    const pinned = before.chats
+      .filter((c: any) => c.me.pinnedAt)
+      .sort((a: any, b: any) => a.me.pinOrder - b.me.pinOrder)
+      .map((c: any) => c.id as number);
+    expect(pinned.length).toBeGreaterThan(1);
+
+    const reversed = [...pinned].reverse();
+    const done = await ask(m.socket, 'chat.pins', { chatIds: reversed });
+    expect(done.ok).toBe(true);
+    const order = (await ask(m.socket, 'chats.list', {})).chats
+      .filter((c: any) => c.me.pinnedAt)
+      .sort((a: any, b: any) => a.me.pinOrder - b.me.pinOrder)
+      .map((c: any) => c.id);
+    expect(order).toEqual(reversed);
+
+    for (const wrong of [
+      reversed.slice(1),
+      [...reversed, chatIds[6]],
+      [reversed[0], ...reversed],
+    ]) {
+      expect((await ask(m.socket, 'chat.pins', { chatIds: wrong })).ok).toBe(
+        false,
+      );
+    }
+  });
+
   it('refuses bad requests and chats that are not yours', async () => {
     const m = await open(me);
     expect(
