@@ -61,6 +61,22 @@ describe('AuthService', () => {
     expect(await auth.check()).toBeNull();
   });
 
+  it("passes on Heimdall's https sign-out address", async () => {
+    const logout = auth.logout();
+    const address = 'https://acme.localhost:7200/oauth/v1/logout?id_token_hint=x';
+    http.expectOne('api/auth/logout').flush({ provider: 'heimdall', redirectTo: address });
+    expect(await logout).toEqual({ provider: 'heimdall', redirectTo: address });
+  });
+
+  it.each(['javascript:alert(1)', '/elsewhere', '//evil.example.com/', 'http://plain.example.com/'])(
+    'never passes on %s as a sign-out address',
+    async (redirectTo) => {
+      const logout = auth.logout();
+      http.expectOne('api/auth/logout').flush({ provider: 'heimdall', redirectTo });
+      expect((await logout).redirectTo).toBeNull();
+    },
+  );
+
   it('reports a session that ended mid-use, once', async () => {
     const login = auth.login({ email: 'maya@example.com', password: 'x' });
     http.expectOne('api/auth/login').flush(maya);

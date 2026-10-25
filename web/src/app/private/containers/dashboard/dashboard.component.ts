@@ -233,8 +233,14 @@ export class DashboardComponent {
   }
 
   async logout() {
-    const provider = await this.auth.logout();
-    await this.leave(provider === 'heimdall' ? { signedOut: 'heimdall' } : {});
+    const { provider, redirectTo } = await this.auth.logout();
+    if (redirectTo) {
+      // Heimdall ends its own session, then sends the browser back to the sign-in page.
+      await this.chatService.signOut();
+      window.location.assign(redirectTo);
+      return;
+    }
+    await this.leave(provider === 'heimdall' ? { signedOut: 'heimdall-kept' } : {});
   }
 
   /** Signed out here or elsewhere: this account's data leaves the device. */

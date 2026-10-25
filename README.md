@@ -55,6 +55,7 @@ Huginn also offers "Continue with Heimdall" when these are set (in `api/.env`, w
 | `HEIMDALL_CLIENT_ID` | `huginn` |
 | `HEIMDALL_CLIENT_SECRET` | printed once by Heimdall's `seed-dev` |
 | `HEIMDALL_REDIRECT_URI` | `http://localhost:4200/api/auth/heimdall/callback` |
+| `HEIMDALL_POST_LOGOUT_REDIRECT_URI` | optional: `http://localhost:4200/public/login?signedOut=heimdall` (registered by `seed-dev`) |
 | `HEIMDALL_CA_FILE` | development only: the ASP.NET dev certificate, from `dotnet dev-certs https --export-path .local/heimdall-dev-ca.pem --format PEM --no-password` (delete the `.key` file it also writes) |
 
 Start Heimdall as its README says (`seed-dev`, then `dotnet run --launch-profile https`). The

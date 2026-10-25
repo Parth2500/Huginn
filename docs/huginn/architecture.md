@@ -59,9 +59,9 @@ sessions nor the rest of the app depend on which one signed someone in.
   - **one audience per token**, picked with `resource` (RFC 8707)
 - **Sign-in UI:** Heimdall's own Angular login, consent and account pages, with an SSO session
   cookie (`__Host-`, `SameSite=Lax`).
+- **Sign-out (Heimdall #40, 2026-10-26):** RP-initiated logout (`end_session_endpoint`) and
+  back-channel logout with `sid`.
 - **Not there yet:**
-  - RP-initiated logout (`end_session_endpoint`, their U14)
-  - back-channel logout
   - DPoP and PAR (their Phase 2)
   - persisted consent (their Phase 3)
 
@@ -93,10 +93,17 @@ sessions nor the rest of the app depend on which one signed someone in.
     links Heimdall from their profile (`?intent=link`), which proves both identities. An
     identity already linked to another account is refused.
   - Unlinking is allowed only while the account has a password, so nobody locks themselves out.
-- **Sign-out** ends Huginn's session. Heimdall has no RP-initiated logout yet, so its own session
-  survives, and "Continue with Heimdall" may skip the password. The sign-in page says so after a
-  Heimdall session signs out. When back-channel logout exists, Huginn can subscribe to it and end
-  the matching sessions.
+- **Sign-out** ends Huginn's session, then sends the browser to Heimdall's `end_session_endpoint`
+  with the ID token of that sign-in (`id_token_hint`). Heimdall ends its own session and comes
+  back to `HEIMDALL_POST_LOGOUT_REDIRECT_URI`. A session from a sign-up kept no ID token, so
+  Heimdall asks the person to confirm first. The session keeps the ID token and Heimdall's `sid`
+  in `providerData`.
+- **Back-channel logout:** `POST /api/auth/heimdall/backchannel-logout` (registered as Huginn's
+  `backchannel_logout_uri`, on the API itself, not the dev proxy). When someone signs out of
+  Heimdall from any app, Heimdall's server posts a `logout_token`. `LogoutTokenVerifier` checks the
+  signature against the JWKS, `typ` `logout+jwt`, `iss`, `aud`, `iat`, `exp`, the logout event,
+  no `nonce`, and a `jti` seen once. Then Huginn ends every session with that `sid` and its
+  sockets. A bad token gets 400.
 - **Development TLS:** Heimdall serves `https://acme.localhost:7200` with the ASP.NET
   development certificate, which is issued for `localhost`. `HEIMDALL_CA_FILE` pins that
   certificate for the API's requests, checked against the name in `HEIMDALL_TLS_NAME` (default
@@ -118,7 +125,7 @@ sessions nor the rest of the app depend on which one signed someone in.
 
 ### 2.4 Asks for the Heimdall roadmap
 
-- RP-initiated logout, and back-channel logout (or at least a session-check endpoint).
+- ~~RP-initiated logout, and back-channel logout~~ (done in Heimdall #40).
 - Registration, email verification, and a real `email_verified` claim (today it's always
   `false`). Until then Huginn keeps its own sign-up, and links accounts only by the owner's action.
 - A client registration API (today `seed-dev` creates Huginn's client).

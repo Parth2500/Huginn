@@ -77,19 +77,32 @@ export class AuthService {
 
   /**
    * Ends the session on the server (and every socket using it), then forgets it here. Returns
-   * the provider that had signed it in, when the server could say.
+   * the provider that had signed it in, and for Heimdall the address that ends Heimdall's own
+   * session too (RP-initiated logout), when the server could say.
    */
-  async logout(): Promise<string | null> {
-    let provider: string | null = null;
+  async logout(): Promise<{ provider: string | null; redirectTo: string | null }> {
+    let result: { provider: string | null; redirectTo: string | null } = {
+      provider: null,
+      redirectTo: null,
+    };
     try {
-      ({ provider } = await firstValueFrom(
-        this.http.post<{ provider: string | null }>('api/auth/logout', {}),
-      ));
+      const answer = await firstValueFrom(
+        this.http.post<{ provider: string | null; redirectTo?: string | null }>(
+          'api/auth/logout',
+          {},
+        ),
+      );
+      // Only Heimdall's https address: the app never follows a script or a relative URL here.
+      const redirectTo =
+        typeof answer.redirectTo === 'string' && /^https:\/\//.test(answer.redirectTo)
+          ? answer.redirectTo
+          : null;
+      result = { provider: answer.provider, redirectTo };
     } catch {
       // Offline: the cookie stays until the session expires, but this device forgets it now.
     }
     this.signedOut();
-    return provider;
+    return result;
   }
 
   /** Called when the server says the session is gone. */

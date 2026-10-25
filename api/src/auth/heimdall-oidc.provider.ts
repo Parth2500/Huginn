@@ -7,9 +7,16 @@ import { Agent, fetch as undiciFetch } from 'undici';
 import {
   AuthProvider,
   ExternalIdentity,
+  ProviderSession,
   SignInError,
   SignInStep,
 } from './auth-provider';
+import {
+  LogoutClaims,
+  LogoutTokenError,
+  LogoutTokenVerifier,
+} from './logout-token';
+import { Session } from './session.entity';
 
 interface Transaction {
   verifier: string;
@@ -26,7 +33,10 @@ export function heimdallSettings() {
   if (!issuer || !clientId || !clientSecret || !redirectUri) {
     return null;
   }
-  return { issuer, clientId, clientSecret, redirectUri };
+  // Optional: where Heimdall sends the browser after a sign-out. It must be registered there.
+  const postLogoutRedirectUri =
+    process.env.HEIMDALL_POST_LOGOUT_REDIRECT_URI || null;
+  return { issuer, clientId, clientSecret, redirectUri, postLogoutRedirectUri };
 }
 
 /**
@@ -42,6 +52,7 @@ export class HeimdallOidcProvider implements AuthProvider {
   readonly name = 'heimdall';
   private readonly logger = new Logger(HeimdallOidcProvider.name);
   private config: Promise<oidc.Configuration> | null = null;
+  private logoutTokens: Promise<LogoutTokenVerifier> | null = null;
 
   get enabled() {
     return heimdallSettings() !== null;
@@ -115,7 +126,68 @@ export class HeimdallOidcProvider implements AuthProvider {
       issuer: claims.iss,
       subject: claims.sub,
       email: typeof info.email === 'string' ? info.email : null,
+      // Kept with the session: the ID token is the hint at sign-out, the sid names the session
+      // in a back-channel logout.
+      session: tokens.id_token
+        ? {
+            idToken: tokens.id_token,
+            sid: typeof claims.sid === 'string' ? claims.sid : null,
+          }
+        : undefined,
     };
+  }
+
+  /**
+   * RP-initiated logout: Heimdall's end_session_endpoint with the ID token of this sign-in, so
+   * Heimdall ends its session at once instead of asking. A session from a sign-up kept no ID
+   * token, so Heimdall asks the person first. Null when Heimdall can't be reached or has no
+   * end_session_endpoint.
+   */
+  async signOutUrl(session: Session): Promise<string | null> {
+    const kept = session.providerData as Partial<ProviderSession> | null;
+    const settings = heimdallSettings();
+    if (!settings) {
+      return null;
+    }
+    try {
+      const config = await this.configuration();
+      return oidc.buildEndSessionUrl(config, {
+        ...(typeof kept?.idToken === 'string'
+          ? { id_token_hint: kept.idToken }
+          : {}),
+        ...(settings.postLogoutRedirectUri
+          ? {
+              post_logout_redirect_uri: settings.postLogoutRedirectUri,
+              state: oidc.randomState(),
+            }
+          : {}),
+      }).href;
+    } catch (error) {
+      this.logger.warn(`Heimdall sign-out URL unavailable: ${describe(error)}`);
+      return null;
+    }
+  }
+
+  /** Checks a back-channel logout_token from Heimdall (see LogoutTokenVerifier). */
+  async verifyLogoutToken(token: unknown): Promise<LogoutClaims> {
+    this.logoutTokens ??= this.configuration().then((config) => {
+      const metadata = config.serverMetadata();
+      return LogoutTokenVerifier.forIssuer(
+        metadata.issuer,
+        config.clientMetadata().client_id,
+        new URL(metadata.jwks_uri),
+        developmentFetch() as unknown as typeof fetch | undefined,
+      );
+    });
+    try {
+      return await (await this.logoutTokens).verify(token);
+    } catch (error) {
+      // A refused token keeps the verifier. A failure to reach Heimdall builds it again next time.
+      if (!(error instanceof LogoutTokenError)) {
+        this.logoutTokens = null;
+      }
+      throw error;
+    }
   }
 
   private settings() {

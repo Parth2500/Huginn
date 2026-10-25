@@ -65,8 +65,13 @@ export class LoginComponent implements OnInit {
     if (outcome) {
       this.serverError = HEIMDALL_OUTCOMES[outcome] ?? HEIMDALL_OUTCOMES['failed'];
     }
-    if (this.route.snapshot.queryParamMap.get('signedOut') === 'heimdall') {
-      // Heimdall has no RP-initiated logout yet, so its own session outlives Huginn's.
+    const signedOut = this.route.snapshot.queryParamMap.get('signedOut');
+    if (signedOut === 'heimdall') {
+      // Heimdall sends the browser back here after its own sign-out (RP-initiated logout).
+      this.notice =
+        "You're signed out of Huginn and Heimdall. The next Continue with Heimdall asks for your password.";
+    } else if (signedOut === 'heimdall-kept') {
+      // Heimdall couldn't be reached, so its own session may still be there.
       this.notice =
         "You're signed out of Huginn. Heimdall may still remember you, so Continue with Heimdall can sign you straight back in.";
     }

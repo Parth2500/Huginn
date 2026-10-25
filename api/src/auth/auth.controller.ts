@@ -1,6 +1,8 @@
 import {
+  BadRequestException,
   Body,
   Controller,
+  Header,
   Delete,
   Get,
   HttpCode,
@@ -23,6 +25,7 @@ import {
 import {
   AuthProvider,
   ExternalIdentity,
+  ProviderSession,
   SignInError,
   SignInStep,
 } from './auth-provider';
@@ -101,15 +104,44 @@ export class AuthController {
 
   /**
    * Always succeeds and always clears the cookie, even if the session had already ended. Answers
-   * with the provider that signed the session in: Heimdall keeps its own session until it has
-   * RP-initiated logout, and the app tells the person so.
+   * with the provider that signed the session in, and for Heimdall, its end_session_endpoint with
+   * this sign-in's ID token (RP-initiated logout). The app sends the browser there, so Heimdall
+   * ends its own session too.
    */
   @Post('logout')
   @HttpCode(200)
   async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const provider = await this.endCurrentSession(req);
+    const resolved = await this.sessions.resolve(
+      readSessionToken(req.headers.cookie),
+    );
+    let redirectTo: string | null = null;
+    if (resolved?.session.provider === this.heimdall.name) {
+      redirectTo = await this.heimdall.signOutUrl(resolved.session);
+    }
+    if (resolved) {
+      await this.sessions.revoke(resolved.session);
+    }
     res.clearCookie(sessionCookieName(), clearCookieOptions());
-    return { provider };
+    return { provider: resolved?.session.provider ?? null, redirectTo };
+  }
+
+  /**
+   * Back-Channel Logout 1.0: Heimdall's server says that a Heimdall session ended. Huginn ends
+   * every session that it started. The token is the only proof, so it is checked in full first.
+   */
+  @Post('heimdall/backchannel-logout')
+  @HttpCode(200)
+  @Header('Cache-Control', 'no-store')
+  async backchannelLogout(@Body('logout_token') token: unknown) {
+    let sid: string;
+    try {
+      ({ sid } = await this.heimdall.verifyLogoutToken(token));
+    } catch {
+      // Section 2.8: 400 for a token that is not valid. The reason stays in the log.
+      throw new BadRequestException({ error: 'invalid_request' });
+    }
+    await this.sessions.revokeByProviderSid(this.heimdall.name, sid);
+    return {};
   }
 
   // ---- Heimdall ------------------------------------------------------------------------------
@@ -197,7 +229,13 @@ export class AuthController {
     const userId = await this.identities.userFor(identity);
     if (userId !== null) {
       await this.endCurrentSession(req);
-      await this.startSession(userId, this.heimdall.name, req, res);
+      await this.startSession(
+        userId,
+        this.heimdall.name,
+        req,
+        res,
+        identity.session,
+      );
       return res.redirect(303, AFTER.signedIn);
     }
     const ticket = await this.identities.startSignup(identity);
@@ -281,9 +319,11 @@ export class AuthController {
     provider: string,
     req: Request,
     res: Response,
+    providerData?: ProviderSession,
   ) {
     const { token } = await this.sessions.create(userId, provider, {
       userAgent: req.headers['user-agent'],
+      providerData,
     });
     res.cookie(sessionCookieName(), token, sessionCookieOptions());
   }

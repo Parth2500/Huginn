@@ -12,6 +12,16 @@ export interface ExternalIdentity {
   subject: string;
   /** As the provider reported it. Heimdall doesn't verify emails yet, so it proves nothing. */
   email: string | null;
+  /**
+   * What the session keeps for a sign-out at the provider: the ID token (sent back as
+   * `id_token_hint`) and the provider's session ID, `sid`, which a back-channel logout names.
+   */
+  session?: ProviderSession;
+}
+
+export interface ProviderSession {
+  idToken: string;
+  sid: string | null;
 }
 
 export type SignInStep =
@@ -39,7 +49,11 @@ export interface AuthProvider {
     callback: URL,
     transaction: string,
   ): Promise<ExternalIdentity>;
-  signOut?(session: Session): Promise<void>;
+  /**
+   * Where the browser goes to end the provider's own session (RP-initiated logout), or null when
+   * the provider has none.
+   */
+  signOutUrl?(session: Session): Promise<string | null>;
 }
 
 /** A sign-in that failed for a reason the person can act on; the message is shown as is. */

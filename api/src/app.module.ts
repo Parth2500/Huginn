@@ -44,6 +44,11 @@ export class AppModule implements NestModule {
         { path: '/auth/providers', method: RequestMethod.GET },
         { path: '/auth/heimdall/start', method: RequestMethod.GET },
         { path: '/auth/heimdall/callback', method: RequestMethod.GET },
+        // Heimdall's server calls it: no cookie, a signed logout_token instead.
+        {
+          path: '/auth/heimdall/backchannel-logout',
+          method: RequestMethod.POST,
+        },
         { path: '/auth/signup', method: RequestMethod.ALL },
         { path: '/users/username-available', method: RequestMethod.GET },
       )

@@ -119,6 +119,22 @@ export class SessionsService implements OnModuleInit, OnModuleDestroy {
     this.ended.next(session.id);
   }
 
+  /**
+   * Ends every session that the provider's session `sid` started (a back-channel logout), and
+   * their sockets. Returns how many ended. An unknown `sid` ends nothing.
+   */
+  async revokeByProviderSid(provider: string, sid: string): Promise<number> {
+    const found = await this.sessions
+      .createQueryBuilder('session')
+      .where('session.provider = :provider', { provider })
+      .andWhere(`session.providerData ->> 'sid' = :sid`, { sid })
+      .getMany();
+    for (const session of found) {
+      await this.revoke(session);
+    }
+    return found.length;
+  }
+
   async prune(now = new Date()): Promise<number> {
     const result = await this.sessions.delete({ expiresAt: LessThan(now) });
     return result.affected ?? 0;
