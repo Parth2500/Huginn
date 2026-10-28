@@ -18,6 +18,8 @@ import { ChatsAndMembers1792524417070 } from './migrations/1792524417070-ChatsAn
 import { Sessions1792601612272 } from './migrations/1792601612272-Sessions';
 import { HeimdallIdentities1792603478066 } from './migrations/1792603478066-HeimdallIdentities';
 import { WatermarkLog1792864666099 } from './migrations/1792864666099-WatermarkLog';
+import { PushSubscriptions1793193166987 } from './migrations/1793193166987-PushSubscriptions';
+import { PushSubscription } from '../notifications/push-subscription.entity';
 
 /**
  * One database configuration for the app and the TypeORM CLI. Schema changes go through
@@ -41,6 +43,7 @@ export const dataSourceOptions: DataSourceOptions = {
     Session,
     UserIdentity,
     PendingSignup,
+    PushSubscription,
   ],
   migrations: [
     InitialSchema1792524417068,
@@ -49,6 +52,7 @@ export const dataSourceOptions: DataSourceOptions = {
     Sessions1792601612272,
     HeimdallIdentities1792603478066,
     WatermarkLog1792864666099,
+    PushSubscriptions1793193166987,
   ],
   // gen_random_uuid() is built into Postgres 13+, so no extension is needed for UUID keys.
   uuidExtension: 'pgcrypto',

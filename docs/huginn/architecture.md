@@ -453,22 +453,42 @@ compiled to WebAssembly and run in a web worker.
 
 ## 8. Notifications (Phase 1; encrypted previews in Phase 2)
 
-1. When a message is stored, the API enqueues one push job per recipient device that needs
-   one. A device needs one when:
-   - it's not focused on that chat
-   - the chat isn't muted or archived (unless a mention breaks through)
-   - it isn't a message request
-   - the user isn't in do-not-disturb
-2. The **push worker** sends Web Push using VAPID keys and the device's `push_subscription`. The
-   payload is `{ chatId, messageId, ciphertext?, title? }`, and `title` is omitted when previews
-   are off.
-3. The **service worker:**
+Built for 1.9 ([#9](https://github.com/Parth2500/Huginn/issues/9)) in `api/src/notifications/`.
+
+1. **Who hears** (`NotificationsService.noticesFor`): after a message is stored and acknowledged,
+   each other active member is checked. Nobody hears when:
+   - they are the sender (on any device)
+   - they are in do-not-disturb (`dndUntil`)
+   - the chat is muted or archived, or it's a group set to "only mentions and replies", unless
+     the message replies to them and *Mentions break through mute* is on. @mentions join this
+     rule when they exist (4.x).
+   - the chat is a message request (only `active` members are asked)
+
+   A retried send (same `clientMessageId`) notifies nobody again.
+2. **The notice** is `{ chatId, messageId, title, body, sound }`. Direct chats: the sender's name
+   and the first 120 characters. Groups: the group's title and "Sender: text". With previews off,
+   `title` and `body` are null, and devices say "New message". The server builds the preview from
+   plaintext in Phase 1. In Phase 2 the payload carries ciphertext instead (2.3, #15).
+3. **One channel per device:**
+   - Every open tab gets a `notify` socket event. The tab knows whether the chat is on screen, so
+     it decides between nothing, a sound, and a system notification.
+   - A browser with no open tab (no socket in its session) gets a **Web Push**: VAPID (RFC 8292),
+     an encrypted payload (RFC 8291), a 24-hour TTL, and `Topic: chat-<id>`, so the push service
+     keeps only the latest push for each chat.
+4. **Subscriptions** (`push_subscription`): `PUT /api/notifications/subscription` saves the
+   browser's subscription for the current session, and `DELETE` removes it. Signing out deletes the
+   session, and the subscription goes with it. Only endpoints at the browsers' push services are
+   accepted (FCM, Mozilla, Apple, Windows), so nobody can point Huginn's server at another
+   address. A 404 or 410 from the push service deletes the subscription.
+5. **Settings** travel with `settings.get` and `settings.update`, next to read receipts:
+   `notifyPreviews`, `notifySounds`, `groupNotifyMode` (`all` or `mentions`), `mentionsBreakMute`,
+   and `dndUntil`. Every tab of the person gets the new `settings`.
+6. **The service worker:**
    - shows the notification with `tag = chatId`, so each chat replaces its own notification
    - opens or focuses the chat when clicked
-   - removes subscriptions that fail with 404/410
-4. **In-tab:** if a Huginn tab is open, it handles the event and the service worker stays
-   quiet. Only one notification is shown per message per device.
-5. **Badges:** the app badge (PWA) and tab title count unread messages in unmuted chats.
+7. **Badges:** the app badge (PWA) and tab title count unread messages in unmuted chats.
+8. **Not yet:** pushes go out from the API process right after the send. A queue and a separate
+   push worker come with scaling (Phase 5).
 
 ---
 

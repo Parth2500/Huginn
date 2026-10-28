@@ -37,6 +37,8 @@ export interface SendResult {
   chatId: number;
   /** True when this send created the chat (a direct chat's first message). */
   createdChat: boolean;
+  /** True when this clientMessageId was sent before: nothing new was stored or announced. */
+  duplicate: boolean;
   updates: Addressed[];
 }
 
@@ -76,6 +78,7 @@ export class MessagesService {
         message: toMessageDto(existing),
         chatId: existing.chatId,
         createdChat: false,
+        duplicate: true,
         updates: [],
       };
     }
@@ -182,7 +185,13 @@ export class MessagesService {
       }
       entries.push(...receipts);
       const updates = await this.updatesService.append(manager, entries);
-      return { message, chatId: chatId, createdChat, updates };
+      return {
+        message,
+        chatId: chatId,
+        createdChat,
+        duplicate: false,
+        updates,
+      };
     });
   }
 

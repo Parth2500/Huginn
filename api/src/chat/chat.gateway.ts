@@ -27,12 +27,19 @@ import {
 import {
   Ack,
   ChatFolder,
+  MessageDto,
   ChatStateChange,
   MuteFor,
   PROTOCOL_VERSION,
 } from './chat.types';
 import { ChatRuleError, ChatsService } from './chats.service';
 import { MessagesService } from './messages.service';
+import {
+  Notice,
+  NotificationRuleError,
+  NotificationsService,
+} from 'src/notifications/notifications.service';
+import { PushSender } from 'src/notifications/push-sender';
 import { Addressed, UpdatesService } from './updates.service';
 
 /** Socket.IO room per user (all their tabs) and per open chat. */
@@ -72,6 +79,8 @@ export class ChatGateway
     private readonly messages: MessagesService,
     private readonly updates: UpdatesService,
     private readonly userEvents: UserEventsService,
+    private readonly notifications: NotificationsService,
+    private readonly push: PushSender,
   ) {}
 
   onModuleInit() {
@@ -101,6 +110,7 @@ export class ChatGateway
       }
       const { user, session } = resolved;
       socket.data.user = user;
+      socket.data.sessionId = session.id;
       await socket.join(sessionChannel(session.id));
       const wasOnline = await this.isOnline(user.Id);
       await socket.join(userChannel(user.Id));
@@ -337,35 +347,50 @@ export class ChatGateway
           await this.openChannel(socket, result.chatId);
         }
         this.publish(result.updates);
+        if (!result.duplicate) {
+          void this.notify(result.message);
+        }
         return { message: result.message, chatId: result.chatId };
       }),
     );
   }
 
-  /** Your settings. For now only read receipts; the rest arrive with Settings (1.11). */
+  /** Your settings: read receipts and notifications. The rest arrive with Settings (1.11). */
   @SubscribeMessage('settings.get')
   onSettingsGet(socket: Socket) {
     return this.handle(socket, async (user) => ({
-      settings: { readReceipts: await this.chats.readReceipts(user.Id) },
+      settings: await this.allSettings(user.Id),
     }));
   }
 
+  /** Changes any of the settings that `settings.get` returns. Your other devices follow. */
   @SubscribeMessage('settings.update')
-  onSettingsUpdate(socket: Socket, request: { readReceipts?: unknown }) {
+  onSettingsUpdate(socket: Socket, request: Record<string, unknown>) {
     return this.handle(socket, async (user) => {
-      if (typeof request?.readReceipts !== 'boolean') {
+      const { readReceipts, ...notify } = request ?? {};
+      if (readReceipts !== undefined && typeof readReceipts !== 'boolean') {
         throw new ChatRuleError('Say whether read receipts are on or off.');
       }
-      const { updates } = await this.chats.setReadReceipts(
-        user.Id,
-        request.readReceipts,
-      );
-      this.publish(updates);
-      // Your other devices show the same switch.
-      this.server
-        .to(userChannel(user.Id))
-        .emit('settings', { readReceipts: request.readReceipts });
-      return { settings: { readReceipts: request.readReceipts } };
+      if (Object.keys(notify).length > 0) {
+        try {
+          await this.notifications.update(user.Id, notify);
+        } catch (error) {
+          if (error instanceof NotificationRuleError) {
+            throw new ChatRuleError(error.message);
+          }
+          throw error;
+        }
+      }
+      if (typeof readReceipts === 'boolean') {
+        const { updates } = await this.chats.setReadReceipts(
+          user.Id,
+          readReceipts,
+        );
+        this.publish(updates);
+      }
+      const settings = await this.allSettings(user.Id);
+      this.server.to(userChannel(user.Id)).emit('settings', settings);
+      return { settings };
     });
   }
 
@@ -527,6 +552,69 @@ export class ChatGateway
   private publish(updates: Addressed[]) {
     for (const { userId, update } of updates) {
       this.server.to(userChannel(userId)).emit('update', update);
+    }
+  }
+
+  private async allSettings(userId: number) {
+    return {
+      readReceipts: await this.chats.readReceipts(userId),
+      ...(await this.notifications.settings(userId)),
+    };
+  }
+
+  /**
+   * Tells the recipients about a new message (architecture.md §8). Open tabs get `notify` and
+   * decide for themselves whether to show it: they know if the chat is on screen. A browser with
+   * no Huginn tab open gets a Web Push instead, so each device hears once. Runs after the send is
+   * acknowledged; a failure here never fails the send.
+   */
+  private async notify(message: MessageDto) {
+    try {
+      const notices = await this.notifications.noticesFor(message);
+      if (notices.length === 0) {
+        return;
+      }
+      const userIds = notices.map((n) => n.userId);
+      const sockets = await this.server
+        .in(userIds.map(userChannel))
+        .fetchSockets();
+      const openSessions = [
+        ...new Set(
+          sockets
+            .map((s) => s.data?.sessionId as string | undefined)
+            .filter((id): id is string => typeof id === 'string'),
+        ),
+      ];
+      const byUser = new Map<number, Notice>(notices.map((n) => [n.userId, n]));
+      for (const notice of notices) {
+        this.server.to(userChannel(notice.userId)).emit('notify', notice);
+      }
+      if (!this.push.publicKey) {
+        return;
+      }
+      const targets = await this.notifications.subscriptionsFor(
+        userIds,
+        openSessions,
+      );
+      await Promise.all(
+        targets.map(async (target) => {
+          const notice = byUser.get(target.userId);
+          const outcome = await this.push.send(target, {
+            chatId: notice.chatId,
+            messageId: notice.messageId,
+            title: notice.title,
+            body: notice.body,
+            sound: notice.sound,
+          });
+          if (outcome === 'gone') {
+            await this.notifications.forget(target.endpoint);
+          }
+        }),
+      );
+    } catch (error) {
+      this.logger.error(
+        `Notifications for message ${message.id} failed: ${error instanceof Error ? error.message : JSON.stringify(error)}`,
+      );
     }
   }
 

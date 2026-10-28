@@ -45,6 +45,17 @@ paths to the API from the same host. API settings for sessions:
 | `APP_ORIGINS` | `http://localhost:4200` | Comma-separated origins the app is served from. Changes and sockets from any other site are refused. |
 | `SESSION_COOKIE_SECURE` | `true` when `NODE_ENV=production` | Secure `__Host-` cookie. Set `false` only to serve over plain HTTP. |
 
+### Web Push (optional)
+
+Notifications reach a closed Huginn through Web Push when these are set in `api/.env`. Without
+them, open tabs are still notified.
+
+| Variable | Example |
+|---|---|
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | from `cd api && npm run push:keys`. Keep the private key secret, and keep the pair: new keys void every subscription. |
+| `VAPID_SUBJECT` | `mailto:you@example.com`: push services write here about problems |
+| `PUSH_SERVICE_HOSTS` | optional: comma-separated host suffixes that replace the built-in list of browser push services |
+
 ### Sign in with Heimdall (optional)
 
 Huginn also offers "Continue with Heimdall" when these are set (in `api/.env`, which git ignores):

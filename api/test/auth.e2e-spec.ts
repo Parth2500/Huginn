@@ -79,7 +79,7 @@ describe('sessions', () => {
       method: 'POST',
     });
     expect(out.status).toBe(200);
-    expect(await out.json()).toEqual({ provider: 'local' });
+    expect(await out.json()).toEqual({ provider: 'local', redirectTo: null });
     expect(out.headers.getSetCookie()[0]).toMatch(/huginn_session=;/);
     expect((await ended).message).toBe('You signed out.');
     await new Promise((r) => setTimeout(r, 200));
