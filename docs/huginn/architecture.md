@@ -61,8 +61,10 @@ sessions nor the rest of the app depend on which one signed someone in.
   cookie (`__Host-`, `SameSite=Lax`).
 - **Sign-out (Heimdall #40, 2026-10-26):** RP-initiated logout (`end_session_endpoint`) and
   back-channel logout with `sid`.
+- **Phase 2 (done 2026-10-28):** PAR (RFC 9126), DPoP, token introspection, `prompt=consent`,
+  and `private_key_jwt` client authentication. Huginn uses PAR (below). It needs no DPoP or
+  introspection, because it keeps no Heimdall token.
 - **Not there yet:**
-  - DPoP and PAR (their Phase 2)
   - persisted consent (their Phase 3)
 
 ### 2.2 How Huginn connects (backend-for-frontend, built 2026-10-21)
@@ -73,7 +75,10 @@ sessions nor the rest of the app depend on which one signed someone in.
   `seed-dev` registers the `huginn` client and prints the secret once.
 - **The flow** (`api/src/auth/heimdall-oidc.provider.ts`, built on `openid-client`):
   1. `GET /api/auth/heimdall/start` creates the PKCE verifier (S256), `state` and `nonce`. It keeps
-     them in a 10-minute httpOnly cookie, then redirects to Heimdall `/authorize`.
+     them in a 10-minute httpOnly cookie. When discovery lists a
+     `pushed_authorization_request_endpoint`, it pushes these parameters to Heimdall (PAR, RFC
+     9126), so the browser carries only a one-time `request_uri`. It then redirects to Heimdall
+     `/authorize`.
   2. Heimdall shows its own sign-in page, then redirects to `/api/auth/heimdall/callback`.
   3. The callback checks `state` and the `iss` response parameter (RFC 9207), and exchanges the
      code at `/token` with the client secret. It checks the ID token against the tenant's

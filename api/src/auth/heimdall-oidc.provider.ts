@@ -66,7 +66,7 @@ export class HeimdallOidcProvider implements AuthProvider {
       state: oidc.randomState(),
       nonce: oidc.randomNonce(),
     };
-    const url = oidc.buildAuthorizationUrl(config, {
+    const parameters = {
       redirect_uri: settings.redirectUri,
       scope: 'openid email',
       code_challenge: await oidc.calculatePKCECodeChallenge(
@@ -75,7 +75,24 @@ export class HeimdallOidcProvider implements AuthProvider {
       code_challenge_method: 'S256',
       state: transaction.state,
       nonce: transaction.nonce,
-    });
+    };
+    // Pushed authorization requests (RFC 9126) when Heimdall offers them: the parameters go to
+    // Heimdall server to server, and the browser carries only a one-time request_uri.
+    let url: URL;
+    if (config.serverMetadata().pushed_authorization_request_endpoint) {
+      try {
+        url = await oidc.buildAuthorizationUrlWithPAR(config, parameters);
+      } catch (error) {
+        this.logger.warn(
+          `Heimdall refused the pushed request: ${describe(error)}`,
+        );
+        throw new SignInError(
+          "Can't reach Heimdall right now. Try again, or sign in with your password.",
+        );
+      }
+    } else {
+      url = oidc.buildAuthorizationUrl(config, parameters);
+    }
     return {
       kind: 'redirect',
       url: url.href,
