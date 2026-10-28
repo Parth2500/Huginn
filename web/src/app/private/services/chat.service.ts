@@ -8,7 +8,10 @@ import {
   ChatStateResult,
   MessageInfoEntry,
   MyChatState,
+  Notice,
+  NotificationSettings,
   PROTOCOL_VERSION,
+  Settings,
   TypingEvent,
   Update,
 } from 'src/app/models/chat.interface';
@@ -55,6 +58,16 @@ export class ChatService {
   readonly userUpdated = new Subject<IUser>();
   /** Read receipts on (product-spec.md §5.4): sharing yours, and seeing other people's. */
   readonly readReceipts = signal(true);
+  /** Notification settings (product-spec.md §6.2), the same on every device. */
+  readonly notificationSettings = signal<NotificationSettings>({
+    notifyPreviews: true,
+    notifySounds: true,
+    groupNotifyMode: 'all',
+    mentionsBreakMute: true,
+    dndUntil: null,
+  });
+  /** A new message worth telling you about. NotificationsService decides how. */
+  readonly notify = new Subject<Notice>();
 
   private me: IUser | null = null;
   private seq = 0;
@@ -80,9 +93,8 @@ export class ChatService {
     socket.on('unauthorized', ({ message }: { message: string }) => this.unauthorized.next(message));
     socket.on('typing', (event: TypingEvent) => this.typing.next(event));
     socket.on('userUpdated', (user: IUser) => this.onUserUpdated(user));
-    socket.on('settings', (settings: { readReceipts: boolean }) =>
-      this.readReceipts.set(settings.readReceipts),
-    );
+    socket.on('settings', (settings: Settings) => this.applySettings(settings));
+    socket.on('notify', (notice: Notice) => this.notify.next(notice));
     socket.on('onlineUsers', (ids: number[]) => this.onlineIds.set(new Set(ids)));
     // New contacts (a new chat or group): who of them is online right now.
     socket.on('presenceBatch', (ids: number[]) =>
@@ -223,16 +235,27 @@ export class ChatService {
 
   /** Turns read receipts on or off, for every device. Returns the reason it failed, or null. */
   async setReadReceipts(on: boolean): Promise<string | null> {
-    const result = await this.socket.request<{ settings: { readReceipts: boolean } }>(
-      'settings.update',
-      { readReceipts: on },
-    );
+    return this.updateSettings({ readReceipts: on });
+  }
+
+  /** Changes notification settings, for every device. Returns the reason it failed, or null. */
+  updateNotificationSettings(change: Partial<NotificationSettings>): Promise<string | null> {
+    return this.updateSettings(change);
+  }
+
+  /** True when this chat is on screen in a visible tab: nothing to notify about. */
+  isLookingAt(chatId: number): boolean {
+    return this.viewingChatId === chatId && document.visibilityState === 'visible';
+  }
+
+  private async updateSettings(change: Partial<Settings>): Promise<string | null> {
+    const result = await this.socket.request<{ settings: Settings }>('settings.update', change);
     if (!result.ok) {
       return result.error === 'offline'
         ? "You're offline. Try again when the connection is back."
         : result.error;
     }
-    this.readReceipts.set(result.settings.readReceipts);
+    this.applySettings(result.settings);
     return null;
   }
 
@@ -594,10 +617,15 @@ export class ChatService {
   }
 
   private async loadSettings() {
-    const result = await this.socket.request<{ settings: { readReceipts: boolean } }>('settings.get');
+    const result = await this.socket.request<{ settings: Settings }>('settings.get');
     if (result.ok) {
-      this.readReceipts.set(result.settings.readReceipts);
+      this.applySettings(result.settings);
     }
+  }
+
+  private applySettings({ readReceipts, ...notifications }: Settings) {
+    this.readReceipts.set(readReceipts);
+    this.notificationSettings.set(notifications);
   }
 
   /** Messages from others reached this device: say so, one request per chat per batch. */

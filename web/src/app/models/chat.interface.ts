@@ -137,3 +137,29 @@ export interface ChatCursor {
   lastActivityAt: string;
   id: number;
 }
+
+/** Your settings (settings.get / settings.update / settings). */
+export interface Settings {
+  readReceipts: boolean;
+  notifyPreviews: boolean;
+  notifySounds: boolean;
+  /** In groups: every message, or only replies to you (and @mentions, once they exist). */
+  groupNotifyMode: 'all' | 'mentions';
+  mentionsBreakMute: boolean;
+  /** Do not disturb until this time; null when off. */
+  dndUntil: string | null;
+}
+
+export type NotificationSettings = Omit<Settings, 'readReceipts'>;
+
+/**
+ * The server's word that a new message is worth telling you about (architecture.md §8). Null
+ * title and body mean previews are off: say "New message".
+ */
+export interface Notice {
+  chatId: number;
+  messageId: number;
+  title: string | null;
+  body: string | null;
+  sound: boolean;
+}
