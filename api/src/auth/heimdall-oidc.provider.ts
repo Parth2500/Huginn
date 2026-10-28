@@ -11,6 +11,7 @@ import {
   SignInError,
   SignInStep,
 } from './auth-provider';
+import { loadClientKey } from './client-key';
 import {
   LogoutClaims,
   LogoutTokenError,
@@ -28,15 +29,54 @@ interface Transaction {
 export function heimdallSettings() {
   const issuer = process.env.HEIMDALL_ISSUER;
   const clientId = process.env.HEIMDALL_CLIENT_ID;
-  const clientSecret = process.env.HEIMDALL_CLIENT_SECRET;
+  // A private key (private_key_jwt) or a client secret (client_secret_basic). The key wins when
+  // both are set: Heimdall gives a client one method, so the secret is then a leftover.
+  const clientKeyFile = process.env.HEIMDALL_CLIENT_KEY_FILE || null;
+  const clientSecret = process.env.HEIMDALL_CLIENT_SECRET || null;
   const redirectUri = process.env.HEIMDALL_REDIRECT_URI;
-  if (!issuer || !clientId || !clientSecret || !redirectUri) {
+  if (
+    !issuer ||
+    !clientId ||
+    !(clientKeyFile || clientSecret) ||
+    !redirectUri
+  ) {
     return null;
   }
   // Optional: where Heimdall sends the browser after a sign-out. It must be registered there.
   const postLogoutRedirectUri =
     process.env.HEIMDALL_POST_LOGOUT_REDIRECT_URI || null;
-  return { issuer, clientId, clientSecret, redirectUri, postLogoutRedirectUri };
+  return {
+    issuer,
+    clientId,
+    clientKeyFile,
+    clientSecret,
+    redirectUri,
+    postLogoutRedirectUri,
+  };
+}
+
+/**
+ * How Huginn authenticates at Heimdall's /par, /token and /revoke. With a key, each request gets a new
+ * signed assertion: `aud` is the issuer (Heimdall refuses an endpoint URL), a fresh `jti`, and a
+ * 60-second `exp`.
+ */
+async function clientAuthentication(
+  settings: NonNullable<ReturnType<typeof heimdallSettings>>,
+): Promise<oidc.ClientAuth> {
+  if (!settings.clientKeyFile) {
+    return oidc.ClientSecretBasic(settings.clientSecret);
+  }
+  const { key, kid } = await loadClientKey(
+    readFileSync(settings.clientKeyFile, 'utf8'),
+  );
+  return oidc.PrivateKeyJwt(
+    { key, kid },
+    {
+      [oidc.modifyAssertion]: (header) => {
+        header.typ = 'client-authentication+jwt';
+      },
+    },
+  );
 }
 
 /**
@@ -215,7 +255,10 @@ export class HeimdallOidcProvider implements AuthProvider {
     return settings;
   }
 
-  /** Discovery, cached once it succeeds (a failure is retried on the next sign-in). */
+  /**
+   * Discovery and the client key, cached once both succeed (a failure is retried on the next
+   * sign-in).
+   */
   private configuration(): Promise<oidc.Configuration> {
     const settings = this.settings();
     this.config ??= (async () => {
@@ -224,7 +267,7 @@ export class HeimdallOidcProvider implements AuthProvider {
         new URL(settings.issuer),
         settings.clientId,
         undefined,
-        oidc.ClientSecretBasic(settings.clientSecret),
+        await clientAuthentication(settings),
         fetchOption ? { [oidc.customFetch]: fetchOption } : undefined,
       );
       if (fetchOption) {
@@ -233,7 +276,7 @@ export class HeimdallOidcProvider implements AuthProvider {
       return config;
     })().catch((error: unknown) => {
       this.config = null;
-      this.logger.error(`Heimdall discovery failed: ${describe(error)}`);
+      this.logger.error(`Heimdall setup failed: ${describe(error)}`);
       throw new SignInError(
         "Can't reach Heimdall right now. Try again, or sign in with your password.",
       );

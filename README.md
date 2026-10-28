@@ -53,10 +53,18 @@ Huginn also offers "Continue with Heimdall" when these are set (in `api/.env`, w
 |---|---|
 | `HEIMDALL_ISSUER` | `https://acme.localhost:7200` |
 | `HEIMDALL_CLIENT_ID` | `huginn` |
-| `HEIMDALL_CLIENT_SECRET` | printed once by Heimdall's `seed-dev` |
+| `HEIMDALL_CLIENT_SECRET` | printed once by Heimdall's `seed-dev`; or use a key, below |
+| `HEIMDALL_CLIENT_KEY_FILE` | optional: `.local/heimdall-client-key.pem`, for `private_key_jwt` instead of the secret |
 | `HEIMDALL_REDIRECT_URI` | `http://localhost:4200/api/auth/heimdall/callback` |
 | `HEIMDALL_POST_LOGOUT_REDIRECT_URI` | optional: `http://localhost:4200/public/login?signedOut=heimdall` (registered by `seed-dev`) |
 | `HEIMDALL_CA_FILE` | development only: the ASP.NET dev certificate, from `dotnet dev-certs https --export-path .local/heimdall-dev-ca.pem --format PEM --no-password` (delete the `.key` file it also writes) |
+
+To authenticate with a key instead of the secret (`private_key_jwt`), run
+`cd api && npm run heimdall:client-key`. It writes an EC P-256 private key to
+`.local/heimdall-client-key.pem` and prints the public JWK Set. Heimdall's operator registers that
+set on the `huginn` client and sets its method to `private_key_jwt`; the secret then stops
+working. The private key never leaves Huginn's server. Keep it readable only by the API's user
+(a drive that ignores Unix permissions, such as NTFS, can't).
 
 Start Heimdall as its README says (`seed-dev`, then `dotnet run --launch-profile https`). The
 first visit to `https://acme.localhost:7200` shows a certificate warning; accept it.

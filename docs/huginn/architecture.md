@@ -62,17 +62,24 @@ sessions nor the rest of the app depend on which one signed someone in.
 - **Sign-out (Heimdall #40, 2026-10-26):** RP-initiated logout (`end_session_endpoint`) and
   back-channel logout with `sid`.
 - **Phase 2 (done 2026-10-28):** PAR (RFC 9126), DPoP, token introspection, `prompt=consent`,
-  and `private_key_jwt` client authentication. Huginn uses PAR (below). It needs no DPoP or
-  introspection, because it keeps no Heimdall token.
+  and `private_key_jwt` client authentication. Huginn uses PAR and can use `private_key_jwt`
+  (below). It needs no DPoP or introspection, because it keeps no Heimdall token.
 - **Not there yet:**
   - persisted consent (their Phase 3)
 
 ### 2.2 How Huginn connects (backend-for-frontend, built 2026-10-21)
 
-- **Client:** Huginn's API is a **confidential client** in the tenant (`client_secret_basic`),
-  with the `authorization_code` grant only, scopes `openid email`, and the redirect URI
+- **Client:** Huginn's API is a **confidential client** in the tenant, with the
+  `authorization_code` grant only, scopes `openid email`, and the redirect URI
   `<app origin>/api/auth/heimdall/callback`. Heimdall has no client registration API yet, so its
   `seed-dev` registers the `huginn` client and prints the secret once.
+- **Client authentication** at `/par`, `/token` and `/revoke`: `client_secret_basic`, or
+  `private_key_jwt` (RFC 7523) when `HEIMDALL_CLIENT_KEY_FILE` is set
+  (`api/src/auth/client-key.ts`). With the key, Heimdall stores only the public key, so no shared
+  secret can leak from either side. Each request gets a new assertion: `aud` is the issuer,
+  never an endpoint URL, with a fresh `jti`, a 60-second `exp`, and `typ`
+  `client-authentication+jwt`. The `kid` is the key's RFC 7638 thumbprint.
+  `npm run heimdall:client-key` makes the key and prints the public JWK Set for Heimdall.
 - **The flow** (`api/src/auth/heimdall-oidc.provider.ts`, built on `openid-client`):
   1. `GET /api/auth/heimdall/start` creates the PKCE verifier (S256), `state` and `nonce`. It keeps
      them in a 10-minute httpOnly cookie. When discovery lists a
@@ -81,7 +88,7 @@ sessions nor the rest of the app depend on which one signed someone in.
      `/authorize`.
   2. Heimdall shows its own sign-in page, then redirects to `/api/auth/heimdall/callback`.
   3. The callback checks `state` and the `iss` response parameter (RFC 9207), and exchanges the
-     code at `/token` with the client secret. It checks the ID token against the tenant's
+     code at `/token`, authenticated as above. It checks the ID token against the tenant's
      JWKS: signature, `iss`, `aud`, `nonce` and expiry.
   4. It reads `email` from `/userinfo`, then decides the account (below).
 - **No Heimdall tokens are kept.** Huginn needs Heimdall only to learn who someone is. After the
