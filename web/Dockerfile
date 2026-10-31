@@ -1,4 +1,4 @@
-FROM node:24-alpine AS development
+FROM node:25-alpine AS development
 WORKDIR /huginn/web
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # pnpm at the version in the packageManager field of package.json.
