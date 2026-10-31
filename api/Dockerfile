@@ -1,4 +1,4 @@
-FROM node:24-alpine AS development
+FROM node:25-alpine AS development
 WORKDIR /huginn/api
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 # pnpm at the version in the packageManager field of package.json.
@@ -8,7 +8,7 @@ COPY . .
 RUN pnpm run build
 EXPOSE 3000
 
-FROM node:24-alpine AS production
+FROM node:25-alpine AS production
 ENV NODE_ENV=production
 WORKDIR /huginn/api
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
