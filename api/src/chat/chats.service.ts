@@ -196,7 +196,12 @@ export class ChatsService {
 
       if ('pin' in change) {
         if (change.pin) {
-          const toPin = rows.filter((r) => !r.pinnedAt);
+          // In request order: the query returns rows in no fixed order.
+          const toPin = rows
+            .filter((r) => !r.pinnedAt)
+            .sort(
+              (a, b) => chatIds.indexOf(a.chatId) - chatIds.indexOf(b.chatId),
+            );
           const pinned = await manager.find(ChatMember, {
             where: { userId, status: 'active', pinnedAt: Not(IsNull()) },
             select: { chatId: true, pinOrder: true },
