@@ -17,7 +17,12 @@ import {
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormsModule, ReactiveFormsModule } from '@angular/forms';
-import { ChatMessage, OpenChat, SystemEvent } from 'src/app/models/chat.interface';
+import {
+  ChatMessage,
+  MessageStatus,
+  OpenChat,
+  ShownMessage,
+} from 'src/app/models/chat.interface';
 import { IUser } from 'src/app/models/user.interface';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';
@@ -46,26 +51,6 @@ const TYPING_TTL_MS = 3500;
 const TYPING_THROTTLE_MS = 2000;
 /** How long a message that just arrived keeps its highlight. */
 const FRESH_MS = 1000;
-
-/** The tick on your own message (product-spec.md §3.1). */
-export type MessageStatus = 'pending' | 'stalled' | 'failed' | 'sent' | 'delivered' | 'read' | null;
-
-/** What a bubble shows: a stored message, or one still in the outbox. */
-export interface ShownMessage {
-  id?: number;
-  text: string | null;
-  sender: IUser | null;
-  createdAt: string;
-  deleted: boolean;
-  deletedById?: number | null;
-  kind?: 'text' | 'system';
-  system?: SystemEvent | null;
-  editedAt?: string | null;
-  replyTo?: { id: number; senderId: number | null; excerpt: string | null } | null;
-  /** Still in the outbox: its key there, and why the server refused it, if it did. */
-  clientMessageId?: string | null;
-  failed?: string;
-}
 
 export type StreamRow =
   | { kind: 'day'; key: string; label: string }

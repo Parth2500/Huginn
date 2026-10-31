@@ -9,7 +9,7 @@ import {
 } from '@angular/core';
 import { plainText } from '../../helpers/chat-display';
 import { IUser } from 'src/app/models/user.interface';
-import { MessageStatus, ShownMessage } from '../chat-room/chat-room.component';
+import { MessageStatus, ShownMessage } from 'src/app/models/chat.interface';
 import { NgClass, DatePipe } from '@angular/common';
 import { AvatarComponent } from '../../../shared/avatar/avatar.component';
 import { IconComponent } from '../../../shared/icon/icon.component';

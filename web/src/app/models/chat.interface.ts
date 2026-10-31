@@ -31,6 +31,26 @@ export interface ChatMessage {
   deletedById: number | null;
 }
 
+/** The tick on your own message (product-spec.md §3.1). */
+export type MessageStatus = 'pending' | 'stalled' | 'failed' | 'sent' | 'delivered' | 'read' | null;
+
+/** What a bubble shows: a stored message, or one still in the outbox. */
+export interface ShownMessage {
+  id?: number;
+  text: string | null;
+  sender: IUser | null;
+  createdAt: string;
+  deleted: boolean;
+  deletedById?: number | null;
+  kind?: 'text' | 'system';
+  system?: SystemEvent | null;
+  editedAt?: string | null;
+  replyTo?: { id: number; senderId: number | null; excerpt: string | null } | null;
+  /** Still in the outbox: its key there, and why the server refused it, if it did. */
+  clientMessageId?: string | null;
+  failed?: string;
+}
+
 export interface ChatMember extends IUser {
   role: MemberRole;
 }
