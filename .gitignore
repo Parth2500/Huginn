@@ -1,2 +1,5 @@
 # Impeccable design-tool working files (mocks, reviews, caches)
 .impeccable/
+
+# graphify knowledge-graph output (local, regenerable)
+graphify-out/
