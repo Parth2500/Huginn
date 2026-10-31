@@ -1,0 +1,14 @@
+# pnpm settings for web/. It is one package, not a workspace of packages.
+
+overrides:
+  # @angular/build 22.2.3 pins vite 8.3.0, which has six advisories (one high) in the dev server.
+  # Remove this when a release of @angular/build depends on vite 8.3.3 or later.
+  vite: 8.3.4
+
+# Dependency install scripts do not run. Each of these packages ships a prebuilt binary or needs no script.
+allowBuilds:
+  "@parcel/watcher": false
+  core-js: false
+  esbuild: false
+  lmdb: false
+  msgpackr-extract: false

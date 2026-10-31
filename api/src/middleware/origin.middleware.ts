@@ -1,5 +1,5 @@
 import { ForbiddenException, Injectable, NestMiddleware } from '@nestjs/common';
-import { Request, Response } from 'express';
+import type { Request, Response } from 'express';
 import { isForeignOrigin } from 'src/auth/session-cookie';
 
 const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);

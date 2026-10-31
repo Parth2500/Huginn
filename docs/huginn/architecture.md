@@ -79,7 +79,7 @@ sessions nor the rest of the app depend on which one signed someone in.
   secret can leak from either side. Each request gets a new assertion: `aud` is the issuer,
   never an endpoint URL, with a fresh `jti`, a 60-second `exp`, and `typ`
   `client-authentication+jwt`. The `kid` is the key's RFC 7638 thumbprint.
-  `npm run heimdall:client-key` makes the key and prints the public JWK Set for Heimdall.
+  `pnpm run heimdall:client-key` makes the key and prints the public JWK Set for Heimdall.
 - **The flow** (`api/src/auth/heimdall-oidc.provider.ts`, built on `openid-client`):
   1. `GET /api/auth/heimdall/start` creates the PKCE verifier (S256), `state` and `nonce`. It keeps
      them in a 10-minute httpOnly cookie. When discovery lists a

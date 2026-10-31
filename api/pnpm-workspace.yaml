@@ -1,0 +1,6 @@
+# pnpm settings for api/. It is one package, not a workspace of packages.
+
+# Dependency install scripts do not run. @swc/core ships a prebuilt binary. @scarf/scarf only sends install telemetry.
+allowBuilds:
+  "@scarf/scarf": false
+  "@swc/core": false

@@ -29,12 +29,12 @@ and pgAdmin at http://localhost:5050.
 
 ```
 docker compose up -d postgres
-cd api && npm ci && DATABASE_URL=postgres://huginn:huginn@localhost:35000/huginn npm run start:dev
-cd web && npm ci && npm start          # proxies /api and /socket.io to http://localhost:3000 (override with API_URL)
+cd api && pnpm install && DATABASE_URL=postgres://huginn:huginn@localhost:35000/huginn pnpm run start:dev
+cd web && pnpm install && pnpm start          # proxies /api and /socket.io to http://localhost:3000 (override with API_URL)
 ```
 
 On drives where file watching is unreliable (some external or network drives), add `--poll 1000`
-to `npm start`, and set `TSC_WATCHFILE=DynamicPriorityPolling` for the API.
+to `pnpm start`, and set `TSC_WATCHFILE=DynamicPriorityPolling` for the API.
 
 Sign-in uses an httpOnly session cookie, so the app, the API and the socket must share one origin.
 The dev server proxies `/api` and `/socket.io`. In production, serve the app and route both
@@ -52,7 +52,7 @@ them, open tabs are still notified.
 
 | Variable | Example |
 |---|---|
-| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | from `cd api && npm run push:keys`. Keep the private key secret, and keep the pair: new keys void every subscription. |
+| `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY` | from `cd api && pnpm run push:keys`. Keep the private key secret, and keep the pair: new keys void every subscription. |
 | `VAPID_SUBJECT` | `mailto:you@example.com`: push services write here about problems |
 | `PUSH_SERVICE_HOSTS` | optional: comma-separated host suffixes that replace the built-in list of browser push services |
 
@@ -71,7 +71,7 @@ Huginn also offers "Continue with Heimdall" when these are set (in `api/.env`, w
 | `HEIMDALL_CA_FILE` | development only: the ASP.NET dev certificate, from `dotnet dev-certs https --export-path .local/heimdall-dev-ca.pem --format PEM --no-password` (delete the `.key` file it also writes) |
 
 To authenticate with a key instead of the secret (`private_key_jwt`), run
-`cd api && npm run heimdall:client-key`. It writes an EC P-256 private key to
+`cd api && pnpm run heimdall:client-key`. It writes an EC P-256 private key to
 `.local/heimdall-client-key.pem` and prints the public JWK Set. Heimdall's operator registers that
 set on the `huginn` client and sets its method to `private_key_jwt`; the secret then stops
 working. The private key never leaves Huginn's server. Keep it readable only by the API's user
@@ -83,7 +83,7 @@ first visit to `https://acme.localhost:7200` shows a certificate warning; accept
 ## Test
 
 ```
-cd api && npm test          # unit tests
-cd api && npm run test:e2e  # API end-to-end tests against Postgres (see api/test/README.md)
-cd web && npm test          # component tests (Vitest)
+cd api && pnpm test          # unit tests
+cd api && pnpm run test:e2e  # API end-to-end tests against Postgres (see api/test/README.md)
+cd web && pnpm test          # component tests (Vitest)
 ```

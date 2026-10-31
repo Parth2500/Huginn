@@ -6,10 +6,10 @@ realtime protocol.
 
 | Script | Does |
 |---|---|
-| `npm run start:dev` | Watch mode (needs `DATABASE_URL` and `JWT_SECRET`) |
-| `npm run build` | Compile into `dist/` |
-| `npm test` | Unit tests (Vitest) |
-| `npm run test:e2e` | End-to-end tests against a real Postgres |
-| `npm run lint` | ESLint with Prettier |
+| `pnpm run start:dev` | Watch mode (needs `DATABASE_URL` and `JWT_SECRET`) |
+| `pnpm run build` | Compile into `dist/` |
+| `pnpm test` | Unit tests (Vitest) |
+| `pnpm run test:e2e` | End-to-end tests against a real Postgres |
+| `pnpm run lint` | ESLint with Prettier |
 
 Profile photos are stored in `uploads/` (git-ignored) and served from `/api/uploads`.

@@ -24,7 +24,7 @@ import { PushSubscription } from '../notifications/push-subscription.entity';
 /**
  * One database configuration for the app and the TypeORM CLI. Schema changes go through
  * migrations in ./migrations; `synchronize` stays off so nothing changes the schema implicitly.
- * Migrations are listed explicitly (add new ones here after `npm run migration:generate`), which
+ * Migrations are listed explicitly (add new ones here after `pnpm run migration:generate`), which
  * also lets the test runner load them without a file glob.
  */
 export const dataSourceOptions: DataSourceOptions = {

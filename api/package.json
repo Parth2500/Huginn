@@ -18,9 +18,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "vitest run --config vitest.e2e.config.mts",
-    "migration:generate": "npm run build && typeorm migration:generate -d dist/database/data-source.js",
-    "migration:run": "npm run build && typeorm migration:run -d dist/database/data-source.js",
-    "migration:revert": "npm run build && typeorm migration:revert -d dist/database/data-source.js"
+    "migration:generate": "pnpm run build && typeorm migration:generate -d dist/database/data-source.js",
+    "migration:run": "pnpm run build && typeorm migration:run -d dist/database/data-source.js",
+    "migration:revert": "pnpm run build && typeorm migration:revert -d dist/database/data-source.js"
   },
   "dependencies": {
     "@nestjs/common": "^12.2.0",
@@ -71,5 +71,6 @@
   },
   "engines": {
     "node": ">=24.11.0"
-  }
+  },
+  "packageManager": "pnpm@12.16.1"
 }

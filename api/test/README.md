@@ -10,5 +10,5 @@ Socket.IO, against a real PostgreSQL.
 
 ```
 docker compose up -d postgres
-npm run test:e2e
+pnpm run test:e2e
 ```

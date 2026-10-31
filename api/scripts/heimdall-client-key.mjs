@@ -1,6 +1,6 @@
 // Makes the key pair for Huginn's private_key_jwt client authentication at Heimdall.
 //
-//   npm run heimdall:client-key [-- <path>]   (default .local/heimdall-client-key.pem)
+//   pnpm run heimdall:client-key [-- <path>]   (default .local/heimdall-client-key.pem)
 //
 // Writes the private key (EC P-256, mode 600) and prints the public JWK Set for Heimdall's
 // operator. The private key never leaves this machine. Refuses to overwrite an existing key: to
