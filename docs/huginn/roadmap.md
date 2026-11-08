@@ -168,3 +168,22 @@ messages, invite links, scheduled quiet hours.
 Audio-only WebRTC calls: one-to-one first, then groups of up to 8 through an SFU, with
 end-to-end encryption using SFrame. TURN/STUN servers, ringing over push, and call history in
 the chat.
+
+---
+
+## Epics (future)
+
+Epics are larger efforts that span several phases. Each is one GitHub issue (label `epic`, no
+milestone) and is split into its own phases, as sub-issues, when work starts.
+
+### Native Android app ([#52](https://github.com/Parth2500/Huginn/issues/52))
+
+The same chat app as a native Android client, with system notifications. If the web design
+doesn't feel right on a phone, it gets redesigned then. Until then, the web work keeps the door
+open:
+
+- **Push:** Android gets push through FCM, not Web Push, so the push worker should support more
+  than one provider. Payloads stay end-to-end encrypted and are decrypted on the device.
+- **Sign-in:** OAuth through Heimdall with PKCE from a native client, not cookies only.
+- **API:** REST and Socket.IO stay usable from clients other than the browser.
+- **Devices and keys:** the phone is one more device in the multi-device and encryption model.
