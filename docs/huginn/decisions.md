@@ -99,7 +99,7 @@ costs, and what would change it. Open questions follow at the end.
 - video calls
 - stories or status updates
 - public broadcast channels
-- bots
+- bots (notices from linked homes are not bots and not chat messages: see D15)
 - phone-number accounts
 - advertising
 - server-side reading of messages
@@ -149,6 +149,54 @@ costs, and what would change it. Open questions follow at the end.
   Huginn only needs the identity at sign-in, so storing and refreshing Heimdall's tokens would
   add risk (refresh-token reuse revokes the family) for nothing.
 - **Replaces:** the "link by verified email, then remove the password" plan in D13.
+
+## D15. Notices from linked homes, in their own lane
+
+- **Decision (2026-11-14):** Huginn shows *notices* sent by a person's linked home (a Bifröst
+  install, from the Asgard suite). A notice has a title, a short text and optional actions, such as
+  Approve and Reject. Notices are not chat messages. They live in their own list, outside every
+  chat, and are not end-to-end encrypted.
+- **How it works:**
+  - A home is linked to its admin's Heimdall account. It calls Huginn with a Heimdall access token
+    whose audience is Huginn. Huginn finds the recipient by the token's `sub`, through the linked
+    Heimdall identity (D14).
+  - A home may send a notice only to the account it is linked to, or to a member who linked their
+    own account to that home.
+  - The home chooses the notice id. When the person picks an action, Huginn stores the choice. The
+    home reads it over a connection the home opened. **Huginn never calls a home.**
+  - An answer is a choice, never a command. Huginn does not know what Approve means.
+- **Why:** it gives the family "your download is ready" and "may this download start?" without
+  bots (D10) and without a server that writes into encrypted chats (D3). The home decides what an
+  answer means, so a fault in Huginn can only answer a question the home asked.
+- **Cost:**
+  - A second kind of content, with its own list, badge and notification settings.
+  - Notice text is readable by the server. Homes are told to keep it short and free of secrets.
+  - Huginn needs an API that accepts access tokens, beside the cookie sessions (D8). The native
+    Android app needs the same thing.
+  - Rate limits per home, and a way for a person to mute or unlink a home.
+- **Would change if:** homes get their own keys in the encryption model. Then notices could be
+  encrypted like messages.
+- **Source:** suite decisions S7, S9 and S12 in `Asgard/docs/decisions.md`.
+
+## D16. One authority, with the LAN as a later delivery path
+
+- **Decision (2026-11-14):** the Huginn server is the only authority for message order, read marks
+  and membership. There is never a second Huginn server in a home. Later, devices in one home may
+  pass messages and set up audio calls over the home network when the internet is down, with
+  Bifröst as the courier. The message is uploaded when any device is online again, and the server
+  gives it its final place.
+- **Why:** two servers that accept messages for the same chats must reconcile them. The parts
+  that make a courier safe already exist: the local store, the outbox, and `clientMessageId` (D7,
+  protocol v1).
+- **Works with no internet:** messages in existing chats between devices in the home, audio calls
+  between them, and reading stored history.
+- **Needs the internet:** first sign-in, linking a device, creating a group or changing its
+  members, reaching anyone outside the home, and notifications to a closed app.
+- **Cost:** it waits for end-to-end encryption (Phase 2), so the courier carries only ciphertext,
+  and for the native app, because a web page cannot reach an address on the home network.
+- **Would change if:** never to a second server. The delivery path may be dropped if it proves
+  too costly.
+- **Source:** suite decision S9.
 
 ## Answered (2026-10-21)
 

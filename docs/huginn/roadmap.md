@@ -176,6 +176,24 @@ the chat.
 Epics are larger efforts that span several phases. Each is one GitHub issue (label `epic`, no
 milestone) and is split into its own phases, as sub-issues, when work starts.
 
+### Notices from linked homes (decision D15)
+
+Not yet an issue. A home in the Asgard suite sends its owner short notices, some with actions.
+
+- **API:** send a notice, read the answers to your own notices, withdraw a notice. Accepts a
+  Heimdall access token with Huginn as its audience.
+- **App:** a notices list outside the chats, a badge, actions on a notice, mute and unlink a home.
+- **Push:** a notice reaches a closed app like a message does.
+- **Fits after** 1.9 (Notifications), because it reuses the notification work. It does not wait
+  for encryption.
+- **Smallest first slice:** a home sends "download finished" and the owner sees it.
+
+### Delivery over the home network (decision D16)
+
+Not yet an issue. Messages and audio calls between devices in one home with no internet, with
+Bifröst as the courier and the server still the only authority. It waits for Phase 2
+(encryption), Phase 6 (calls) for the call part, and the native Android app below.
+
 ### Native Android app ([#52](https://github.com/Parth2500/Huginn/issues/52))
 
 The same chat app as a native Android client, with system notifications. If the web design
